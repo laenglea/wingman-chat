@@ -1,6 +1,6 @@
-FROM node:lts-alpine
+FROM node:lts-alpine AS app
 
-WORKDIR /app
+WORKDIR /src
 
 COPY package.json .
 RUN npm install
@@ -8,6 +8,25 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-EXPOSE 8000
 
-CMD [ "npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "8000" ]
+FROM golang:1-alpine AS server
+
+WORKDIR /src
+
+COPY go.* .
+RUN go mod download
+
+COPY *.go ./
+RUN CGO_ENABLED=0 GOOS=linux go build -o server
+
+
+FROM alpine
+
+WORKDIR /app
+
+COPY --from=app /src/dist ./dist
+COPY --from=server /src/server .
+
+EXPOSE 8080
+
+CMD ["./server"]
