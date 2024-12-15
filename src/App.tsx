@@ -5,17 +5,17 @@ import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
 import { Chat, Message, Model, Role } from './models/chat';
 import { useChats } from './hooks/useChats';
-import { complete, models } from './lib/client';
-import { title } from './lib/config';
+import { complete } from './lib/client';
+import { Title, Models } from './lib/config';
 import { ChatModel } from './components/ChatModel';
 
 function App() {
-  const { chats, createChat, deleteChat } = useChats()
+  const { chats, createChat, deleteChat, saveChats } = useChats()
 
   const [showSidebar, setShowSidebar] = useState(false);
 
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
-  const [currentModel, setCurrentModel] = useState<Model>(models[0]);
+  const [currentModel, setCurrentModel] = useState<Model>(Models[0]);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
 
   const messageContainerRef = useRef<HTMLDivElement>(null);
@@ -82,7 +82,7 @@ function App() {
   };
 
   useEffect(() => {
-    document.title = title;
+    document.title = Title;
   }, []);
 
   useEffect(() => {
@@ -93,13 +93,16 @@ function App() {
 
   useEffect(() => {
     if (currentChat) {
+      currentChat.updated = new Date();
       currentChat.model = currentModel;
     }
   }, [currentModel])
 
   useEffect(() => {
     if (currentChat) {
+      currentChat.updated = new Date();
       currentChat.messages = currentMessages;
+      saveChats();
     }
   }, [currentMessages])
 
@@ -141,7 +144,7 @@ function App() {
             </button>
             
             <ChatModel
-              models={models}
+              models={Models}
               selectedModel={currentModel}
               onSelectModel={handleSelectModel}
             />
