@@ -19,18 +19,35 @@ const client = new OpenAI({
 })
 
 export async function complete(model: string, input: Message[], handler?: (delta: string, snapshot: string) => void): Promise<Message> {
-	const messages = input.map((m) => {
-		return {
-			role: m.role,
-			content: m.content,
-		};
-	});
-	
+	const messages = [];
+
+	for (const m of input) {
+		const content = [];
+
+		if (m.content) {
+			content.push({ type: 'text', text: m.content });
+		}
+
+		for (const a of m.attachments ?? []) {
+			content.push({
+				type: 'image_url',
+				image_url: {
+					url: a.url
+				}
+			});
+		}
+
+		messages.push({
+			role: m.role as OpenAI.Chat.ChatCompletionRole,
+			content: content,
+		});
+	}
+
 	const stream = client.beta.chat.completions.stream({
 		model: model,
 		stream: true,
 
-		messages: messages,
+		messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
 	});
 
 	stream.on('content', (delta, snapshot) => {
