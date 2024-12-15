@@ -62,7 +62,7 @@ function App() {
       content: "...",
     }]);
     
-    const completion = await complete(model.id, messages, (delta, snapshot) => {
+    const completion = await complete(model.id, messages, (snapshot) => {
       setCurrentMessages([...messages, {
         role: Role.Assistant,
         content: snapshot,
