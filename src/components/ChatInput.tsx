@@ -1,6 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef } from 'react';
 import { Attachment, Message, Role } from '../models/chat';
 import { Send, Paperclip, Image, X } from 'lucide-react';
+import { readAsDataURL } from '../lib/utils';
 
 type ChatInputProps = {
   onSend: (message: Message) => void;
@@ -34,7 +35,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
     }
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
 
     if (files) {
@@ -43,8 +44,10 @@ export function ChatInput({ onSend }: ChatInputProps) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
 
-        const url = URL.createObjectURL(file);
-        newAttachments.push({ name: file.name, url });
+        const name = file.name;
+        const url = await readAsDataURL(file);
+        
+        newAttachments.push({ name: name, url: url });
       }
 
       setAttachments((prev) => [...prev, ...newAttachments]);
