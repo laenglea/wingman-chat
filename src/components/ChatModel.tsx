@@ -1,4 +1,5 @@
 import { useState } from 'react';
+
 import { Model } from '../models/chat';
 
 type ChatModelProps = {
