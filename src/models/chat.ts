@@ -19,6 +19,11 @@ export type Chat = {
     id: string;
     title: string;
 
-    model: string;
+    model: Model | null;
     messages: Array<Message>;
 };
+
+export type Model = {
+    id: string;
+    name: string;
+}

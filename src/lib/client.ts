@@ -1,7 +1,16 @@
 import OpenAI from 'openai';
 import { Message, Role } from '../models/chat';
 
-export const model = 'gpt-4o-mini';
+export const models = [
+	{
+		id: 'gpt-4o',
+		name: 'GPT-4o',
+	},
+	{
+		id: 'gpt-4o-mini',
+		name: 'GPT-4o Mini',
+	},
+];
 
 const client = new OpenAI({
 	baseURL: new URL('/api/v1', window.location.origin).toString(),
@@ -9,7 +18,7 @@ const client = new OpenAI({
 	dangerouslyAllowBrowser: true,
 })
 
-export async function complete(input: Message[], handler?: (delta: string, snapshot: string) => void): Promise<Message> {
+export async function complete(model: string, input: Message[], handler?: (delta: string, snapshot: string) => void): Promise<Message> {
 	const messages = input.map((m) => {
 		return {
 			role: m.role,

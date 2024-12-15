@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
 import { Chat } from '../models/chat';
-import { model } from '../lib/client';
 
 export function useChats() {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -11,7 +10,7 @@ export function useChats() {
       id: crypto.randomUUID(),
       title: "Untitled",
 
-      model: model,
+      model: null,
       messages: [],
     };
 
