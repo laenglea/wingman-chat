@@ -17,7 +17,7 @@ function App() {
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [currentModel, setCurrentModel] = useState<Model>(models[0]);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
-  
+
   const messageContainerRef = useRef<HTMLDivElement>(null);
 
   const toggleSidebar = () => {
@@ -30,7 +30,7 @@ function App() {
 
   const handleDeleteChat = (id: string) => {
     deleteChat(id)
-    
+
     if (currentChat?.id === id) {
       handleCreateChat();
     }
@@ -44,10 +44,10 @@ function App() {
     setCurrentModel(model);
   }
 
-  const sendMessage = async (message: Message) => {    
+  const sendMessage = async (message: Message) => {
     var chat = currentChat;
     var model = currentModel;
-    
+
     if (!chat) {
       chat = createChat();
       chat.model = model;
@@ -61,7 +61,7 @@ function App() {
       role: Role.Assistant,
       content: "...",
     }]);
-    
+
     const completion = await complete(model.id, messages, (snapshot) => {
       setCurrentMessages([...messages, {
         role: Role.Assistant,
@@ -91,7 +91,7 @@ function App() {
   useEffect(() => {
     if (currentChat) {
       currentChat.messages = currentMessages;
-    }    
+    }
   }, [currentMessages])
 
   useEffect(() => {
@@ -99,7 +99,7 @@ function App() {
     setCurrentMessages(currentChat?.messages ?? []);
   }, [currentChat])
 
-  useEffect(() => {    
+  useEffect(() => {
     messageContainerRef.current?.scrollTo({
       top: messageContainerRef.current.scrollHeight,
       behavior: 'smooth'
@@ -112,7 +112,7 @@ function App() {
         <Sidebar
           isVisible={showSidebar}
           chats={chats}
-          selectedChat={currentChat}          
+          selectedChat={currentChat}
           onSelectChat={handleSelectChat}
           onDeleteChat={(chat) => handleDeleteChat(chat.id)}
         />
@@ -120,25 +120,29 @@ function App() {
 
       <div className="flex-1 flex flex-col">
         <div className="p-2 flex items-center justify-between bg-[#121212] flex-shrink-0">
-          <button
-            className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
-            onClick={toggleSidebar}
-          >
-            <Menu size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
+              onClick={toggleSidebar}
+            >
+              <Menu size={20} />
+            </button>
 
-          <ChatModel
-            models={models}
-            selectedModel={currentModel}
-            onSelectModel={(model) => handleSelectModel(model)}
-          />
+            <ChatModel
+              models={models}
+              selectedModel={currentModel}
+              onSelectModel={(model) => handleSelectModel(model)}
+            />
+          </div>
 
-          <button
-            className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
-            onClick={handleCreateChat}
-          >
-            <Plus size={20} />
-          </button>
+          <div>
+            <button
+              className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
+              onClick={handleCreateChat}
+            >
+              <Plus size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto bg-[#121212] p-4" ref={messageContainerRef}>
