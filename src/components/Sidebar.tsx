@@ -1,6 +1,6 @@
 import { Trash } from 'lucide-react';
 import { Chat } from '../models/chat';
-import { title } from '../lib/config';
+import { Title } from '../lib/config';
 
 type SidebarProps = {
   isVisible: boolean;
@@ -18,7 +18,7 @@ export function Sidebar({ isVisible, chats, selectedChat, onSelectChat, onDelete
       className={`fixed top-0 left-0 h-full w-64 bg-[#1c1c1e] text-[#e5e5e5] transition-transform duration-300 ${isVisible ? 'translate-x-0' : '-translate-x-full'}`}
     >
       <div className="flex flex-col h-full gap-4 p-4">
-        <h2 className="text-xl font-semibold">{title}</h2>
+        <h2 className="text-xl font-semibold">{Title}</h2>
         <ul className="flex flex-col gap-2 flex-1 overflow-auto">
           {chats.map((chat) => (
             <li
