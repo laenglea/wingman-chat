@@ -51,6 +51,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
             }
           }}
         />
+
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="flex space-x-4 pt-2 h-60">
+            {message.attachments?.map((attachment, index) => (
+              <img key={index} src={attachment.url} />
+            ))}
+          </div>
+        )}
       </div>
 
       {isUser && (
