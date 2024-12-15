@@ -110,8 +110,9 @@ function App() {
     <div className="h-screen w-screen overflow-hidden flex bg-[#121212]">
       <div className={`${showSidebar ? 'w-64' : 'w-0'} bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 overflow-hidden`}>
         <Sidebar
+          isVisible={showSidebar}
           chats={chats}
-          selected={currentChat}
+          selectedChat={currentChat}          
           onSelectChat={handleSelectChat}
           onDeleteChat={(chat) => handleDeleteChat(chat.id)}
         />
