@@ -4,7 +4,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 import { Message, Role } from '../models/chat';
 
-import { Bot } from 'lucide-react';
+import { Bot, User } from 'lucide-react';
 
 type ChatMessageProps = {
   message: Message
@@ -18,7 +18,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
     : 'bg-[#2c2c2e] text-[#e5e5e5]';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} px-4 mb-4`}>
       {!isUser && (
         <div className="mr-2 pt-3">
           <Bot className="text-[#e5e5e5] w-6 h-6" />
@@ -52,6 +52,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
           }}
         />
       </div>
+
+      {isUser && (
+        <div className="ml-2 pt-3">
+          <User className="text-[#e5e5e5] w-6 h-6" />
+        </div>
+      )}
     </div>
   );
 }
