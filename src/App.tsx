@@ -117,7 +117,8 @@ function App() {
 
   return (
     <div className="h-screen w-screen overflow-hidden flex bg-[#121212]">
-      <div className={`${showSidebar ? 'w-64' : 'w-0'} bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 overflow-hidden`}>
+      {/* Sidebar */}
+      <aside className={`${showSidebar ? 'w-64' : 'w-0'} bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 overflow-hidden`}>
         <Sidebar
           isVisible={showSidebar}
           chats={chats}
@@ -125,10 +126,12 @@ function App() {
           onSelectChat={handleSelectChat}
           onDeleteChat={(chat) => handleDeleteChat(chat.id)}
         />
-      </div>
+      </aside>
 
-      <div className="flex-1 flex flex-col">
-        <div className="p-2 flex items-center justify-between bg-[#121212] flex-shrink-0">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col">
+        {/* Header */}
+        <header className="p-2 flex items-center justify-between bg-[#121212] flex-shrink-0">
           <div className="flex items-center gap-2">
             <button
               className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
@@ -136,32 +139,31 @@ function App() {
             >
               <Menu size={20} />
             </button>
-
+            
             <ChatModel
               models={models}
               selectedModel={currentModel}
-              onSelectModel={(model) => handleSelectModel(model)}
+              onSelectModel={handleSelectModel}
             />
           </div>
+          <button
+            onClick={handleCreateChat}
+            className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
+          >
+            <Plus size={20} />
+          </button>
+        </header>
 
-          <div>
-            <button
-              className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
-              onClick={handleCreateChat}
-            >
-              <Plus size={20} />
-            </button>
-          </div>
-        </div>
-
+        {/* Chat Window */}
         <div className="flex-1 overflow-auto bg-[#121212] p-4" ref={messageContainerRef}>
           <ChatWindow messages={currentMessages} />
         </div>
 
-        <div className="bg-[#121212] border-t border-[#3a3a3c] p-4">
+        {/* Input Area */}
+        <footer className="bg-[#121212] border-t border-[#3a3a3c] p-4">
           <ChatInput onSend={sendMessage} />
-        </div>
-      </div>
+        </footer>
+      </main>
     </div>
   );
 }
