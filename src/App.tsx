@@ -119,7 +119,7 @@ function App() {
   }, [currentChat, currentMessages]);
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex bg-[#121212]">
+    <div className="h-dvh w-dvw overflow-hidden flex bg-[#121212]">
       {/* Sidebar */}
       <aside className={`${showSidebar ? 'w-64' : 'w-0'} bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 overflow-hidden`}>
         <Sidebar
