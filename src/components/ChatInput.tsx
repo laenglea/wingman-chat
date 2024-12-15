@@ -1,6 +1,8 @@
 import { ChangeEvent, useState, FormEvent, useRef } from 'react';
-import { Attachment, Message, Role } from '../models/chat';
+
 import { Send, Paperclip, Image, X } from 'lucide-react';
+
+import { Attachment, Message, Role } from '../models/chat';
 import { readAsDataURL } from '../lib/utils';
 
 type ChatInputProps = {
@@ -59,6 +61,13 @@ export function ChatInput({ onSend }: ChatInputProps) {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {    
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as unknown as FormEvent);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="bg-[#121212]">
       <div className="flex py-4 px-4 items-center gap-2">
@@ -71,12 +80,12 @@ export function ChatInput({ onSend }: ChatInputProps) {
           onChange={handleFileChange}
         />
 
-        <input
-          className="flex-1 border border-[#3a3a3c] bg-[#2c2c2e] text-[#e5e5e5] rounded px-3 py-2 focus:outline-none"
-          type="text"
+        <textarea
+          className="flex-1 border border-[#3a3a3c] bg-[#2c2c2e] text-[#e5e5e5] rounded px-3 py-2 focus:outline-none h-10.5 min-h-10.5"
           placeholder="Ask..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          onKeyDown={handleKeyDown}
         />
 
         <button

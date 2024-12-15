@@ -2,9 +2,9 @@ import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
-import { Message, Role } from '../models/chat';
-
 import { Bot, User } from 'lucide-react';
+
+import { Message, Role } from '../models/chat';
 
 type ChatMessageProps = {
   message: Message
