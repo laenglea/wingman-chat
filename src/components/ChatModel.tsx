@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState } from "react";
 
-import { Model } from '../models/chat';
+import { Model } from "../models/chat";
 
 type ChatModelProps = {
   models: Model[];
@@ -9,7 +9,11 @@ type ChatModelProps = {
   onSelectModel: (model: Model) => void;
 };
 
-export function ChatModel({ models, selectedModel, onSelectModel }: ChatModelProps) {
+export function ChatModel({
+  models,
+  selectedModel,
+  onSelectModel,
+}: ChatModelProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const toggleDropdown = () => setIsOpen(!isOpen);
@@ -27,7 +31,7 @@ export function ChatModel({ models, selectedModel, onSelectModel }: ChatModelPro
       >
         {selectedModel.name ?? selectedModel.id}
       </button>
-      
+
       {isOpen && (
         <div className="absolute left-0 mt-2 w-40 bg-[#1c1c1e] border border-[#3a3a3c] rounded shadow-lg z-10">
           <ul className="py-1">

@@ -1,16 +1,16 @@
-import { ChangeEvent, useState, FormEvent, useRef } from 'react';
+import { ChangeEvent, useState, FormEvent, useRef } from "react";
 
-import { Send, Paperclip, Image, X } from 'lucide-react';
+import { Send, Paperclip, Image, X } from "lucide-react";
 
-import { Attachment, Message, Role } from '../models/chat';
-import { readAsDataURL } from '../lib/utils';
+import { Attachment, Message, Role } from "../models/chat";
+import { readAsDataURL } from "../lib/utils";
 
 type ChatInputProps = {
   onSend: (message: Message) => void;
 };
 
 export function ChatInput({ onSend }: ChatInputProps) {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -22,11 +22,11 @@ export function ChatInput({ onSend }: ChatInputProps) {
       const message: Message = {
         role: Role.User,
         content: content,
-        attachments: attachments
-      }
+        attachments: attachments,
+      };
 
       onSend(message);
-      setContent('');
+      setContent("");
       setAttachments([]);
     }
   };
@@ -48,12 +48,12 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         const name = file.name;
         const url = await readAsDataURL(file);
-        
+
         newAttachments.push({ name: name, url: url });
       }
 
       setAttachments((prev) => [...prev, ...newAttachments]);
-      e.target.value = '';
+      e.target.value = "";
     }
   };
 
@@ -61,8 +61,8 @@ export function ChatInput({ onSend }: ChatInputProps) {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {    
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e as unknown as FormEvent);
     }
@@ -107,9 +107,14 @@ export function ChatInput({ onSend }: ChatInputProps) {
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 pl-4 pr-26">
           {attachments.map((val, i) => (
-            <div key={i} className="flex items-center gap-1 bg-[#2c2c2e] p-2 rounded">
+            <div
+              key={i}
+              className="flex items-center gap-1 bg-[#2c2c2e] p-2 rounded"
+            >
               <Image className="text-[#e5e5e5]" size={16} />
-              <span className="text-[#e5e5e5] text-sm break-all">{val.name}</span>
+              <span className="text-[#e5e5e5] text-sm break-all">
+                {val.name}
+              </span>
               <button
                 type="button"
                 className="text-[#e5e5e5] hover:text-gray-300"
