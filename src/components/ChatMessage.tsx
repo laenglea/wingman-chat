@@ -22,7 +22,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
       )}
 
-      <div className={`max-w-sm rounded-lg p-3 ${bubbleClasses}`}>
+      <div className={`max-w-[60%] rounded-lg p-3 ${bubbleClasses} break-words`}>
         <ReactMarkdown>{message.content}</ReactMarkdown>
       </div>
     </div>
