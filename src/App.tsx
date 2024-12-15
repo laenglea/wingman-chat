@@ -62,14 +62,23 @@ function App() {
       content: "...",
     }]);
 
-    const completion = await complete(model.id, messages, (_, snapshot) => {
+    try {
+      const completion = await complete(model.id, messages, (_, snapshot) => {
+        setCurrentMessages([...messages, {
+          role: Role.Assistant,
+          content: snapshot,
+        }]);
+      });
+  
+      setCurrentMessages([...messages, completion]);
+    } catch(error) {
+      var content = "An error occurred while processing the request.\n" + error?.toString()
+
       setCurrentMessages([...messages, {
         role: Role.Assistant,
-        content: snapshot,
+        content: content,
       }]);
-    });
-
-    setCurrentMessages([...messages, completion]);
+    }    
   };
 
   useEffect(() => {

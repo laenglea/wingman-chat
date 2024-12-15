@@ -4,13 +4,33 @@ import { Message, Role } from '../models/chat';
 
 export const models = [
 	{
-		id: 'gpt-4o',
-		name: 'GPT-4o',
+		"id": "poppy",
+		"name": "Anthropic Claude"
 	},
 	{
-		id: 'gpt-4o-mini',
-		name: 'GPT-4o Mini',
+		"id": "herby",
+		"name": "OpenAI GPT-4o"
 	},
+	{
+		"id": "gabi",
+		"name": "Google Gemini"
+	},
+	{
+		"id": "anton",
+		"name": "Amazon Nova"
+	},
+	{
+		"id": "brauni",
+		"name": "Meta Llama"
+	},
+	{
+		"id": "ernie",
+		"name": "xAI Grok"
+	},
+	{
+		"id": "schlaubi",
+		"name": "OpenAI o1"
+	}
 ];
 
 const client = new OpenAI({
