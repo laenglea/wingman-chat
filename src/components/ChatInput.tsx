@@ -1,7 +1,6 @@
 import { ChangeEvent, useState, FormEvent, useRef } from 'react';
 import { Attachment, Message, Role } from '../models/chat';
-
-import { Send, Paperclip } from 'lucide-react';
+import { Send, Paperclip, Image, X } from 'lucide-react';
 
 type ChatInputProps = {
   onSend: (message: Message) => void;
@@ -44,41 +43,26 @@ export function ChatInput({ onSend }: ChatInputProps) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
 
-        if (file.type === "application/pdf") {
-          const url = URL.createObjectURL(file);
-          newAttachments.push({ name: file.name, url });
-        }
+        const url = URL.createObjectURL(file);
+        newAttachments.push({ name: file.name, url });
       }
 
       setAttachments((prev) => [...prev, ...newAttachments]);
+      e.target.value = '';
     }
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
     <form onSubmit={handleSubmit} className="bg-[#121212]">
-      {attachments.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2 p-4">
-          {attachments.map((val, i) => (
-            <div key={i} className="flex items-center gap-1 bg-[#2c2c2e] p-2 rounded">
-              <span className="text-[#e5e5e5] text-sm break-all">{val.name}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex p-4 items-center gap-2">
-        <button
-          type="button"
-          className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-transparent"
-          onClick={handleAttachmentClick}
-        >
-          <Paperclip size={20} />
-        </button>
-
+      <div className="flex py-4 px-4 items-center gap-2">
         <input
           type="file"
           multiple
-          accept="application/pdf"
+          accept="image/*"
           ref={fileInputRef}
           className="hidden"
           onChange={handleFileChange}
@@ -93,12 +77,38 @@ export function ChatInput({ onSend }: ChatInputProps) {
         />
 
         <button
+          type="button"
+          className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-transparent"
+          onClick={handleAttachmentClick}
+        >
+          <Paperclip size={20} />
+        </button>
+
+        <button
           className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-transparent"
           type="submit"
         >
           <Send size={20} />
         </button>
       </div>
+
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 pl-4 pr-26">
+          {attachments.map((val, i) => (
+            <div key={i} className="flex items-center gap-1 bg-[#2c2c2e] p-2 rounded">
+              <Image className="text-[#e5e5e5]" size={16} />
+              <span className="text-[#e5e5e5] text-sm break-all">{val.name}</span>
+              <button
+                type="button"
+                className="text-[#e5e5e5] hover:text-gray-300"
+                onClick={() => handleRemoveAttachment(i)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </form>
   );
 }
