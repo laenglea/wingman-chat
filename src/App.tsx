@@ -20,15 +20,15 @@ function App() {
   
   const messageContainerRef = useRef<HTMLDivElement>(null);
 
-  function toggleSidebar() {
+  const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
   }
 
-  function handleCreateChat(): void {
+  const handleCreateChat = () => {
     setCurrentChat(null);
   }
 
-  function handleDeleteChat(id: string): void {
+  const handleDeleteChat = (id: string) => {
     deleteChat(id)
     
     if (currentChat?.id === id) {
@@ -36,11 +36,11 @@ function App() {
     }
   }
 
-  function handleSelectChat(chat: Chat) {
+  const handleSelectChat = (chat: Chat) => {
     setCurrentChat(chat);
   }
 
-  function handleSelectModel(model: Model) {
+  const handleSelectModel = (model: Model) => {
     setCurrentModel(model);
   }
 
