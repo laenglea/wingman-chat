@@ -1,6 +1,8 @@
 import ReactMarkdown from 'react-markdown';
 import { Message, Role } from '../models/chat';
 
+import { Bot } from 'lucide-react';
+
 type ChatMessageProps = {
   message: Message
 };
@@ -14,6 +16,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+      {!isUser && (
+        <div className="mr-2 pt-3">
+          <Bot className="text-[#e5e5e5] w-6 h-6" />
+        </div>
+      )}
+
       <div className={`max-w-sm rounded-lg p-3 ${bubbleClasses}`}>
         <ReactMarkdown>{message.content}</ReactMarkdown>
       </div>

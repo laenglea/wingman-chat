@@ -3,10 +3,11 @@ import { Menu, Plus } from 'lucide-react';
 import { Sidebar } from './components/Sidebar';
 import { ChatWindow } from './components/ChatWindow';
 import { ChatInput } from './components/ChatInput';
-import { Chat, Message, Role } from './models/chat';
+import { Chat, Message, Model, Role } from './models/chat';
 import { useChats } from './hooks/useChats';
-import { complete } from './lib/client';
+import { complete, models } from './lib/client';
 import { title } from './lib/config';
+import { ChatModel } from './components/ChatModel';
 
 function App() {
   const { chats, createChat, deleteChat } = useChats()
@@ -14,6 +15,7 @@ function App() {
   const [showSidebar, setShowSidebar] = useState(false);
 
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
+  const [currentModel, setCurrentModel] = useState<Model>(models[0]);
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
   
   const messageContainerRef = useRef<HTMLDivElement>(null);
@@ -38,11 +40,18 @@ function App() {
     setCurrentChat(chat);
   }
 
-  const sendMessage = async (message: Message) => {
-    var chat = currentChat;    
+  function handleSelectModel(model: Model) {
+    setCurrentModel(model);
+  }
 
+  const sendMessage = async (message: Message) => {    
+    var chat = currentChat;
+    var model = currentModel;
+    
     if (!chat) {
       chat = createChat();
+      chat.model = model;
+
       setCurrentChat(chat);
     }
 
@@ -53,7 +62,7 @@ function App() {
       content: "...",
     }]);
     
-    const completion = await complete(messages, (delta, snapshot) => {
+    const completion = await complete(model.id, messages, (delta, snapshot) => {
       setCurrentMessages([...messages, {
         role: Role.Assistant,
         content: snapshot,
@@ -75,11 +84,18 @@ function App() {
 
   useEffect(() => {
     if (currentChat) {
+      currentChat.model = currentModel;
+    }
+  }, [currentModel])
+
+  useEffect(() => {
+    if (currentChat) {
       currentChat.messages = currentMessages;
     }    
   }, [currentMessages])
 
   useEffect(() => {
+    setCurrentModel(currentChat?.model ?? currentModel);
     setCurrentMessages(currentChat?.messages ?? []);
   }, [currentChat])
 
@@ -96,7 +112,7 @@ function App() {
         <Sidebar
           chats={chats}
           selected={currentChat}
-          onSelectChat={(chat) => handleSelectChat(chat)}
+          onSelectChat={handleSelectChat}
           onDeleteChat={(chat) => handleDeleteChat(chat.id)}
         />
       </div>
@@ -109,6 +125,12 @@ function App() {
           >
             <Menu size={20} />
           </button>
+
+          <ChatModel
+            models={models}
+            selectedModel={currentModel}
+            onSelectModel={(model) => handleSelectModel(model)}
+          />
 
           <button
             className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
