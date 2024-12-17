@@ -1,14 +1,19 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 func main() {
+	title := os.Getenv("TITLE")
+
 	target, _ := url.Parse(os.Getenv("OPENAI_BASE_URL"))
 	token := os.Getenv("OPENAI_API_KEY")
 
@@ -20,10 +25,60 @@ func main() {
 	target.Path = strings.TrimRight(target.Path, "/v1")
 
 	mux := http.NewServeMux()
-
 	dist := os.DirFS("dist")
 
 	mux.Handle("/", http.FileServerFS(dist))
+
+	mux.HandleFunc("GET /config.json", func(w http.ResponseWriter, r *http.Request) {
+		type modelType struct {
+			ID   string `json:"id,omitempty" yaml:"id,omitempty"`
+			Name string `json:"name,omitempty" yaml:"name,omitempty"`
+		}
+
+		type configType struct {
+			Title string `json:"title,omitempty" yaml:"title,omitempty"`
+
+			Models []modelType `json:"models,omitempty" yaml:"models,omitempty"`
+		}
+
+		config := configType{}
+
+		if title != "" {
+			config.Title = title
+		}
+
+		if data, err := os.ReadFile("models.yaml"); err == nil {
+			yaml.Unmarshal(data, &config.Models)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(config)
+	})
+
+	mux.HandleFunc("GET /manifest.json", func(w http.ResponseWriter, r *http.Request) {
+		manifest := map[string]any{
+			"name":             "Chat",
+			"short_name":       "Chat",
+			"start_url":        "/",
+			"display":          "standalone",
+			"background_color": "rgb(14, 17, 23)",
+			"icons": []map[string]any{
+				{
+					"src":   "/logo.png",
+					"sizes": "512x512",
+					"type":  "image/png",
+				},
+			},
+		}
+
+		if title != "" {
+			manifest["name"] = title
+			manifest["short_name"] = title
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(manifest)
+	})
 
 	mux.Handle("/api/", http.StripPrefix("/api", &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
