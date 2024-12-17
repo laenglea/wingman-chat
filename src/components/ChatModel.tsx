@@ -1,11 +1,9 @@
 import { useState } from "react";
-
 import { Model } from "../models/chat";
 
 type ChatModelProps = {
   models: Model[];
   selectedModel: Model | null;
-
   onSelectModel: (model: Model) => void;
 };
 
@@ -33,7 +31,7 @@ export function ChatModel({
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 mt-2 w-40 bg-[#1c1c1e] border border-[#3a3a3c] rounded shadow-lg z-10">
+        <div className="absolute left-0 mt-2 max-h-[50vh] bg-[#1c1c1e] border border-[#3a3a3c] rounded shadow-lg z-10 overflow-y-auto whitespace-nowrap">
           <ul className="py-1">
             {models.map((model) => (
               <li
