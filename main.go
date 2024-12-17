@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -14,8 +15,12 @@ import (
 func main() {
 	title := os.Getenv("TITLE")
 
-	target, _ := url.Parse(os.Getenv("OPENAI_BASE_URL"))
+	models := strings.FieldsFunc(os.Getenv("MODELS"), func(r rune) bool {
+		return r == ',' || r == ';' || unicode.IsSpace(r)
+	})
+
 	token := os.Getenv("OPENAI_API_KEY")
+	target, _ := url.Parse(os.Getenv("OPENAI_BASE_URL"))
 
 	if target.Host == "" {
 		target, _ = url.Parse("https://api.openai.com/v1")
@@ -39,6 +44,8 @@ func main() {
 			Title string `json:"title,omitempty" yaml:"title,omitempty"`
 
 			Models []modelType `json:"models,omitempty" yaml:"models,omitempty"`
+
+			ModelsFilter []string `json:"modelsFilter,omitempty" yaml:"modelsFilter,omitempty"`
 		}
 
 		config := configType{}
@@ -49,6 +56,10 @@ func main() {
 
 		if data, err := os.ReadFile("models.yaml"); err == nil {
 			yaml.Unmarshal(data, &config.Models)
+		}
+
+		if len(models) > 0 {
+			config.ModelsFilter = models
 		}
 
 		w.Header().Set("Content-Type", "application/json")
