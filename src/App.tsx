@@ -5,17 +5,18 @@ import { ChatWindow } from "./components/ChatWindow";
 import { ChatInput } from "./components/ChatInput";
 import { Chat, Message, Model, Role } from "./models/chat";
 import { useChats } from "./hooks/useChats";
+import { useModels } from "./hooks/useModels";
 import { complete } from "./lib/client";
-import { Title, Models } from "./lib/config";
 import { ChatModel } from "./components/ChatModel";
 
 function App() {
   const { chats, createChat, deleteChat, saveChats } = useChats();
+  const { models } = useModels();
 
   const [showSidebar, setShowSidebar] = useState(false);
 
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
-  const [currentModel, setCurrentModel] = useState<Model>(Models[0]);
+  const [currentModel, setCurrentModel] = useState<Model>();
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
 
   const messageContainerRef = useRef<HTMLDivElement>(null);
@@ -47,6 +48,10 @@ function App() {
   const sendMessage = async (message: Message) => {
     var chat = currentChat;
     var model = currentModel;
+
+    if (!model) {
+      throw new Error("no model selected");
+    }
 
     if (!chat) {
       chat = createChat();
@@ -92,8 +97,14 @@ function App() {
   };
 
   useEffect(() => {
-    document.title = Title;
-  }, []);
+    if (currentModel) {
+      return;
+    }
+
+    if (models.length > 0) {
+      setCurrentModel(models[0]);
+    }
+  }, [models]);
 
   useEffect(() => {
     if (chats.length == 0) {
@@ -104,7 +115,7 @@ function App() {
   useEffect(() => {
     if (currentChat) {
       currentChat.updated = new Date();
-      currentChat.model = currentModel;
+      currentChat.model = currentModel ?? null;
     }
   }, [currentModel]);
 
@@ -158,8 +169,8 @@ function App() {
             </button>
 
             <ChatModel
-              models={Models}
-              selectedModel={currentModel}
+              models={models}
+              selectedModel={currentModel ?? null}
               onSelectModel={handleSelectModel}
             />
           </div>

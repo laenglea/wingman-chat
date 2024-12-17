@@ -1,57 +1,72 @@
-import OpenAI from 'openai';
+import OpenAI from "openai";
 
-import { Message, Role } from '../models/chat';
+import { Message, Model, Role } from "../models/chat";
 
 const client = new OpenAI({
-	baseURL: new URL('/api/v1', window.location.origin).toString(),
-	apiKey: 'sk-',
-	dangerouslyAllowBrowser: true,
-})
+  baseURL: new URL("/api/v1", window.location.origin).toString(),
+  apiKey: "sk-",
+  dangerouslyAllowBrowser: true,
+});
 
-export async function complete(model: string, input: Message[], handler?: (delta: string, snapshot: string) => void): Promise<Message> {
-	const messages = [];
+export async function listModels(): Promise<Model[]> {
+  const models = await client.models.list();
 
-	for (const m of input) {
-		const content = [];
+  return models.data.map((model) => {
+    return {
+      id: model.id,
+      name: model.id,
+    };
+  });
+}
 
-		if (m.content) {
-			content.push({ type: 'text', text: m.content });
-		}
+export async function complete(
+  model: string,
+  input: Message[],
+  handler?: (delta: string, snapshot: string) => void
+): Promise<Message> {
+  const messages = [];
 
-		for (const a of m.attachments ?? []) {
-			content.push({
-				type: 'image_url',
-				image_url: {
-					url: a.url
-				}
-			});
-		}
+  for (const m of input) {
+    const content = [];
 
-		messages.push({
-			role: m.role as OpenAI.Chat.ChatCompletionRole,
-			content: content,
-		});
-	}
+    if (m.content) {
+      content.push({ type: "text", text: m.content });
+    }
 
-	const stream = client.beta.chat.completions.stream({
-		model: model,
-		stream: true,
+    for (const a of m.attachments ?? []) {
+      content.push({
+        type: "image_url",
+        image_url: {
+          url: a.url,
+        },
+      });
+    }
 
-		messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-	});
+    messages.push({
+      role: m.role as OpenAI.Chat.ChatCompletionRole,
+      content: content,
+    });
+  }
 
-	stream.on('content', (delta, snapshot) => {
-		if (handler) {
-			handler(delta, snapshot);
-		}
-	});
+  const stream = client.beta.chat.completions.stream({
+    model: model,
+    stream: true,
 
-	const completion = await stream.finalChatCompletion();
+    messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+  });
 
-	const result = {
-		role: Role.Assistant,
-		content: completion.choices[0].message.content ?? '',
-	}
+  stream.on("content", (delta, snapshot) => {
+    if (handler) {
+      handler(delta, snapshot);
+    }
+  });
 
-	return result;
+  const completion = await stream.finalChatCompletion();
+
+  const result = {
+    role: Role.Assistant,
+    content: completion.choices[0].message.content ?? "",
+  };
+
+  return result;
 }

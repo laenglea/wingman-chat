@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
+
 import { Model } from "../models/chat";
 
 type ChatModelProps = {
   models: Model[];
-  selectedModel: Model;
+  selectedModel: Model | null;
+
   onSelectModel: (model: Model) => void;
 };
 
@@ -13,56 +15,36 @@ export function ChatModel({
   onSelectModel,
 }: ChatModelProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    };
+  const toggleDropdown = () => setIsOpen(!isOpen);
 
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
+  const handleModelSelect = (model: Model) => {
+    onSelectModel(model);
+    setIsOpen(false);
+  };
 
   return (
-    <div ref={containerRef} className="relative">
+    <div className="relative inline-block text-left">
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="p-2 text-[#e5e5e5] text-left hover:text-gray-300 bg-[#1c1c1e] rounded min-w-40"
+        onClick={toggleDropdown}
+        className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
       >
-        {selectedModel.name ?? selectedModel.id}
+        {selectedModel?.name ?? selectedModel?.id ?? "Select Model"}
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 w-full bg-[#1c1c1e] border border-[#3a3a3c] rounded-md shadow-lg">
-          {models.map((model) => (
-            <button
-              key={model.id}
-              onClick={() => {
-                onSelectModel(model);
-                setIsOpen(false);
-              }}
-              className="w-full px-4 py-2 text-left text-[#e5e5e5] hover:bg-[#2c2c2e] first:rounded-t-md last:rounded-b-md"
-            >
-              {model.name ?? model.id}
-            </button>
-          ))}
+        <div className="absolute left-0 mt-2 w-40 bg-[#1c1c1e] border border-[#3a3a3c] rounded shadow-lg z-10">
+          <ul className="py-1">
+            {models.map((model) => (
+              <li
+                key={model.id}
+                onClick={() => handleModelSelect(model)}
+                className="px-4 py-2 text-[#e5e5e5] hover:bg-[#2c2c2e] cursor-pointer"
+              >
+                {model.name ?? model.id}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

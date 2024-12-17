@@ -1,14 +1,2 @@
 {
-    "name": "Dihei AI",
-    "short_name": "Dihei AI",
-    "start_url": "/",
-    "display": "standalone",
-    "background_color": "rgb(18, 18, 18)",
-    "icons": [
-        {
-            "src": "logo.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        }
-    ]
 }
