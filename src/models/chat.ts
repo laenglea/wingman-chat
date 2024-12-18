@@ -16,8 +16,9 @@ export enum Role {
 }
 
 export enum AttachmentType {
-    Image = "image_data",
     Text = "text",
+    File = "file_data",
+    Image = "image_data",
   }
 
 export type Attachment = {
