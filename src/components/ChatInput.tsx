@@ -3,8 +3,14 @@ import { ChangeEvent, useState, FormEvent, useRef } from "react";
 import { Send, Paperclip, Image, X } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../models/chat";
-import { readAsDataURL } from "../lib/utils";
-import { partition, partitionTypes } from "../lib/client";
+import { readAsDataURL, readAsText } from "../lib/utils";
+import {
+  partition,
+  supportedTypes,
+  textTypes,
+  partitionTypes,
+  imageTypes,
+} from "../lib/client";
 
 type ChatInputProps = {
   onSend: (message: Message) => void;
@@ -49,7 +55,16 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         console.log(file);
 
-        if (file.type.startsWith("image/")) {
+        if (textTypes.includes(file.type)) {
+          const text = await readAsText(file);
+          newAttachments.push({
+            type: AttachmentType.Text,
+            name: file.name,
+            data: text,
+          });
+        }
+
+        if (imageTypes.includes(file.type)) {
           const url = await readAsDataURL(file);
           newAttachments.push({
             type: AttachmentType.Image,
@@ -60,9 +75,8 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         if (partitionTypes.includes(file.type)) {
           const parts = await partition(file);
-
           const text = parts.map((part) => part.text).join("\n\n");
-          
+
           newAttachments.push({
             type: AttachmentType.Text,
             name: file.name,
@@ -93,7 +107,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
         <input
           type="file"
           multiple
-          accept={`image/*,${partitionTypes.join(",")}`}
+          accept={supportedTypes.join(",")}
           ref={fileInputRef}
           className="hidden"
           onChange={handleFileChange}
