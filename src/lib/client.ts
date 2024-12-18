@@ -19,10 +19,30 @@ export async function listModels(): Promise<Model[]> {
   });
 };
 
+export const textTypes = [
+  "text/csv",
+  "text/markdown",
+  "text/plain",
+];
+
+export const imageTypes = [
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]
+
 export const partitionTypes = [
   "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
+export const supportedTypes = [
+  ...textTypes,
+  ...imageTypes,
+  ...partitionTypes,
 ];
 
 export async function partition(blob: Blob): Promise<Partition[]> {
@@ -55,19 +75,28 @@ export async function complete(
     }
 
     for (const a of m.attachments ?? []) {
+      if (a.type == AttachmentType.Text) {
+        content.push({
+          type: "text",
+          text: a.name + ":\n```"+ a.data + "\n```",
+        });
+      }
+
+      if (a.type == AttachmentType.File) {
+        content.push({
+          type: "file_url",
+          file_url: {
+            url: a.data,
+          },
+        });
+      }
+
       if (a.type == AttachmentType.Image) {
         content.push({
           type: "image_url",
           image_url: {
             url: a.data,
           },
-        });
-      }
-
-      if (a.type == AttachmentType.Text) {
-        content.push({
-          type: "text",
-          text: a.data,
         });
       }
     }

@@ -2,7 +2,7 @@ import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
-import { Bot, User } from "lucide-react";
+import { Bot, User, File } from "lucide-react";
 
 import { AttachmentType, Message, Role } from "../models/chat";
 
@@ -57,15 +57,32 @@ export function ChatMessage({ message }: ChatMessageProps) {
         />
 
         {message.attachments && message.attachments.length > 0 && (
-          <div className="flex space-x-4 pt-2 h-60">
-            {message.attachments?.map((attachment, index) => {
-              console.log(attachment);
-              if (attachment.type === AttachmentType.Image) {
-                return <img key={index} src={attachment.data} />;
-              }
-
-              return <span key={index}>{attachment.name}</span>;
-            })}
+          <div className="flex flex-col gap-2 pt-2">
+            {/* Render files first in a compact grid */}
+            <div className="grid grid-cols-2 gap-2">
+              {message.attachments
+                .filter(attachment => attachment.type !== AttachmentType.Image)
+                .map((attachment, index) => (
+                  <div key={index} className="flex items-center gap-2 text-sm">
+                    <File className="w-4 h-4 shrink-0" />
+                    <span className="truncate">{attachment.name}</span>
+                  </div>
+                ))}
+            </div>
+            
+            {/* Render images below */}
+            <div className="flex flex-wrap gap-4">
+              {message.attachments
+                .filter(attachment => attachment.type === AttachmentType.Image)
+                .map((attachment, index) => (
+                  <img
+                    key={index}
+                    src={attachment.data}
+                    className="max-h-60 rounded-md"
+                    alt={attachment.name}
+                  />
+                ))}
+            </div>
           </div>
         )}
       </div>
