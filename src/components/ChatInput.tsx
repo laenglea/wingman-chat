@@ -3,7 +3,7 @@ import { ChangeEvent, useState, FormEvent, useRef } from "react";
 import { Send, Paperclip, Image, X } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../models/chat";
-import { readAsDataURL, readAsText } from "../lib/utils";
+import { readAsDataURL, readAsText, resizeImageBlob } from "../lib/utils";
 import {
   partition,
   supportedTypes,
@@ -65,7 +65,8 @@ export function ChatInput({ onSend }: ChatInputProps) {
         }
 
         if (imageTypes.includes(file.type)) {
-          const url = await readAsDataURL(file);
+          const blob = await resizeImageBlob(file, 1920, 1920);
+          const url = await readAsDataURL(blob);
           newAttachments.push({
             type: AttachmentType.Image,
             name: file.name,
