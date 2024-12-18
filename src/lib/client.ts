@@ -26,9 +26,9 @@ export const textTypes = [
 ];
 
 export const imageTypes = [
-  "image/gif",
   "image/jpeg",
   "image/png",
+  "image/gif",
   "image/webp",
 ]
 
