@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 
-import { Message, Model, Role } from "../models/chat";
+import { Message, Model, Role, Partition, AttachmentType } from "../models/chat";
 
 const client = new OpenAI({
   baseURL: new URL("/api/v1", window.location.origin).toString(),
@@ -17,6 +17,27 @@ export async function listModels(): Promise<Model[]> {
       name: model.id,
     };
   });
+};
+
+export const partitionTypes = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+];
+
+export async function partition(blob: Blob): Promise<Partition[]> {
+  const data = new FormData();
+  data.append("files", blob);
+
+  const resp = await fetch("/api/v1/partition", {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+    },
+    body: data,
+  });
+
+  return resp.json() as Promise<Partition[]>;
 }
 
 export async function complete(
@@ -34,12 +55,21 @@ export async function complete(
     }
 
     for (const a of m.attachments ?? []) {
-      content.push({
-        type: "image_url",
-        image_url: {
-          url: a.url,
-        },
-      });
+      if (a.type == AttachmentType.Image) {
+        content.push({
+          type: "image_url",
+          image_url: {
+            url: a.data,
+          },
+        });
+      }
+
+      if (a.type == AttachmentType.Text) {
+        content.push({
+          type: "text",
+          text: a.data,
+        });
+      }
     }
 
     messages.push({
