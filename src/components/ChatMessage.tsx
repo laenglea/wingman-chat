@@ -4,7 +4,7 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 import { Bot, User } from "lucide-react";
 
-import { Message, Role } from "../models/chat";
+import { AttachmentType, Message, Role } from "../models/chat";
 
 type ChatMessageProps = {
   message: Message;
@@ -58,9 +58,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex space-x-4 pt-2 h-60">
-            {message.attachments?.map((attachment, index) => (
-              <img key={index} src={attachment.url} />
-            ))}
+            {message.attachments?.map((attachment, index) => {
+              console.log(attachment);
+              if (attachment.type === AttachmentType.Image) {
+                return <img key={index} src={attachment.data} />;
+              }
+
+              return <span key={index}>{attachment.name}</span>;
+            })}
           </div>
         )}
       </div>
