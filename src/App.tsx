@@ -6,7 +6,7 @@ import { ChatInput } from "./components/ChatInput";
 import { Chat, Message, Model, Role } from "./models/chat";
 import { useChats } from "./hooks/useChats";
 import { useModels } from "./hooks/useModels";
-import { complete } from "./lib/client";
+import { complete, summarize } from "./lib/client";
 import { ChatModel } from "./components/ChatModel";
 
 function App() {
@@ -120,10 +120,25 @@ function App() {
   }, [currentModel]);
 
   useEffect(() => {
-    if (currentChat) {
-      currentChat.updated = new Date();
-      currentChat.messages = currentMessages;
-      saveChats();
+    if (!currentChat) {
+      return
+    }
+
+    currentChat.updated = new Date();
+    currentChat.messages = currentMessages;
+
+    saveChats();
+  }, [currentMessages]);
+
+  useEffect(() => {
+    if (!currentChat || !currentModel) {
+      return
+    }
+    
+    if (currentMessages.length % 4) {
+      summarize(currentModel.id, currentMessages).then((title) => {
+        currentChat.title = title;
+      });
     }
   }, [currentMessages]);
 
@@ -184,10 +199,7 @@ function App() {
 
         {/* Backdrop */}
         {showSidebar && (
-          <div
-            className="fixed inset-0 z-20"
-            onClick={toggleSidebar}
-          />
+          <div className="fixed inset-0 z-20" onClick={toggleSidebar} />
         )}
 
         {/* Create Chat Button */}
