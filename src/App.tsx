@@ -140,12 +140,12 @@ function App() {
   }, [currentChat, currentMessages]);
 
   return (
-    <div className="h-dvh w-dvw overflow-hidden flex bg-[#121212]">
+    <div className="h-dvh w-dvw overflow-hidden bg-[#121212]">
       {/* Sidebar */}
       <aside
         className={`${
           showSidebar ? "w-64" : "w-0"
-        } bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 overflow-hidden`}
+        } bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 overflow-hidden fixed top-0 bottom-0 left-0 z-20`}
       >
         <Sidebar
           isVisible={showSidebar}
@@ -157,9 +157,11 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col">
+      <main className={`h-full flex flex-col transition-all duration-300 ${
+        showSidebar ? "ml-64" : "ml-0"
+      }`}>
         {/* Header */}
-        <header className="p-2 flex items-center justify-between bg-[#121212] flex-shrink-0">
+        <header className="p-2 flex items-center bg-[#121212] flex-shrink-0">
           <div className="flex gap-2">
             <button
               className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
@@ -168,14 +170,16 @@ function App() {
               <Menu size={20} />
             </button>
 
-            <ChatModel
-              models={models}
-              selectedModel={currentModel ?? null}
-              onSelectModel={handleSelectModel}
-            />
+            <div className="hidden sm:block">
+              <ChatModel
+                models={models}
+                selectedModel={currentModel ?? null}
+                onSelectModel={handleSelectModel}
+              />
+            </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex-1 flex justify-end">
             <button
               className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
               onClick={handleCreateChat}
