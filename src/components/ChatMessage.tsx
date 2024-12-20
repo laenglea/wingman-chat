@@ -28,18 +28,25 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
 
       <div
-        className={`max-w-[60%] rounded-lg p-3 break-words ${bubbleClasses} whitespace-pre-wrap break-words overflow-x-auto`}
+        className={`max-w-[60%] rounded-lg p-3 ${bubbleClasses} whitespace-pre-wrap leading-none break-words overflow-x-auto`}
       >
         <ReactMarkdown
           children={message.content}
           components={{
+            p: ({ node, ...props }) => <p {...props} />,
+            ul: ({ node, ...props }) => (
+              <ul className="list-disc list-inside" {...props} />
+            ),
+            ol: ({ node, ...props }) => (
+              <ol className="list-decimal list-inside" {...props} />
+            ),
             code(props) {
               const { children, className, node, ref, ...rest } = props;
               const match = /language-(\w+)/.exec(className || "");
               return match ? (
                 <SyntaxHighlighter
                   {...rest}
-                  className={`${className} whitespace-pre-wrap`}
+                  className={`${className}`}
                   children={String(children).replace(/\n$/, "")}
                   PreTag="div"
                   style={vscDarkPlus}
@@ -48,7 +55,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               ) : (
                 <code
                   {...rest}
-                  className={`${className} whitespace-pre-wrap`}
+                  className={`${className}`}
                   children={children}
                 />
               );
@@ -61,7 +68,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {/* Render files first in a compact grid */}
             <div className="grid grid-cols-2 gap-2">
               {message.attachments
-                .filter(attachment => attachment.type !== AttachmentType.Image)
+                .filter(
+                  (attachment) => attachment.type !== AttachmentType.Image
+                )
                 .map((attachment, index) => (
                   <div key={index} className="flex items-center gap-2 text-sm">
                     <File className="w-4 h-4 shrink-0" />
@@ -69,11 +78,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   </div>
                 ))}
             </div>
-            
+
             {/* Render images below */}
             <div className="flex flex-wrap gap-4">
               {message.attachments
-                .filter(attachment => attachment.type === AttachmentType.Image)
+                .filter(
+                  (attachment) => attachment.type === AttachmentType.Image
+                )
                 .map((attachment, index) => (
                   <img
                     key={index}
