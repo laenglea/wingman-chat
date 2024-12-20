@@ -143,9 +143,8 @@ function App() {
     <div className="h-dvh w-dvw overflow-hidden bg-[#121212]">
       {/* Sidebar */}
       <aside
-        className={`${
-          showSidebar ? "w-64" : "w-0"
-        } bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 overflow-hidden fixed top-0 bottom-0 left-0 z-20`}
+        className={`${showSidebar ? "translate-x-0" : "-translate-x-full"}
+        bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 fixed top-0 bottom-0 left-0 w-64 z-30`}
       >
         <Sidebar
           isVisible={showSidebar}
@@ -157,11 +156,13 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className={`h-full flex flex-col transition-all duration-300 ${
-        showSidebar ? "ml-64" : "ml-0"
-      }`}>
+      <main className="h-full flex flex-col">
         {/* Header */}
-        <header className="p-2 flex items-center bg-[#121212] flex-shrink-0">
+        <header
+          className={`p-2 flex items-center bg-[#121212] flex-shrink-0 transition-transform duration-300 ${
+            showSidebar ? "translate-x-64" : "translate-x-0"
+          }`}
+        >
           <div className="flex gap-2">
             <button
               className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
@@ -170,7 +171,8 @@ function App() {
               <Menu size={20} />
             </button>
 
-            <div className="hidden sm:block">
+            {/* <div className="hidden sm:block"> */}
+            <div>
               <ChatModel
                 models={models}
                 selectedModel={currentModel ?? null}
@@ -178,16 +180,23 @@ function App() {
               />
             </div>
           </div>
-
-          <div className="flex-1 flex justify-end">
-            <button
-              className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
-              onClick={handleCreateChat}
-            >
-              <Plus size={20} />
-            </button>
-          </div>
         </header>
+
+        {/* Backdrop */}
+        {showSidebar && (
+          <div
+            className="fixed inset-0 z-20"
+            onClick={toggleSidebar}
+          />
+        )}
+
+        {/* Create Chat Button */}
+        <button
+          className="fixed top-2 right-2 p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded z-10"
+          onClick={handleCreateChat}
+        >
+          <Plus size={20} />
+        </button>
 
         {/* Chat Window */}
         <div
