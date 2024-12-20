@@ -40,8 +40,9 @@ export function Sidebar({
               <div
                 onClick={() => onSelectChat(chat)}
                 className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                title={chat.title ?? "Untitled"}
               >
-                {chat.title ?? chat.id ?? "Untitled"}
+                {chat.title ?? "Untitled"}
               </div>
               <button
                 onClick={(e) => {

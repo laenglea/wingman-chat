@@ -1,6 +1,12 @@
 import OpenAI from "openai";
 
-import { Message, Model, Role, Partition, AttachmentType } from "../models/chat";
+import {
+  Message,
+  Model,
+  Role,
+  Partition,
+  AttachmentType,
+} from "../models/chat";
 
 const client = new OpenAI({
   baseURL: new URL("/api/v1", window.location.origin).toString(),
@@ -17,20 +23,16 @@ export async function listModels(): Promise<Model[]> {
       name: model.id,
     };
   });
-};
+}
 
-export const textTypes = [
-  "text/csv",
-  "text/markdown",
-  "text/plain",
-];
+export const textTypes = ["text/csv", "text/markdown", "text/plain"];
 
 export const imageTypes = [
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
-]
+];
 
 export const partitionTypes = [
   "application/pdf",
@@ -39,11 +41,7 @@ export const partitionTypes = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
-export const supportedTypes = [
-  ...textTypes,
-  ...imageTypes,
-  ...partitionTypes,
-];
+export const supportedTypes = [...textTypes, ...imageTypes, ...partitionTypes];
 
 export async function partition(blob: Blob): Promise<Partition[]> {
   const data = new FormData();
@@ -78,7 +76,7 @@ export async function complete(
       if (a.type == AttachmentType.Text) {
         content.push({
           type: "text",
-          text: a.name + ":\n```"+ a.data + "\n```",
+          text: a.name + ":\n```" + a.data + "\n```",
         });
       }
 
@@ -128,4 +126,26 @@ export async function complete(
   };
 
   return result;
+}
+
+export async function summarize(
+  model: string,
+  input: Message[]
+): Promise<string> {
+  const history = input
+    .slice(-6)
+    .map((m) => m.content)
+    .join("\n");
+
+  const completion = await client.chat.completions.create({
+    model: model,
+    messages: [
+      {
+        role: "user",
+        content: `Your Task is to summarize the conversation to a short title.\nReturn only the title without explaination or quotes:\n${history}`,
+      },
+    ],
+  });
+
+  return completion.choices[0].message.content ?? "";
 }
