@@ -28,7 +28,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
 
       <div
-        className={`max-w-[60%] rounded-lg p-3 ${bubbleClasses} whitespace-pre-wrap leading-none break-words overflow-x-auto`}
+        className={`max-w-[60%] rounded-lg p-3 ${bubbleClasses} whitespace-pre-wrap leading-normal break-words overflow-x-auto`}
       >
         <ReactMarkdown
           children={message.content}
@@ -65,7 +65,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex flex-col gap-2 pt-2">
-            {/* Render files first in a compact grid */}
             <div className="grid grid-cols-2 gap-2">
               {message.attachments
                 .filter(
@@ -79,7 +78,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
                 ))}
             </div>
 
-            {/* Render images below */}
             <div className="flex flex-wrap gap-4">
               {message.attachments
                 .filter(

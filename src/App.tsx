@@ -121,7 +121,7 @@ function App() {
 
   useEffect(() => {
     if (!currentChat) {
-      return
+      return;
     }
 
     currentChat.updated = new Date();
@@ -132,9 +132,9 @@ function App() {
 
   useEffect(() => {
     if (!currentChat || !currentModel) {
-      return
+      return;
     }
-    
+
     if (currentMessages.length % 4) {
       summarize(currentModel.id, currentMessages).then((title) => {
         currentChat.title = title;
@@ -156,7 +156,6 @@ function App() {
 
   return (
     <div className="h-dvh w-dvw overflow-hidden bg-[#121212]">
-      {/* Sidebar */}
       <aside
         className={`${showSidebar ? "translate-x-0" : "-translate-x-full"}
         bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 fixed top-0 bottom-0 left-0 w-64 z-30`}
@@ -170,11 +169,16 @@ function App() {
         />
       </aside>
 
-      {/* Main Content */}
       <main className="h-full flex flex-col">
-        {/* Header */}
+        {showSidebar && (
+          <div
+            className="fixed inset-0 z-20 bg-black/50 backdrop-blur-xs"
+            onClick={toggleSidebar}
+          />
+        )}
+
         <header
-          className={`p-2 flex items-center bg-[#121212] flex-shrink-0 transition-transform duration-300 ${
+          className={`fixed top-2 left-2 bg-[#121212] flex transition-transform duration-300 ${
             showSidebar ? "translate-x-64" : "translate-x-0"
           }`}
         >
@@ -197,28 +201,22 @@ function App() {
           </div>
         </header>
 
-        {/* Backdrop */}
-        {showSidebar && (
-          <div className="fixed inset-0 z-20" onClick={toggleSidebar} />
-        )}
+        <header className="fixed top-2 right-2 z-10">
+          <button
+            className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
+            onClick={handleCreateChat}
+          >
+            <Plus size={20} />
+          </button>
+        </header>
 
-        {/* Create Chat Button */}
-        <button
-          className="fixed top-2 right-2 p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded z-10"
-          onClick={handleCreateChat}
-        >
-          <Plus size={20} />
-        </button>
-
-        {/* Chat Window */}
         <div
-          className="flex-1 overflow-auto bg-[#121212] p-4"
+          className="flex-1 overflow-auto bg-[#121212] p-4 mt-14"
           ref={messageContainerRef}
         >
           <ChatWindow messages={currentMessages} />
         </div>
 
-        {/* Input Area */}
         <footer className="bg-[#121212] border-t border-[#3a3a3c] p-4">
           <ChatInput onSend={sendMessage} />
         </footer>
