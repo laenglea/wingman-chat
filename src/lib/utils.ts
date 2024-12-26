@@ -79,7 +79,7 @@ export async function resizeImageBlob(
           }
         },
         blob.type,
-        0.90
+        0.9
       );
     };
 
@@ -88,4 +88,41 @@ export async function resizeImageBlob(
       reject(new Error("Failed to load image"));
     };
   });
+}
+
+export function supportsScreenshot(): boolean {
+  return "getDisplayMedia" in navigator.mediaDevices;
+}
+
+export async function captureScreenshot(): Promise<string> {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    });
+
+    const video = document.createElement("video");
+    video.srcObject = stream;
+
+    await new Promise((resolve) => {
+      video.onloadedmetadata = () => {
+        video.play();
+        resolve(null);
+      };
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    stream.getTracks().forEach((track) => track.stop());
+
+    return canvas.toDataURL("image/png");
+  } catch (err) {
+    console.error("Error capturing screenshot:", err);
+    throw err;
+  }
 }
