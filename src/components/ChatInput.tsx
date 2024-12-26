@@ -1,9 +1,15 @@
 import { ChangeEvent, useState, FormEvent, useRef } from "react";
 
-import { Send, Paperclip, Image, X } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../models/chat";
-import { readAsDataURL, readAsText, resizeImageBlob } from "../lib/utils";
+import {
+  captureScreenshot,
+  readAsDataURL,
+  readAsText,
+  resizeImageBlob,
+  supportsScreenshot,
+} from "../lib/utils";
 import {
   partition,
   supportedTypes,
@@ -42,6 +48,18 @@ export function ChatInput({ onSend }: ChatInputProps) {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
+  };
+
+  const handleScreenshotClick = async () => {
+    const data = await captureScreenshot();
+
+    const attachment = {
+      type: AttachmentType.Image,
+      name: "screenshot.png",
+      data: data,
+    };
+
+    setAttachments((prev) => [...prev, attachment]);
   };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -121,6 +139,16 @@ export function ChatInput({ onSend }: ChatInputProps) {
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
         />
+
+        {supportsScreenshot() && (
+          <button
+            type="button"
+            className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-transparent"
+            onClick={handleScreenshotClick}
+          >
+            <ScreenShare size={20} />
+          </button>
+        )}
 
         <button
           type="button"
