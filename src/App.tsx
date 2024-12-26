@@ -1,13 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { Menu, Plus } from "lucide-react";
-import { Sidebar } from "./components/Sidebar";
-import { ChatWindow } from "./components/ChatWindow";
-import { ChatInput } from "./components/ChatInput";
-import { Chat, Message, Model, Role } from "./models/chat";
+
+import { Chat, Message, Model, Role } from "./models/chat"
+import { complete, summarize } from "./lib/client";;
+
 import { useChats } from "./hooks/useChats";
 import { useModels } from "./hooks/useModels";
-import { complete, summarize } from "./lib/client";
+
+import { Sidebar } from "./components/Sidebar";
+
+import { ChatInput } from "./components/ChatInput";
+import { ChatMessage } from "./components/ChatMessage";
 import { ChatModel } from "./components/ChatModel";
+
+import { Menu, Plus } from "lucide-react";
 
 function App() {
   const { chats, createChat, deleteChat, saveChats } = useChats();
@@ -214,7 +219,15 @@ function App() {
           className="flex-1 overflow-auto bg-[#121212] p-4 mt-14"
           ref={messageContainerRef}
         >
-          <ChatWindow messages={currentMessages} />
+          {currentMessages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center text-[#e5e5e5]">
+              <img src="/logo.png" className="w-48 h-48 mb-4" />
+            </div>
+          ) : (
+            currentMessages.map((message, idx) => (
+              <ChatMessage key={idx} message={message} />
+            ))
+          )}
         </div>
 
         <footer className="bg-[#121212] border-t border-[#3a3a3c] p-4">
