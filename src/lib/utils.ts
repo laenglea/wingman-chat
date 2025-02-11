@@ -91,7 +91,7 @@ export async function resizeImageBlob(
 }
 
 export function supportsScreenshot(): boolean {
-  return "getDisplayMedia" in navigator.mediaDevices;
+  return "mediaDevices" in navigator && "getDisplayMedia" in navigator.mediaDevices;
 }
 
 export async function captureScreenshot(): Promise<string> {
@@ -125,4 +125,9 @@ export async function captureScreenshot(): Promise<string> {
     console.error("Error capturing screenshot:", err);
     throw err;
   }
+}
+
+export function getFileExt(filename: string): string {
+  const parts = filename.split('.');
+  return parts.length > 1 ? "." + parts.pop() || "" : "";
 }
