@@ -1,10 +1,12 @@
-import { ChangeEvent, useState, FormEvent, useRef } from "react";
+import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
+import { Textarea } from '@headlessui/react'
 
 import { Send, Paperclip, ScreenShare, Image, X } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../models/chat";
 import {
   captureScreenshot,
+  getFileExt,
   readAsDataURL,
   readAsText,
   resizeImageBlob,
@@ -27,6 +29,15 @@ export function ChatInput({ onSend }: ChatInputProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textInputRef.current) {
+      textInputRef.current.style.height = "auto";
+      const newHeight = Math.min(textInputRef.current.scrollHeight, window.innerHeight * 0.4);
+      textInputRef.current.style.height = newHeight + "px";
+    }
+  }, [content]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -71,9 +82,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
 
-        console.log(file);
-
-        if (textTypes.includes(file.type)) {
+        if (textTypes.includes(file.type) || textTypes.includes(getFileExt(file.name))) {
           const text = await readAsText(file);
           newAttachments.push({
             type: AttachmentType.Text,
@@ -82,7 +91,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
           });
         }
 
-        if (imageTypes.includes(file.type)) {
+        if (imageTypes.includes(file.type) || imageTypes.includes(getFileExt(file.name))) {
           const blob = await resizeImageBlob(file, 1920, 1920);
           const url = await readAsDataURL(blob);
           newAttachments.push({
@@ -92,9 +101,11 @@ export function ChatInput({ onSend }: ChatInputProps) {
           });
         }
 
-        if (partitionTypes.includes(file.type)) {
+        if (partitionTypes.includes(file.type) || partitionTypes.includes(getFileExt(file.name))) {
           const parts = await partition(file);
-          const text = parts.map((part) => part.text).join("\n\n");
+          
+          let text = parts.map((part) => part.text).join("\n\n");
+          text = text.replace(/[\u0000-\u001F\u007F]/g, "");
 
           newAttachments.push({
             type: AttachmentType.Text,
@@ -122,7 +133,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
   return (
     <form onSubmit={handleSubmit} className="bg-[#121212]">
-      <div className="flex py-4 px-4 items-center gap-2">
+      <div className="flex py-2 items-center gap-1">
         <input
           type="file"
           multiple
@@ -132,10 +143,13 @@ export function ChatInput({ onSend }: ChatInputProps) {
           onChange={handleFileChange}
         />
 
-        <textarea
-          className="flex-1 border border-[#3a3a3c] bg-[#2c2c2e] text-[#e5e5e5] rounded px-3 py-2 focus:outline-none h-10.5 min-h-10.5"
-          placeholder="Ask..."
+        <Textarea
+          ref={textInputRef}
+          className="flex-1 border border-[#3a3a3c] bg-[#2c2c2e] text-[#e5e5e5] rounded px-3 py-2 focus:outline-none max-h-[40vh] overflow-y-auto resize-none"
+          style={{ scrollbarWidth: "thin" }}
+          placeholder="we need to talk..."
           value={content}
+          rows={1}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
         />
@@ -167,7 +181,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
       </div>
 
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 pl-4 pr-26">
+        <div className="flex flex-wrap gap-2 mr-30">
           {attachments.map((val, i) => (
             <div
               key={i}

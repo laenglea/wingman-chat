@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
-import { Chat, Message, Model, Role } from "./models/chat"
-import { complete, summarize } from "./lib/client";;
+import { Chat, Message, Model, Role } from "./models/chat";
+import { complete, summarize } from "./lib/client";
 
 import { useChats } from "./hooks/useChats";
 import { useModels } from "./hooks/useModels";
@@ -10,9 +10,9 @@ import { Sidebar } from "./components/Sidebar";
 
 import { ChatInput } from "./components/ChatInput";
 import { ChatMessage } from "./components/ChatMessage";
-import { ChatModel } from "./components/ChatModel";
+import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 
-import { Menu, Plus } from "lucide-react";
+import { Menu as MenuIcon, Plus as PlusIcon } from "lucide-react";
 
 function App() {
   const { chats, createChat, deleteChat, saveChats } = useChats();
@@ -44,10 +44,6 @@ function App() {
 
   const handleSelectChat = (chat: Chat) => {
     setCurrentChat(chat);
-  };
-
-  const handleSelectModel = (model: Model) => {
-    setCurrentModel(model);
   };
 
   const sendMessage = async (message: Message) => {
@@ -86,7 +82,15 @@ function App() {
         ]);
       });
 
-      setCurrentMessages([...messages, completion]);
+      messages = [...messages, completion];
+      setCurrentMessages(messages);
+
+      if (messages.length % 4 === 0) {
+        summarize(model.id, messages).then((title) => {
+          chat!.title = title;
+        });
+      }
+
     } catch (error) {
       if (error?.toString().includes("missing finish_reason")) {
         console.log(error);
@@ -141,18 +145,6 @@ function App() {
   }, [currentMessages]);
 
   useEffect(() => {
-    if (!currentChat || !currentModel) {
-      return;
-    }
-
-    if (currentMessages.length % 4) {
-      summarize(currentModel.id, currentMessages).then((title) => {
-        currentChat.title = title;
-      });
-    }
-  }, [currentMessages]);
-
-  useEffect(() => {
     setCurrentModel(currentChat?.model ?? currentModel);
     setCurrentMessages(currentChat?.messages ?? []);
   }, [currentChat]);
@@ -193,31 +185,48 @@ function App() {
           }`}
         >
           <div className="flex gap-2">
-            <button
+            <Button
               className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
               onClick={toggleSidebar}
             >
-              <Menu size={20} />
-            </button>
+              <MenuIcon size={20} />
+            </Button>
 
             {/* <div className="hidden sm:block"> */}
             <div>
-              <ChatModel
-                models={models}
-                selectedModel={currentModel ?? null}
-                onSelectModel={handleSelectModel}
-              />
+              <Menu>
+                <MenuButton className="inline-flex items-center p-2 text-[#e5e5e5] bg-[#1c1c1e] rounded">
+                  {currentModel?.name ?? currentModel?.id ?? "Select Model"}
+                </MenuButton>
+
+                <MenuItems
+                  transition
+                  anchor="bottom start"
+                  className="!max-h-[50vh] mt-2 rounded border bg-[#1c1c1e] border-[#3a3a3c] overflow-y-auto shadow-lg"
+                >
+                  {models.map((model) => (
+                    <MenuItem key={model.id}>
+                      <Button
+                        onClick={() => setCurrentModel(model)}
+                        className="group flex w-full items-center px-4 py-2 text-[#e5e5e5] data-[focus]:bg-[#2c2c2e] cursor-pointer"
+                      >
+                        {model.name ?? model.id}
+                      </Button>
+                    </MenuItem>
+                  ))}
+                </MenuItems>
+              </Menu>
             </div>
           </div>
         </header>
 
         <header className="fixed top-2 right-2 z-10">
-          <button
+          <Button
             className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
             onClick={handleCreateChat}
           >
-            <Plus size={20} />
-          </button>
+            <PlusIcon size={20} />
+          </Button>
         </header>
 
         <div
