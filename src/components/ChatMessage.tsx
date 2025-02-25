@@ -1,4 +1,5 @@
-import ReactMarkdown from "react-markdown";
+import Markdown from "react-markdown";
+import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
@@ -30,8 +31,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div
         className={`max-w-[80%] rounded-lg p-3 ${bubbleClasses} whitespace-pre-wrap leading-normal break-words overflow-x-auto`}
       >
-        <ReactMarkdown
+        <Markdown
           children={message.content}
+          remarkPlugins={[remarkGfm]}
           components={{
             p: ({ node, ...props }) => <p {...props} />,
             ul: ({ node, ...props }) => (
