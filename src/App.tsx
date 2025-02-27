@@ -208,6 +208,7 @@ function App() {
                     <MenuItem key={model.id}>
                       <Button
                         onClick={() => setCurrentModel(model)}
+                        title={model.description}
                         className="group flex w-full items-center px-4 py-2 text-[#e5e5e5] data-[focus]:bg-[#2c2c2e] cursor-pointer"
                       >
                         {model.name ?? model.id}

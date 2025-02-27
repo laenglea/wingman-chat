@@ -36,8 +36,10 @@ func main() {
 
 	mux.HandleFunc("GET /config.json", func(w http.ResponseWriter, r *http.Request) {
 		type modelType struct {
-			ID   string `json:"id,omitempty" yaml:"id,omitempty"`
-			Name string `json:"name,omitempty" yaml:"name,omitempty"`
+			ID string `json:"id,omitempty" yaml:"id,omitempty"`
+
+			Name        string `json:"name,omitempty" yaml:"name,omitempty"`
+			Description string `json:"description,omitempty" yaml:"description,omitempty"`
 		}
 
 		type configType struct {
