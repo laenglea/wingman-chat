@@ -1,6 +1,7 @@
 export type Model = {
     id: string;
     name: string;
+    description: string;
 }
 
 export type Message = {

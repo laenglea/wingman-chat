@@ -34,7 +34,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
   useEffect(() => {
     if (textInputRef.current) {
       textInputRef.current.style.height = "auto";
-      const newHeight = Math.min(textInputRef.current.scrollHeight, window.innerHeight * 0.4);
+      const newHeight = Math.min(textInputRef.current.scrollHeight, window.innerHeight * 0.4) + 2;
       textInputRef.current.style.height = newHeight + "px";
     }
   }, [content]);
