@@ -77,7 +77,7 @@ func main() {
 			"background_color": "rgb(14, 17, 23)",
 			"icons": []map[string]any{
 				{
-					"src":   "/logo.png",
+					"src":   "/icon.png",
 					"sizes": "512x512",
 					"type":  "image/png",
 				},
