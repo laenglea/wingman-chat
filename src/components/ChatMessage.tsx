@@ -14,22 +14,18 @@ type ChatMessageProps = {
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === Role.User;
 
-  const bubbleClasses = isUser
-    ? "bg-[#3a3a3c] text-[#e5e5e5]"
-    : "bg-[#2c2c2e] text-[#e5e5e5]";
-
   return (
     <div
-      className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}
+      className={`flex chat-bubble ${isUser ? "justify-end" : "justify-start"} mb-4`}
     >
       {!isUser && (
         <div className="mr-3 pt-3">
-          <Bot className="text-[#e5e5e5] w-6 h-6" />
+          <Bot className="w-6 h-6" />
         </div>
       )}
 
       <div
-        className={`max-w-[80%] rounded-lg p-3 ${bubbleClasses} whitespace-pre-wrap leading-normal break-words overflow-x-auto`}
+        className={`max-w-[80%] rounded-lg p-3 ${isUser ? "chat-bubble-user" : "chat-bubble-assistant"} whitespace-pre-wrap leading-normal break-words overflow-x-auto`}
       >
         <Markdown
           children={message.content}
@@ -100,7 +96,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       {isUser && (
         <div className="ml-3 pt-3">
-          <User className="text-[#e5e5e5] w-6 h-6" />
+          <User className="w-6 h-6" />
         </div>
       )}
     </div>

@@ -157,10 +157,9 @@ function App() {
   }, [currentChat, currentMessages]);
 
   return (
-    <div className="h-dvh w-dvw overflow-hidden bg-[#121212]">
+    <div className="h-dvh w-dvw overflow-hidden">
       <aside
-        className={`${showSidebar ? "translate-x-0" : "-translate-x-full"}
-        bg-[#1c1c1e] text-[#e5e5e5] transition-all duration-300 fixed top-0 bottom-0 left-0 w-64 z-30`}
+        className={`${showSidebar ? "translate-x-0" : "-translate-x-full"} transition-all duration-300 fixed top-0 bottom-0 left-0 w-64 z-30`}
       >
         <Sidebar
           isVisible={showSidebar}
@@ -174,19 +173,19 @@ function App() {
       <main className="h-full flex flex-col">
         {showSidebar && (
           <div
-            className="fixed inset-0 z-20 bg-black/50 backdrop-blur-xs"
+            className="fixed inset-0 z-20 bg-black/10 dark:bg-black/50 backdrop-blur-xs"
             onClick={toggleSidebar}
           />
         )}
 
         <header
-          className={`fixed top-2 left-2 bg-[#121212] flex transition-transform duration-300 ${
+          className={`fixed top-2 left-2 flex transition-transform duration-300 ${
             showSidebar ? "translate-x-64" : "translate-x-0"
           }`}
         >
           <div className="flex gap-2">
             <Button
-              className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
+              className="menu-button"
               onClick={toggleSidebar}
             >
               <MenuIcon size={20} />
@@ -195,21 +194,21 @@ function App() {
             {/* <div className="hidden sm:block"> */}
             <div>
               <Menu>
-                <MenuButton className="inline-flex items-center p-2 text-[#e5e5e5] bg-[#1c1c1e] rounded">
+                <MenuButton className="inline-flex items-center menu-button">
                   {currentModel?.name ?? currentModel?.id ?? "Select Model"}
                 </MenuButton>
 
                 <MenuItems
                   transition
                   anchor="bottom start"
-                  className="!max-h-[50vh] mt-2 rounded border bg-[#1c1c1e] border-[#3a3a3c] overflow-y-auto shadow-lg"
+                  className="!max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg"
                 >
                   {models.map((model) => (
                     <MenuItem key={model.id}>
                       <Button
                         onClick={() => setCurrentModel(model)}
                         title={model.description}
-                        className="group flex w-full items-center px-4 py-2 text-[#e5e5e5] data-[focus]:bg-[#2c2c2e] cursor-pointer"
+                        className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
                       >
                         {model.name ?? model.id}
                       </Button>
@@ -223,7 +222,7 @@ function App() {
 
         <header className="fixed top-2 right-2 z-10">
           <Button
-            className="p-2 text-[#e5e5e5] hover:text-gray-300 bg-[#1c1c1e] rounded"
+            className="menu-button"
             onClick={handleCreateChat}
           >
             <PlusIcon size={20} />
@@ -231,11 +230,11 @@ function App() {
         </header>
 
         <div
-          className="flex-1 overflow-auto bg-[#121212] p-4 mt-14"
+          className="flex-1 overflow-auto p-4 mt-14 border-t border-[#3a3a3c]"
           ref={messageContainerRef}
         >
           {currentMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center text-[#e5e5e5]">
+            <div className="flex flex-col items-center justify-center h-full text-center">
               <img src="/logo.png" className="w-48 h-48 mb-4" />
             </div>
           ) : (
@@ -245,7 +244,7 @@ function App() {
           )}
         </div>
 
-        <footer className="bg-[#121212] border-t border-[#3a3a3c] p-4">
+        <footer className="border-t border-[#3a3a3c] p-4">
           <ChatInput onSend={sendMessage} />
         </footer>
       </main>

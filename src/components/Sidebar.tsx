@@ -23,7 +23,7 @@ export function Sidebar({
 
   return (
     <div
-      className={`fixed top-0 left-0 h-full w-64 bg-[#1c1c1e] text-[#e5e5e5] transition-transform duration-300 ${
+      className={`fixed top-0 left-0 h-full w-64 sidebar transition-transform duration-300 ${
         isVisible ? "translate-x-0" : "-translate-x-full"
       }`}
     >
@@ -33,8 +33,8 @@ export function Sidebar({
           {chats.map((chat) => (
             <li
               key={chat.id}
-              className={`p-2 rounded flex items-center justify-between cursor-pointer hover:bg-[#2c2c2e] ${
-                chat.id === selectedChat?.id ? "bg-[#3a3a3c]" : ""
+              className={`flex items-center justify-between sidebar-item ${
+                chat.id === selectedChat?.id ? "sidebar-item-selected" : ""
               }`}
             >
               <div
@@ -49,7 +49,7 @@ export function Sidebar({
                   e.stopPropagation();
                   onDeleteChat(chat);
                 }}
-                className="text-[#e5e5e5] hover:text-gray-300 p-1"
+                className="cursor-pointer"
               >
                 <Trash size={16} />
               </button>
