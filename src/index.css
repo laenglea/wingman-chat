@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+/* @custom-variant dark (&:where(.dark, .dark *)); */
+
 body {
-  @apply bg-[#121212];
+  @apply bg-neutral-50 dark:bg-neutral-950;
+}
+
+.sidebar {
+  @apply bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-200;
+}
+
+.sidebar-item {
+  @apply p-2 hover:bg-neutral-400 dark:hover:text-gray-300 dark:hover:bg-neutral-800 rounded cursor-pointer;
+}
+
+.sidebar-item-selected {
+  @apply p-2 bg-neutral-300 dark:bg-neutral-800;
+}
+
+.menu-button {
+  @apply p-2 dark:text-neutral-200 hover:text-neutral-600 bg-neutral-300 dark:bg-neutral-800 dark:hover:text-neutral-400 rounded cursor-pointer;  
+}
+
+.chat-bubble {
+  @apply text-neutral-900 dark:text-neutral-200
+}
+
+.chat-bubble-user {
+  @apply bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-200;
+}
+
+.chat-bubble-assistant {
+  @apply bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200;
+}
+
+.chat-input {
+  @apply p-2 border border-neutral-700 bg-neutral-50 dark:text-neutral-200 dark:bg-neutral-800 rounded focus:outline-none
+}
+
+.chat-input-button {
+  @apply p-2 text-neutral-900 hover:text-neutral-500 dark:text-neutral-100 cursor-pointer;
+}
+
+.chat-input-attachment {
+  @apply p-2 text-white dark:text-neutral-200 hover:text-gray-300 bg-neutral-800 dark:bg-neutral-700 rounded cursor-default;
 }
