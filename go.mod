@@ -1,4 +1,4 @@
-module llama-chat
+module github.com/adrianliechti/wingman-chat
 
 go 1.23.4
 

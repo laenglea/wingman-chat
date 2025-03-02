@@ -15,6 +15,10 @@ import (
 func main() {
 	title := os.Getenv("TITLE")
 
+	if title == "" {
+		title = "Wingman AI"
+	}
+
 	models := strings.FieldsFunc(os.Getenv("MODELS"), func(r rune) bool {
 		return r == ',' || r == ';' || unicode.IsSpace(r)
 	})
@@ -50,10 +54,8 @@ func main() {
 			ModelsFilter []string `json:"modelsFilter,omitempty" yaml:"modelsFilter,omitempty"`
 		}
 
-		config := configType{}
-
-		if title != "" {
-			config.Title = title
+		config := configType{
+			Title: title,
 		}
 
 		if data, err := os.ReadFile("models.yaml"); err == nil {
@@ -70,8 +72,8 @@ func main() {
 
 	mux.HandleFunc("GET /manifest.json", func(w http.ResponseWriter, r *http.Request) {
 		manifest := map[string]any{
-			"name":             "Chat",
-			"short_name":       "Chat",
+			"name":             title,
+			"short_name":       title,
 			"start_url":        "/",
 			"display":          "standalone",
 			"background_color": "rgb(14, 17, 23)",
@@ -82,11 +84,6 @@ func main() {
 					"type":  "image/png",
 				},
 			},
-		}
-
-		if title != "" {
-			manifest["name"] = title
-			manifest["short_name"] = title
 		}
 
 		w.Header().Set("Content-Type", "application/json")
