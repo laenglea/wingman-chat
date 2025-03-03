@@ -1,8 +1,4 @@
-import Markdown from "react-markdown";
-import remarkGfm from 'remark-gfm';
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-
+import { Markdown } from './Markdown';
 import { Bot, User, File } from "lucide-react";
 
 import { AttachmentType, Message, Role } from "../models/chat";
@@ -25,41 +21,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
 
       <div
-        className={`max-w-[80%] rounded-lg p-3 ${isUser ? "chat-bubble-user" : "chat-bubble-assistant"} whitespace-pre-wrap leading-normal break-words overflow-x-auto`}
+        className={`max-w-[80%] rounded-lg p-3 ${isUser ? "chat-bubble-user" : "chat-bubble-assistant"} break-words overflow-x-auto`}
       >
-        <Markdown
-          children={message.content}
-          remarkPlugins={[remarkGfm]}
-          components={{
-            p: ({ node, ...props }) => <p {...props} />,
-            ul: ({ node, ...props }) => (
-              <ul className="list-disc list-inside" {...props} />
-            ),
-            ol: ({ node, ...props }) => (
-              <ol className="list-decimal list-inside" {...props} />
-            ),
-            code(props) {
-              const { children, className, node, ref, ...rest } = props;
-              const match = /language-(\w+)/.exec(className || "");
-              return match ? (
-                <SyntaxHighlighter
-                  {...rest}
-                  className={`${className}`}
-                  children={String(children).replace(/\n$/, "")}
-                  PreTag="div"
-                  style={vscDarkPlus}
-                  language={match[1]}
-                />
-              ) : (
-                <code
-                  {...rest}
-                  className={`${className}`}
-                  children={children}
-                />
-              );
-            },
-          }}
-        />
+        <Markdown>{message.content}</Markdown>
 
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex flex-col gap-2 pt-2">
