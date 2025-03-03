@@ -1,11 +1,16 @@
 import { memo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { CopyButton } from './CopyButton';
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 const components: Partial<Components> = {
-    pre: ({ children }) => <>{children}</>,
+    pre: ({ children }) => {
+        return <>
+            {children}
+        </>;
+    },
     ol: ({ node, children, ...props }) => {
         return (
             <ol className="list-decimal list-inside ml-2" {...props}>
@@ -106,14 +111,19 @@ const components: Partial<Components> = {
             return <Markdown>{text}</Markdown>;
         }
 
-        return <SyntaxHighlighter
-            {...rest}
-            className={`${className}`}
-            children={text}
-            PreTag="div"
-            style={vscDarkPlus}
-            language={language}
-        />;
+        return (
+            <div className="relative">
+                <CopyButton text={text} />
+                <SyntaxHighlighter
+                    {...rest}
+                    className={`${className}`}
+                    children={text}
+                    PreTag="div"
+                    style={vscDarkPlus}
+                    language={language}
+                />
+            </div>
+        );
     },
 };
 
