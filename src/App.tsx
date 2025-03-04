@@ -235,7 +235,7 @@ function App() {
         >
           {currentMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <img src="/logo.png" className="w-48 h-48 mb-4" />
+              <img src="/logo.svg" className="w-48 h-48 mb-4" />
             </div>
           ) : (
             currentMessages.map((message, idx) => (
