@@ -3,7 +3,7 @@
 /* @custom-variant dark (&:where(.dark, .dark *)); */
 
 body {
-  @apply bg-neutral-50 dark:bg-neutral-950;
+  @apply text-white bg-neutral-50 dark:text-black dark:bg-neutral-950;
 }
 
 .sidebar {
