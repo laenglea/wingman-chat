@@ -135,6 +135,10 @@ export async function complete(
     model: model,
     stream: true,
 
+    stream_options: {
+      include_usage: true,
+    },
+
     messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
   });
 
