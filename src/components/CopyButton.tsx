@@ -17,13 +17,13 @@ export const CopyButton = ({ text }: { text: string }) => {
     return (
         <button
             onClick={handleCopy}
-            className="absolute top-2 right-2 p-1 text-neutral-300 hover:text-white transition-colors"
+            className="text-neutral-300 hover:text-white transition-colors"
             title="Copy code to clipboard"
         >
             {copied ? (
-                <CopyCheckIcon />
+                <CopyCheckIcon className="h-4" />
             ) : (
-                <CopyIcon />
+                <CopyIcon className="h-4" />
             )}
         </button>
     );
