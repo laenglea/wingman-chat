@@ -9,6 +9,11 @@ export type Message = {
     role: 'user' | 'assistant';
 
     content: string;
+    refusal?: string;
+
+    inputTokens?: number
+    outputTokens?: number
+
     attachments?: Attachment[];
 };
 

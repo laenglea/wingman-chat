@@ -152,7 +152,12 @@ export async function complete(
 
   const result = {
     role: Role.Assistant,
+
     content: completion.choices[0].message.content ?? "",
+    refusal: completion.choices[0].message.refusal ?? "",
+
+    inputTokens: completion.usage?.prompt_tokens ?? 0,
+    outputTokens: completion.usage?.completion_tokens ?? 0,
   };
 
   return result;
