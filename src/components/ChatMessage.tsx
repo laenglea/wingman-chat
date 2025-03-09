@@ -56,6 +56,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </div>
           </div>
         )}
+        
+        {!isUser && (message.inputTokens !== undefined && message.outputTokens !== undefined) && (
+          <div className="text-[9px] text-neutral-500 dark:text-neutral-400 mt-2">
+            Usage: {message.inputTokens} / {message.outputTokens} tokens
+          </div>
+        )}
       </div>
 
       {isUser && (
