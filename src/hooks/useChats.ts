@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 
 import { Chat } from '../models/chat';
 
 const STORAGE_KEY = 'app_chats';
+const SAVE_DELAY = 2000;
 
 export function useChats() {
   const [chats, setChats] = useState<Chat[]>(() => loadLocalChats());
+  const saveTimeoutRef = useRef<number | null>(null);
 
   function createChat() {
     const chat = {
@@ -21,7 +23,7 @@ export function useChats() {
 
     setChats((prev) => {
       const items = [...prev, chat];
-      saveLocalChats(items);
+      debounceSaveChats(items);
 
       return items;
     });
@@ -32,14 +34,25 @@ export function useChats() {
   function deleteChat(chatId: string) {
     setChats((prev) => {
       const items = prev.filter((chat) => chat.id !== chatId);
-      saveLocalChats(items);
+      debounceSaveChats(items);
       
       return items;
     });
   };
 
+  const debounceSaveChats = useCallback((chatItems = chats) => {
+    if (saveTimeoutRef.current) {
+      window.clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = window.setTimeout(() => {
+      saveLocalChats(chatItems);
+      saveTimeoutRef.current = null;
+    }, SAVE_DELAY);
+  }, [chats]);
+
   function saveChats() {
-    saveLocalChats(chats)
+    debounceSaveChats();
   }
 
   function saveLocalChats(chats: Chat[]) {
