@@ -157,7 +157,7 @@ const components: Partial<Components> = {
             <img 
                 src={src} 
                 alt={alt || 'Image'} 
-                className="max-w-full h-auto my-2 rounded-md" 
+                className="max-h-60 my-2 rounded-md" 
                 loading="lazy"
                 {...props} 
             />
