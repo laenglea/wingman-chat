@@ -16,25 +16,21 @@ export function TranslatePage() {
   const [translatedText, setTranslatedText] = useState("");
   const [targetLang, setTargetLang] = useState("en");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const performTranslate = async (langToUse: string, textToTranslate: string) => {
     if (!textToTranslate.trim()) {
       setTranslatedText("");
-      setError(null);
       return;
     }
 
     setIsLoading(true);
-    setError(null);
     setTranslatedText("");
 
     try {
       const result = await translate(langToUse, textToTranslate);
       setTranslatedText(result);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error occurred during translation.");
-      setTranslatedText("");
+      setTranslatedText(err instanceof Error ? err.message : "An unknown error occurred during translation.");
     } finally {
       setIsLoading(false);
     }
@@ -55,7 +51,6 @@ export function TranslatePage() {
   const handleReset = () => {
     setSourceText("");
     setTranslatedText("");
-    setError(null);
   };
 
   return (
@@ -101,7 +96,7 @@ export function TranslatePage() {
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
             placeholder="Enter text to translate..."
-            className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-blue-500"
+            className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-blue-500 mb-2"
           />
         </div>
 
@@ -124,8 +119,8 @@ export function TranslatePage() {
           <textarea
             value={translatedText}
             readOnly
-            placeholder={error ? error : "Translation will appear here..."}
-            className={`w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-200 dark:bg-neutral-700 border-neutral-300 dark:border-neutral-600 ${error ? 'placeholder-red-500 dark:placeholder-red-400' : ''}`}
+            placeholder={"Translation will appear here..."}
+            className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-blue-500 mb-2"
           />
         </div>
       </main>
