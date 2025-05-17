@@ -1,24 +1,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { Tool } from "../models/chat";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-let client: Client|undefined = undefined
+let client: Client|undefined;
 
-try {
-    client = new Client({
-        name: 'wingman-client',
-        version: '1.0.0'
-    });
-
-    const transport = new SSEClientTransport(
-        new URL("http://localhost:4200/sse"),
-    );
-    
-    await client.connect(transport);
-    console.log("Local MCP Server connected");
-} catch (error) {
-    console.error("Error connecting to Model Context Protocol:", error);
-}
+(async () => {
+    client = await initializeClient();
+})();
 
 export async function listTools(): Promise<Tool[]> {
     if (!client) {
@@ -76,4 +65,37 @@ export async function callTool(name: string, args: any): Promise<string> {
     }
 
     return "";
+}
+
+async function initializeClient(): Promise<Client | undefined> {
+    let client: Client | undefined = undefined;
+    let transport: Transport | undefined = undefined;
+    
+    try {
+        transport = new SSEClientTransport(
+            new URL("http://localhost:4200/sse"),
+        );
+
+        client = new Client({
+            name: 'wingman-client',
+            version: '1.0.0'
+        });
+
+        await client.connect(transport);
+        console.log("Local MCP Server connected");
+
+        return client;
+    } catch (error) {
+        console.error("Error initializing MCP client:", error);
+        
+        if (client) {
+            client.close();
+        }
+        
+        if (transport) {
+           transport.close();
+        }
+
+        return undefined;
+    }
 }
