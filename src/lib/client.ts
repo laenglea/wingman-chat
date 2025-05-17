@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { Tool } from "../models/tool";
+import { Tool } from "../models/chat";
 
 import {
   Message,
