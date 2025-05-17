@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { Tool } from "../models/chat";
 
 import {
   Message,
@@ -7,6 +8,7 @@ import {
   Partition,
   AttachmentType,
 } from "../models/chat";
+import { callTool } from "./mcp";
 
 const client = new OpenAI({
   baseURL: new URL("/api/v1", window.location.origin).toString(),
@@ -99,6 +101,7 @@ export async function translate(lang: string, text: string): Promise<string> {
 
 export async function complete(
   model: string,
+  tools: Tool[],
   input: Message[],
   handler?: (delta: string, snapshot: string) => void
 ): Promise<Message> {
@@ -152,6 +155,7 @@ export async function complete(
       include_usage: true,
     },
 
+    tools: toOpenAITools(tools),
     messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
   });
 
@@ -161,8 +165,34 @@ export async function complete(
     }
   });
 
-  const completion = await stream.finalChatCompletion();
+  let completion = await stream.finalChatCompletion();
+  messages.push(completion.choices[0].message);
 
+  while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
+    for (const toolCall of completion.choices[0].message.tool_calls ?? []) {
+      console.log(toolCall.function.name);
+
+      const content = await callTool(toolCall.function.name, JSON.parse(toolCall.function.arguments));
+      console.log(content);
+
+      messages.push({
+        role: "tool",
+        content: content,
+        tool_call_id: toolCall.id,
+      });
+
+      completion = await client.beta.chat.completions.parse({
+        model: model,
+
+        tools: toOpenAITools(tools),
+        messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+      });
+
+      messages.push(completion.choices[0].message);
+      console.log(completion.choices[0].message);
+    }
+  }
+  
   const result = {
     role: Role.Assistant,
 
@@ -197,3 +227,18 @@ export async function summarize(
 
   return completion.choices[0].message.content ?? "";
 }
+
+const toOpenAITools = (tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] => {
+  return tools.map((tool) => ({
+    type: 'function',
+
+    function: {
+      name: tool.name,
+      description: tool.description,
+
+      strict: true,
+      parameters: tool.parameters,
+
+    },
+  }));
+};
