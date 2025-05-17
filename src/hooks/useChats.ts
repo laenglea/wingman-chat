@@ -12,7 +12,6 @@ export function useChats() {
   function createChat() {
     const chat = {
       id: crypto.randomUUID(),
-      title: "Untitled",
 
       created: new Date(),
       updated: new Date(),

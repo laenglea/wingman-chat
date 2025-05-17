@@ -79,7 +79,7 @@ export function ChatPage() {
       messages = [...messages, completion];
       setCurrentMessages(messages);
 
-      if (messages.length % 4 === 0) {
+      if (!chat.title || messages.length % 3 === 0) {
         summarize(model.id, messages).then((title) => {
           chat!.title = title;
         });
