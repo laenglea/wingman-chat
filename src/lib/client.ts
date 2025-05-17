@@ -8,7 +8,6 @@ import {
   Partition,
   AttachmentType,
 } from "../models/chat";
-import { callTool } from "./mcp";
 
 const client = new OpenAI({
   baseURL: new URL("/api/v1", window.location.origin).toString(),
@@ -105,7 +104,7 @@ export async function complete(
   input: Message[],
   handler?: (delta: string, snapshot: string) => void
 ): Promise<Message> {
-  const messages = [];
+  const messages = []; 
 
   for (const m of input) {
     const content = [];
@@ -170,7 +169,13 @@ export async function complete(
 
   while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
     for (const toolCall of completion.choices[0].message.tool_calls ?? []) {
-      const content = await callTool(toolCall.function.name, JSON.parse(toolCall.function.arguments));
+      const tool = tools.find((t) => t.name === toolCall.function.name);
+
+      if (!tool) {
+        throw new Error("Tool not found: " + toolCall.function.name);
+      }
+
+      const content = await tool.function(JSON.parse(toolCall.function.arguments));
 
       messages.push({
         role: "tool",
@@ -186,7 +191,6 @@ export async function complete(
       });
 
       messages.push(completion.choices[0].message);
-      console.log(completion.choices[0].message);
     }
   }
   
@@ -235,7 +239,6 @@ const toOpenAITools = (tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionToo
 
       strict: true,
       parameters: tool.parameters,
-
     },
   }));
 };
