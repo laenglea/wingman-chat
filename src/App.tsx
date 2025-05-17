@@ -20,7 +20,7 @@ function App() {
             <button
               key={key}
               onClick={() => setCurrentPage(key)}
-              className={`px-4 p-2 text-sm font-medium rounded transition-colors ${
+              className={`px-4 p-2 font-medium rounded transition-colors ${
                 currentPage === key
                   ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-200"
                   : "bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700"
