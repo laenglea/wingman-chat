@@ -12,7 +12,6 @@ export function useChats() {
   function createChat() {
     const chat = {
       id: crypto.randomUUID(),
-      title: "Untitled",
 
       created: new Date(),
       updated: new Date(),
@@ -46,7 +45,12 @@ export function useChats() {
     }
 
     saveTimeoutRef.current = window.setTimeout(() => {
-      saveLocalChats(chatItems);
+      const savedChats = loadLocalChats();
+
+      if (JSON.stringify(chatItems) !== JSON.stringify(savedChats)) {
+        saveLocalChats(chatItems);
+      }
+      
       saveTimeoutRef.current = null;
     }, SAVE_DELAY);
   }, [chats]);
@@ -58,7 +62,7 @@ export function useChats() {
   function saveLocalChats(chats: Chat[]) {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
-      console.log('chats saved');
+      //console.log('chats saved');
     }
     catch (error) {
       console.error('error saving chats', error);
@@ -79,7 +83,7 @@ export function useChats() {
         return [];
       }
 
-      console.log('chats loaded');
+      //console.log('chats loaded');
       return charts;
     }
     catch (error) {

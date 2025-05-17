@@ -96,14 +96,14 @@ export function TranslatePage() {
             value={sourceText}
             onChange={(e) => setSourceText(e.target.value)}
             placeholder="Enter text to translate..."
-            className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-blue-500 mb-2"
+            className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700"
           />
         </div>
 
         <div className="flex flex-col items-center justify-center px-2">
           <button
             onClick={handleTranslateButtonClick}
-            className="px-3 py-2 font-semibold rounded menu-button transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+            className="px-3 py-2 font-semibold rounded menu-button transition-colors focus:outline-none disabled:opacity-50"
             title={`Translate to ${languages.find(l => l.code === targetLang)?.name}`}
             disabled={isLoading || !sourceText.trim()}
           >
