@@ -14,7 +14,7 @@ export async function listTools(): Promise<Tool[]> {
         return [];
     }
 
-    console.log("Listing tools...");
+    console.log("list local tools");
 
     const result = await client.listTools();
 
@@ -37,8 +37,8 @@ export async function callTool(name: string, args: any): Promise<string> {
     if (!client) {
         return "";
     }
-    
-    console.log("Calling tool:", name);
+
+    console.log("call local tool", name, args);
 
     const result = await client.callTool({
       name: name,
@@ -67,7 +67,7 @@ export async function callTool(name: string, args: any): Promise<string> {
     return "";
 }
 
-async function initializeClient(): Promise<Client | undefined> {
+async function initializeClient(): Promise<Client | undefined> {    
     let client: Client | undefined = undefined;
     let transport: Transport | undefined = undefined;
     
@@ -82,7 +82,7 @@ async function initializeClient(): Promise<Client | undefined> {
         });
 
         await client.connect(transport);
-        console.log("Local MCP Server connected");
+        console.log("local tools connected");
 
         return client;
     } catch (error) {

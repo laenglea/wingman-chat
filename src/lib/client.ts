@@ -170,10 +170,7 @@ export async function complete(
 
   while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
     for (const toolCall of completion.choices[0].message.tool_calls ?? []) {
-      console.log(toolCall.function.name);
-
       const content = await callTool(toolCall.function.name, JSON.parse(toolCall.function.arguments));
-      console.log(content);
 
       messages.push({
         role: "tool",

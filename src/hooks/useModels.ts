@@ -28,9 +28,7 @@ export function useModels() {
           models = models.filter((model) => config.modelsFilter.includes(model.id));
         }
 
-        setModels(models);
-
-        console.log("models loaded");
+        setModels(models);        
       } catch (error) {
         console.error("error loading models", error);
       }
