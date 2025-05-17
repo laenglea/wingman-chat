@@ -1,7 +1,7 @@
 import { Tool } from "../models/chat";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-// import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-// import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
 let client: Client|undefined;
 
@@ -68,36 +68,34 @@ export async function callTool(name: string, args: any): Promise<string> {
 }
 
 async function initializeClient(): Promise<Client | undefined> {
-    return undefined;
-
-    // let client: Client | undefined = undefined;
-    // let transport: Transport | undefined = undefined;
+    let client: Client | undefined = undefined;
+    let transport: Transport | undefined = undefined;
     
-    // try {
-    //     transport = new SSEClientTransport(
-    //         new URL("http://localhost:4200/sse"),
-    //     );
+    try {
+        transport = new SSEClientTransport(
+            new URL("http://localhost:4200/sse"),
+        );
 
-    //     client = new Client({
-    //         name: 'wingman-client',
-    //         version: '1.0.0'
-    //     });
+        client = new Client({
+            name: 'wingman-client',
+            version: '1.0.0'
+        });
 
-    //     await client.connect(transport);
-    //     console.log("local tools connected");
+        await client.connect(transport);
+        console.log("local tools connected");
 
-    //     return client;
-    // } catch (error) {
-    //     console.error("Error initializing MCP client:", error);
+        return client;
+    } catch (error) {
+        console.error("Error initializing MCP client:", error);
         
-    //     if (client) {
-    //         client.close();
-    //     }
+        if (client) {
+            client.close();
+        }
         
-    //     if (transport) {
-    //        transport.close();
-    //     }
+        if (transport) {
+           transport.close();
+        }
 
-    //     return undefined;
-    // }
+        return undefined;
+    }
 }
