@@ -8,6 +8,7 @@ import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { Menu as MenuIcon, Plus as PlusIcon } from "lucide-react";
+import { listTools } from "../lib/mcp";
 
 export function ChatPage() {
   const { chats, createChat, deleteChat, saveChats } = useChats();
@@ -63,7 +64,9 @@ export function ChatPage() {
     ]);
 
     try {
-      const completion = await complete(model.id, messages, (_, snapshot) => {
+      const tools = await listTools();
+
+      const completion = await complete(model.id, tools, messages, (_, snapshot) => {
         setCurrentMessages([
           ...messages,
           {
@@ -76,7 +79,7 @@ export function ChatPage() {
       messages = [...messages, completion];
       setCurrentMessages(messages);
 
-      if (messages.length % 4 === 0) {
+      if (!chat.title || messages.length % 3 === 0) {
         summarize(model.id, messages).then((title) => {
           chat!.title = title;
         });

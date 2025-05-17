@@ -29,8 +29,8 @@ export function useModels() {
         }
 
         setModels(models);
-
-        console.log("models loaded");
+        //console.log("models loaded");
+        
       } catch (error) {
         console.error("error loading models", error);
       }
