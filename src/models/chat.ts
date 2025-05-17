@@ -22,6 +22,12 @@ export enum Role {
     Assistant = "assistant",
 }
 
+export type Tool = {
+    name: string;
+    description: string;
+    parameters: any;
+}
+
 export enum AttachmentType {
     Text = "text",
     File = "file_data",

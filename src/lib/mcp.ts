@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { Tool } from "../models/tool";
+import { Tool } from "../models/chat";
 
 let client: Client|undefined = undefined
 
@@ -25,6 +25,8 @@ export async function listTools(): Promise<Tool[]> {
         return [];
     }
 
+    console.log("Listing tools...");
+
     const result = await client.listTools();
 
     return result.tools.map((tool) => {
@@ -46,6 +48,8 @@ export async function callTool(name: string, args: any): Promise<string> {
     if (!client) {
         return "";
     }
+    
+    console.log("Calling tool:", name);
 
     const result = await client.callTool({
       name: name,
