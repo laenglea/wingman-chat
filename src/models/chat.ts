@@ -43,7 +43,7 @@ export type Attachment = {
 
 export type Chat = {
     id: string;
-    title: string;
+    title?: string;
 
     created: Date | null;
     updated: Date | null;

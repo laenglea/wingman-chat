@@ -20,6 +20,12 @@ export function Sidebar({
   onDeleteChat,
 }: SidebarProps) {
   const config = getConfig();
+  
+  const sortedChats = [...chats].sort((a, b) => {
+    const dateA = a.updated ? new Date(a.updated).getTime() : 0;
+    const dateB = b.updated ? new Date(b.updated).getTime() : 0;
+    return dateB - dateA; // Descending order (newest first)
+  });
 
   return (
     <div
@@ -30,7 +36,7 @@ export function Sidebar({
       <div className="flex flex-col h-full gap-4 p-4">
         <h2 className="text-xl font-semibold">{config.title}</h2>
         <ul className="flex flex-col gap-2 flex-1 overflow-auto">
-          {chats.map((chat) => (
+          {sortedChats.map((chat) => (
             <li
               key={chat.id}
               className={`flex items-center justify-between sidebar-item ${
