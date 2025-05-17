@@ -24,6 +24,31 @@ export async function listTools(): Promise<Tool[]> {
             description: tool.description ?? "",
 
             parameters: tool.inputSchema,
+
+            function: async (args: any) => {
+                try {
+                    console.log("call local tool", tool.name, args);
+
+                    const result = await client?.callTool({
+                        name: tool.name,
+                        arguments: args,
+                    });
+                    
+                    const results = result?.content as ToolTextResult[];
+                    const texts: string[] = [];
+
+                    for (const result of results) {
+                        if (result.type === "text" && result.text) {
+                            texts.push(result.text);
+                        }
+                    }
+
+                    return texts.join("\n\n");
+                }
+                catch (error) {
+                    return "tool failed";
+                }               
+            },
         };
     });
 }
@@ -33,39 +58,6 @@ interface ToolTextResult {
     text?: string;
 }
 
-export async function callTool(name: string, args: any): Promise<string> {
-    if (!client) {
-        return "";
-    }
-
-    console.log("call local tool", name, args);
-
-    const result = await client.callTool({
-      name: name,
-      arguments: args,
-    });
-
-    if (result && result.content) {
-        try {
-            const results = result.content as ToolTextResult[];
-            const texts: string[] = [];
-
-            for (const result of results) {
-                if (result.type === "text" && result.text) {
-                    texts.push(result.text);
-                }
-            }
-
-            return texts.join("\n\n");
-
-        } catch (error) {
-            console.error("Error parsing tool result content:", error);
-            return "";
-        }
-    }
-
-    return "";
-}
 
 async function initializeClient(): Promise<Client | undefined> {
     let client: Client | undefined = undefined;
@@ -77,7 +69,7 @@ async function initializeClient(): Promise<Client | undefined> {
         );
 
         client = new Client({
-            name: 'wingman-client',
+            name: 'wingman-chat',
             version: '1.0.0'
         });
 

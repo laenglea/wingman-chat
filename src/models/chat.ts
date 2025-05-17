@@ -25,7 +25,10 @@ export enum Role {
 export type Tool = {
     name: string;
     description: string;
+
     parameters: any;
+
+    function: (args: any) => Promise<string>;
 }
 
 export enum AttachmentType {
