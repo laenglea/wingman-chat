@@ -17,16 +17,17 @@ import {
   textTypes,
   partitionTypes,
   imageTypes,
-  Client,
 } from "../lib/client";
+import { getConfig } from "../config";
 
 type ChatInputProps = {
   onSend: (message: Message) => void;
 };
 
 export function ChatInput({ onSend }: ChatInputProps) {
-  const client = new Client();
-  
+  const config = getConfig();
+  const client = config.client;
+
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
@@ -105,7 +106,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         if (partitionTypes.includes(file.type) || partitionTypes.includes(getFileExt(file.name))) {
           const parts = await client.partition(file);
-          
+
           let text = parts.map((part) => part.text).join("\n\n");
           text = text.replace(/[\u0000-\u001F\u007F]/g, "");
 

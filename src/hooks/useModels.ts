@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { Model } from "../models/chat";
 import { getConfig } from "../config";
-import { Client } from "../lib/client";
 
 export function useModels() {
   const [models, setModels] = useState<Model[]>([]);
 
   useEffect(() => {
     const config = getConfig();
-    const client = new Client();
+    const client = config.client;
 
     if (config?.models?.length > 0) {
       let models = config.models
@@ -29,7 +28,7 @@ export function useModels() {
           models = models.filter((model) => config.modelsFilter.includes(model.id));
         }
 
-        setModels(models);        
+        setModels(models);
       } catch (error) {
         console.error("error loading models", error);
       }

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Client } from "../lib/client";
 import { Chat, Message, Model, Role } from "../models/chat";
 import { useChats } from "../hooks/useChats";
 import { useModels } from "../hooks/useModels";
@@ -8,10 +7,12 @@ import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { Menu as MenuIcon, Plus as PlusIcon } from "lucide-react";
-import { listTools } from "../lib/mcp";
+import { getConfig } from "../config";
 
 export function ChatPage() {
-  const client = new Client();
+  const config = getConfig();
+  const client = config.client;
+  const bridge = config.bridge;
 
   const { chats, createChat, deleteChat, saveChats } = useChats();
   const { models } = useModels();
@@ -66,7 +67,7 @@ export function ChatPage() {
     ]);
 
     try {
-      const tools = await listTools();
+      const tools = await bridge.listTools();
 
       const completion = await client.complete(model.id, tools, messages, (_, snapshot) => {
         setCurrentMessages([
@@ -82,7 +83,7 @@ export function ChatPage() {
       setCurrentMessages(messages);
 
       if (!chat.title || messages.length % 3 === 0) {
-       client.summarize(model.id, messages).then((title) => {
+        client.summarize(model.id, messages).then((title) => {
           chat!.title = title;
         });
       }
@@ -162,7 +163,7 @@ export function ChatPage() {
         />
       </aside>
 
-      <div 
+      <div
         className="fixed top-2 left-2 flex items-center gap-2 transition-transform duration-300 z-20"
         style={{ transform: showSidebar ? 'translateX(264px)' : 'translateX(0)' }}
       >
