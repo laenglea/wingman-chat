@@ -13,11 +13,11 @@ import {
   supportsScreenshot,
 } from "../lib/utils";
 import {
-  partition,
   supportedTypes,
   textTypes,
   partitionTypes,
   imageTypes,
+  Client,
 } from "../lib/client";
 
 type ChatInputProps = {
@@ -25,6 +25,8 @@ type ChatInputProps = {
 };
 
 export function ChatInput({ onSend }: ChatInputProps) {
+  const client = new Client();
+  
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
@@ -102,7 +104,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
         }
 
         if (partitionTypes.includes(file.type) || partitionTypes.includes(getFileExt(file.name))) {
-          const parts = await partition(file);
+          const parts = await client.partition(file);
           
           let text = parts.map((part) => part.text).join("\n\n");
           text = text.replace(/[\u0000-\u001F\u007F]/g, "");
