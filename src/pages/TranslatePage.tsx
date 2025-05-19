@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon } from "lucide-react";
-import { Client } from "../lib/client";
+import { getConfig } from "../config";
 
 const languages = [
   { code: "en", name: "English" },
@@ -12,7 +12,8 @@ const languages = [
 ];
 
 export function TranslatePage() {
-  const client = new Client();
+  const config = getConfig();
+  const client = config.client;
 
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
@@ -44,7 +45,7 @@ export function TranslatePage() {
 
   const handleLanguageChange = (newLangCode: string) => {
     setTargetLang(newLangCode);
-    
+
     (async () => {
       await performTranslate(newLangCode, sourceText);
     })();
@@ -81,7 +82,7 @@ export function TranslatePage() {
           </MenuItems>
         </Menu>
       </div>
-      
+
       <div className="fixed top-2 right-2 z-20">
         <Button
           className="menu-button"
@@ -91,7 +92,7 @@ export function TranslatePage() {
           <PlusIcon size={20} />
         </Button>
       </div>
-      
+
       <main className="w-full flex flex-col md:flex-row items-stretch gap-4 flex-grow p-4 pt-16">
         <div className="flex-1 flex flex-col gap-2 relative">
           <textarea

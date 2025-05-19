@@ -1,7 +1,12 @@
+import { Bridge } from "./lib/bridge";
+import { Client } from "./lib/client";
 import { Model } from "./models/chat";
 
 interface Config {
   title: string;
+
+  client: Client;
+  bridge: Bridge;
 
   models: Model[];
 
@@ -18,7 +23,16 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       throw new Error(`failed to load config.json: ${resp.statusText}`);
     }
 
-    return config = await resp.json();
+    config = await resp.json();
+
+    const client = new Client();
+    const bridge = await Bridge.create("http://localhost:4200");
+
+    config.client = client;
+    config.bridge = bridge;
+
+    return config;
+
   } catch (error) {
     console.error("unable to load config", error);
   }
