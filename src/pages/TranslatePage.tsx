@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon } from "lucide-react";
-import { translate } from "../lib/client";
+import { Client } from "../lib/client";
 
 const languages = [
   { code: "en", name: "English" },
@@ -12,6 +12,8 @@ const languages = [
 ];
 
 export function TranslatePage() {
+  const client = new Client();
+
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [targetLang, setTargetLang] = useState("en");
@@ -27,7 +29,7 @@ export function TranslatePage() {
     setTranslatedText("");
 
     try {
-      const result = await translate(langToUse, textToTranslate);
+      const result = await client.translate(langToUse, textToTranslate);
       setTranslatedText(result);
     } catch (err) {
       setTranslatedText(err instanceof Error ? err.message : "An unknown error occurred during translation.");

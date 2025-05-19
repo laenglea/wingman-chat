@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { Client } from "../lib/client";
 import { Chat, Message, Model, Role } from "../models/chat";
-import { complete, summarize } from "../lib/client";
 import { useChats } from "../hooks/useChats";
 import { useModels } from "../hooks/useModels";
 import { Sidebar } from "../components/Sidebar";
@@ -11,6 +11,8 @@ import { Menu as MenuIcon, Plus as PlusIcon } from "lucide-react";
 import { listTools } from "../lib/mcp";
 
 export function ChatPage() {
+  const client = new Client();
+
   const { chats, createChat, deleteChat, saveChats } = useChats();
   const { models } = useModels();
 
@@ -66,7 +68,7 @@ export function ChatPage() {
     try {
       const tools = await listTools();
 
-      const completion = await complete(model.id, tools, messages, (_, snapshot) => {
+      const completion = await client.complete(model.id, tools, messages, (_, snapshot) => {
         setCurrentMessages([
           ...messages,
           {
@@ -80,7 +82,7 @@ export function ChatPage() {
       setCurrentMessages(messages);
 
       if (!chat.title || messages.length % 3 === 0) {
-        summarize(model.id, messages).then((title) => {
+       client.summarize(model.id, messages).then((title) => {
           chat!.title = title;
         });
       }

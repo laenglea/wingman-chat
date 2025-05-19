@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Model } from "../models/chat";
 import { getConfig } from "../config";
-import { listModels } from "../lib/client";
+import { Client } from "../lib/client";
 
 export function useModels() {
   const [models, setModels] = useState<Model[]>([]);
 
   useEffect(() => {
     const config = getConfig();
+    const client = new Client();
 
     if (config?.models?.length > 0) {
       let models = config.models
@@ -22,7 +23,7 @@ export function useModels() {
 
     const loadModels = async () => {
       try {
-        let models = await listModels();
+        let models = await client.listModels();
 
         if (config.modelsFilter) {
           models = models.filter((model) => config.modelsFilter.includes(model.id));
