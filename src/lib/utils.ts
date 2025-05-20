@@ -131,3 +131,45 @@ export function getFileExt(filename: string): string {
   const parts = filename.split('.');
   return parts.length > 1 ? "." + parts.pop() || "" : "";
 }
+
+export const textTypes = [
+  "text/csv",
+  "text/markdown",
+  "text/plain",
+  "application/json",
+  "application/sql",
+  "application/toml",
+  "application/x-yaml",
+  "application/xml",
+  "text/css",
+  "text/html",
+  "text/xml",
+  "text/yaml",
+  ".c",
+  ".cpp",
+  ".cs",
+  ".go",
+  ".html",
+  ".java",
+  ".js",
+  ".kt",
+  ".py",
+  ".rs",
+  ".ts",
+];
+
+export const imageTypes = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+
+export const partitionTypes = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
+export const supportedTypes = [...textTypes, ...imageTypes, ...partitionTypes];

@@ -43,8 +43,8 @@ export function ChatPage() {
   };
 
   const sendMessage = async (message: Message) => {
-    var chat = currentChat;
-    var model = currentModel;
+    let chat = currentChat;
+    const model = currentModel;
 
     if (!model) {
       throw new Error("no model selected");
@@ -56,7 +56,7 @@ export function ChatPage() {
       setCurrentChat(chat);
     }
 
-    var messages = [...currentMessages, message];
+    let messages = [...currentMessages, message];
 
     setCurrentMessages([
       ...messages,
@@ -93,8 +93,7 @@ export function ChatPage() {
         return;
       }
 
-      var content =
-        "An error occurred while processing the request.\n" + error?.toString();
+      const content = "An error occurred while processing the request.\n" + error?.toString();
 
       setCurrentMessages([
         ...messages,
@@ -113,7 +112,7 @@ export function ChatPage() {
     if (models.length > 0) {
       setCurrentModel(models[0]);
     }
-  }, [models]);
+  }, [currentModel, models]);
 
   useEffect(() => {
     if (chats.length == 0) {
@@ -126,7 +125,7 @@ export function ChatPage() {
       currentChat.updated = new Date();
       currentChat.model = currentModel ?? null;
     }
-  }, [currentModel]);
+  }, [currentChat, currentModel]);
 
   useEffect(() => {
     if (!currentChat) {
@@ -135,12 +134,12 @@ export function ChatPage() {
     currentChat.updated = new Date();
     currentChat.messages = currentMessages;
     saveChats();
-  }, [currentMessages]);
+  }, [currentChat, currentMessages, saveChats]);
 
   useEffect(() => {
     setCurrentModel(currentChat?.model ?? currentModel);
     setCurrentMessages(currentChat?.messages ?? []);
-  }, [currentChat]);
+  }, [currentChat, currentModel]);
 
   useEffect(() => {
     messageContainerRef.current?.scrollTo({

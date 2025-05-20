@@ -11,13 +11,11 @@ import {
   readAsText,
   resizeImageBlob,
   supportsScreenshot,
-} from "../lib/utils";
-import {
   supportedTypes,
   textTypes,
   partitionTypes,
   imageTypes,
-} from "../lib/client";
+} from "../lib/utils";
 import { getConfig } from "../config";
 
 type ChatInputProps = {
@@ -106,9 +104,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         if (partitionTypes.includes(file.type) || partitionTypes.includes(getFileExt(file.name))) {
           const parts = await client.partition(file);
-
-          let text = parts.map((part) => part.text).join("\n\n");
-          text = text.replace(/[\u0000-\u001F\u007F]/g, "");
+          const text = parts.map((part) => part.text).join("\n\n");
 
           newAttachments.push({
             type: AttachmentType.Text,
