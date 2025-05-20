@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"unicode"
 
 	"gopkg.in/yaml.v3"
 )
@@ -19,10 +18,6 @@ func main() {
 		title = "Wingman AI"
 	}
 
-	models := strings.FieldsFunc(os.Getenv("MODELS"), func(r rune) bool {
-		return r == ',' || r == ';' || unicode.IsSpace(r)
-	})
-
 	token := os.Getenv("OPENAI_API_KEY")
 	target, _ := url.Parse(os.Getenv("OPENAI_BASE_URL"))
 
@@ -32,6 +27,8 @@ func main() {
 
 	target.Path = strings.TrimRight(target.Path, "/")
 	target.Path = strings.TrimRight(target.Path, "/v1")
+
+	bridgeURL := os.Getenv("BRIDGE_BASE_URL")
 
 	mux := http.NewServeMux()
 	dist := os.DirFS("dist")
@@ -46,12 +43,15 @@ func main() {
 			Description string `json:"description,omitempty" yaml:"description,omitempty"`
 		}
 
+		type bridgeType struct {
+			URL string `json:"url,omitempty" yaml:"url,omitempty"`
+		}
+
 		type configType struct {
 			Title string `json:"title,omitempty" yaml:"title,omitempty"`
 
 			Models []modelType `json:"models,omitempty" yaml:"models,omitempty"`
-
-			ModelsFilter []string `json:"modelsFilter,omitempty" yaml:"modelsFilter,omitempty"`
+			Bridge *bridgeType `json:"bridge,omitempty" yaml:"bridge,omitempty"`
 		}
 
 		config := configType{
@@ -62,8 +62,10 @@ func main() {
 			yaml.Unmarshal(data, &config.Models)
 		}
 
-		if len(models) > 0 {
-			config.ModelsFilter = models
+		if bridgeURL != "" {
+			config.Bridge = &bridgeType{
+				URL: bridgeURL,
+			}
 		}
 
 		w.Header().Set("Content-Type", "application/json")
