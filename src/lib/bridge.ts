@@ -15,27 +15,28 @@ interface ToolTextResult {
 export class Bridge {
     private mcp: Client | undefined;
 
-    private constructor() {
+    private constructor(mcp?: Client) {
+        this.mcp = mcp;
     }
 
-    public static async create(baseUrl: string = "http://localhost:4200"): Promise<Bridge> {
-        const bridge = new Bridge();
+    public static async create(baseUrl: string): Promise<Bridge> {
+       if (baseUrl === "") {
+            return new Bridge();
+        }
 
         try {
             const response = await fetch(new URL("/.well-known/wingman", baseUrl))
 
             if (!response.ok) {
                 console.info("Bridge not available");
-                bridge.mcp = undefined;
-                return bridge
+                return new Bridge();
             }
 
             const config: BridgeConfig = await response.json();
             console.info("Bridge config", config);
 
         } catch {
-            bridge.mcp = undefined;
-            return bridge
+            return new Bridge();
         }        
 
         let client: Client | undefined = undefined;
@@ -52,10 +53,10 @@ export class Bridge {
             });
 
             await client.connect(transport);
-
-            bridge.mcp = client;
             console.info("Bridge connected");
-        } catch (error) {
+
+            return new Bridge(client);
+        } catch {
             if (client) {
                 client.close();
             }
@@ -63,11 +64,9 @@ export class Bridge {
             if (transport) {
                 transport.close();
             }
-
-            bridge.mcp = undefined;
+            
+            return new Bridge();
         }
-
-        return bridge;
     }
 
     public async listTools(): Promise<Tool[]> {

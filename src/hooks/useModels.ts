@@ -10,24 +10,13 @@ export function useModels() {
     const client = config.client;
 
     if (config?.models?.length > 0) {
-      let models = config.models
-
-      if (config.modelsFilter) {
-        models = models.filter((model) => config.modelsFilter.includes(model.id));
-      }
-
-      setModels(models);
+      setModels(config.models);
       return;
     }
 
     const loadModels = async () => {
       try {
-        let models = await client.listModels();
-
-        if (config.modelsFilter) {
-          models = models.filter((model) => config.modelsFilter.includes(model.id));
-        }
-
+        const models = await client.listModels();
         setModels(models);
       } catch (error) {
         console.error("error loading models", error);
