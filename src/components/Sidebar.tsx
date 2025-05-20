@@ -24,7 +24,7 @@ export function Sidebar({
   const sortedChats = [...chats].sort((a, b) => {
     const dateA = a.updated ? new Date(a.updated).getTime() : 0;
     const dateB = b.updated ? new Date(b.updated).getTime() : 0;
-    return dateB - dateA; // Descending order (newest first)
+    return dateB - dateA;
   });
 
   return (

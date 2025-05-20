@@ -26,9 +26,9 @@ export type Tool = {
     name: string;
     description: string;
 
-    parameters: any;
+    parameters: Record<string, unknown>;
 
-    function: (args: any) => Promise<string>;
+    function: (args: Record<string, unknown>) => Promise<string>;
 }
 
 export enum AttachmentType {

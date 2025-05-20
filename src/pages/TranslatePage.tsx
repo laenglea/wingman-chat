@@ -40,7 +40,7 @@ export function TranslatePage() {
   };
 
   const handleTranslateButtonClick = () => {
-    performTranslate(targetLang, sourceText); // Uses current targetLang from state
+    performTranslate(targetLang, sourceText);
   };
 
   const handleLanguageChange = (newLangCode: string) => {

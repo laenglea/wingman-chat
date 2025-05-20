@@ -70,15 +70,11 @@ export class Bridge {
     }
 
     public async listTools(): Promise<Tool[]> {
-        console.log("list tools");
-        console.log(this.mcp);
-
         if (!this.mcp) {
             return [];
         }
 
         const result = await this.mcp.listTools();
-        console.log("tools", result);
 
         return result.tools.map((tool) => {
             return {
@@ -87,7 +83,7 @@ export class Bridge {
 
                 parameters: tool.inputSchema,
 
-                function: async (args: any) => {
+                function: async (args: Record<string, unknown>) => {
                     if (!this.mcp) {
                         return "tool currently unavailable";
                     }

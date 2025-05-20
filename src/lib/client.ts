@@ -83,20 +83,22 @@ export class Client {
 
         if (!tool) {
           messages.push({
-            role: "tool",
             tool_call_id: toolCall.id,
+            
+            role: "tool",
             content: `Error: Tool "${toolCall.function.name}" not found or not executable.`,
           });
 
           continue;
         }
 
-        const args = JSON.parse(toolCall.function.arguments);
+        const args = JSON.parse(toolCall.function.arguments || '{}');
         const content = await tool.function(args);
 
         messages.push({
-          role: "tool",
           tool_call_id: toolCall.id,
+
+          role: "tool",
           content: content,
         });
 
@@ -126,8 +128,8 @@ export class Client {
 
   async summarize(model: string, input: Message[]): Promise<string> {
     const history = input
-      .slice(-6) // Get last 6 messages
-      .map((m) => `${m.role}: ${m.content}`) // Include role for context
+      .slice(-6)
+      .map((m) => `${m.role}: ${m.content}`)
       .join("\\n");
 
     const completion = await this.oai.chat.completions.create({
