@@ -2,48 +2,6 @@ import OpenAI from "openai";
 import { Tool } from "../models/chat";
 import { Message, Model, Role, AttachmentType, Partition } from "../models/chat";
 
-export const textTypes = [
-  "text/csv",
-  "text/markdown",
-  "text/plain",
-  "application/json",
-  "application/sql",
-  "application/toml",
-  "application/x-yaml",
-  "application/xml",
-  "text/css",
-  "text/html",
-  "text/xml",
-  "text/yaml",
-  ".c",
-  ".cpp",
-  ".cs",
-  ".go",
-  ".html",
-  ".java",
-  ".js",
-  ".kt",
-  ".py",
-  ".rs",
-  ".ts",
-];
-
-export const imageTypes = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-];
-
-export const partitionTypes = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
-
-export const supportedTypes = [...textTypes, ...imageTypes, ...partitionTypes];
-
 export class Client {
   private oai: OpenAI;
 
