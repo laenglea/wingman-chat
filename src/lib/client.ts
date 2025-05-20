@@ -120,10 +120,7 @@ export class Client {
     messages.push(completion.choices[0].message);
 
     while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
-      const toolCalls = completion.choices[0].message.tool_calls;
-      if (!toolCalls) break;
-
-      for (const toolCall of toolCalls) {
+      for (const toolCall of completion.choices[0].message.tool_calls ?? []) {
         const tool = tools.find((t) => t.name === toolCall.function.name);
 
         if (!tool) {
@@ -136,30 +133,24 @@ export class Client {
           continue;
         }
 
-        try {
-          const args = JSON.parse(toolCall.function.arguments);
-          const content = await tool.function(args);
+        const args = JSON.parse(toolCall.function.arguments);
+        const content = await tool.function(args);
 
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: content,
-          });
-        } catch (error) {
-          messages.push({
-            role: "tool",
-            tool_call_id: toolCall.id,
-            content: `Error executing tool "${toolCall.function.name}": ${(error as Error).message}`,
-          });
-        }
+        messages.push({
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: content,
+        });
+
+        completion = await this.oai.beta.chat.completions.parse({
+          model: model,
+
+          tools: this.toTools(tools),
+          messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+        });
+
+        messages.push(completion.choices[0].message);
       }
-
-      completion = await this.oai.beta.chat.completions.parse({
-        model: model,
-        
-        tools: this.toTools(tools),
-        messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-      });
     }
 
     const message = completion.choices[0].message;
