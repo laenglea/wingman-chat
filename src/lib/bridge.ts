@@ -19,54 +19,52 @@ export class Bridge {
         this.mcp = mcp;
     }
 
-    public static async create(baseUrl: string): Promise<Bridge> {
-       if (baseUrl === "") {
-            return new Bridge();
+    public static create(baseUrl: string): Bridge {
+        const bridge = new Bridge();
+
+        if (baseUrl === "") {
+            return bridge;
         }
 
-        try {
-            const response = await fetch(new URL("/.well-known/wingman", baseUrl))
+        (async () => {
+            try {
+                const response = await fetch(new URL("/.well-known/wingman", baseUrl));
 
-            if (!response.ok) {
-                console.info("Bridge not available");
-                return new Bridge();
+                if (!response.ok) {
+                    console.info("Bridge not available");
+                    return;
+                }
+
+                const config : BridgeConfig = await response.json();
+                console.log("Bridge config", config);
+            } catch {
+                return;
             }
 
-            const config: BridgeConfig = await response.json();
-            console.info("Bridge config", config);
+            let client: Client | undefined;
+            let transport: Transport | undefined;
 
-        } catch {
-            return new Bridge();
-        }        
+            try {
+                transport = new SSEClientTransport(
+                    new URL("/sse", baseUrl),
+                );
 
-        let client: Client | undefined = undefined;
-        let transport: Transport | undefined = undefined;
+                client = new Client({
+                    name: 'wingman-bridge',
+                    version: '1.0.0'
+                });
 
-        try {
-            transport = new SSEClientTransport(
-                new URL("/sse", baseUrl),
-            );
+                await client.connect(transport);
+                bridge.mcp = client;
 
-            client = new Client({
-                name: 'wingman-chat',
-                version: '1.0.0'
-            });
-
-            await client.connect(transport);
-            console.info("Bridge connected");
-
-            return new Bridge(client);
-        } catch {
-            if (client) {
-                client.close();
+                console.info("Bridge connected");
+            } catch {
+                if (client) client.close();
+                if (transport) transport.close();
             }
+        })();
 
-            if (transport) {
-                transport.close();
-            }
-            
-            return new Bridge();
-        }
+        return bridge;
     }
 
     public async listTools(): Promise<Tool[]> {
