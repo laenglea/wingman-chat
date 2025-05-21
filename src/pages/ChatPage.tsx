@@ -88,8 +88,9 @@ export function ChatPage() {
         });
       }
     } catch (error) {
+      console.log(error);
+
       if (error?.toString().includes("missing finish_reason")) {
-        console.log(error);
         return;
       }
 
