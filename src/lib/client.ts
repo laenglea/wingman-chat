@@ -54,10 +54,21 @@ export class Client {
         }
       }
 
-      messages.push({
-        role: Role.User,
-        content: content,
-      });
+      switch (m.role) {
+        case Role.User:
+          messages.push({
+            role: Role.User,
+            content: content,
+          });
+          break;
+
+        case Role.Assistant:
+          messages.push({
+            role: Role.Assistant,
+            content: content.filter((c) => c.type === "text"),
+          });
+          break;
+      }
     }
 
     const stream = this.oai.beta.chat.completions.stream({
@@ -74,7 +85,7 @@ export class Client {
       stream.on("content", handler);
     }
 
-    let completion = await stream.finalChatCompletion();
+    let completion = await stream.finalChatCompletion() as OpenAI.ChatCompletion;
     messages.push(completion.choices[0].message);
 
     while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
@@ -84,7 +95,7 @@ export class Client {
         if (!tool) {
           messages.push({
             tool_call_id: toolCall.id,
-            
+
             role: "tool",
             content: `Error: Tool "${toolCall.function.name}" not found or not executable.`,
           });
@@ -92,21 +103,33 @@ export class Client {
           continue;
         }
 
-        const args = JSON.parse(toolCall.function.arguments || '{}');
-        const content = await tool.function(args);
+        try {
+          const args = JSON.parse(toolCall.function.arguments || "{}");
+          const result = await tool.function(args);
 
-        messages.push({
-          tool_call_id: toolCall.id,
+          messages.push({
+            role: "tool",
+            content: result,
 
-          role: "tool",
-          content: content,
-        });
+            tool_call_id: toolCall.id,
+          });
+        }
+        catch(error) {
+          console.error("Tool failed", error);
 
-        completion = await this.oai.beta.chat.completions.parse({
+          messages.push({
+            role: "tool",
+            content: "error: tool execution failed.",
+
+            tool_call_id: toolCall.id,
+          });
+        }
+
+        completion = await this.oai.chat.completions.create({
           model: model,
 
           tools: this.toTools(tools),
-          messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+          messages: messages,
         });
 
         messages.push(completion.choices[0].message);
@@ -139,8 +162,7 @@ export class Client {
           role: "user",
           content: `Summarize the following conversation into a short title (less than 10 words). Return only the title itself, without any introductory phrases, explanations, or quotation marks.\n\nConversation:\n${history}`,
         },
-      ],
-      temperature: 0.2,
+      ]
     });
 
     return completion.choices[0].message.content?.trim() ?? "Summary not available";
