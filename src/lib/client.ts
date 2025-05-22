@@ -114,7 +114,7 @@ export class Client {
             tool_call_id: toolCall.id,
           });
         }
-        catch(error) {
+        catch (error) {
           console.error("Tool failed", error);
 
           messages.push({
@@ -124,16 +124,16 @@ export class Client {
             tool_call_id: toolCall.id,
           });
         }
-
-        completion = await this.oai.chat.completions.create({
-          model: model,
-
-          tools: this.toTools(tools),
-          messages: messages,
-        });
-
-        messages.push(completion.choices[0].message);
       }
+
+      completion = await this.oai.chat.completions.create({
+        model: model,
+
+        tools: this.toTools(tools),
+        messages: messages,
+      });
+
+      messages.push(completion.choices[0].message);
     }
 
     const message = completion.choices[0].message;
