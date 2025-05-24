@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Chat, Message, Model, Role } from "../models/chat";
 import { useChats } from "../hooks/useChats";
 import { useModels } from "../hooks/useModels";
@@ -149,10 +150,60 @@ export function ChatPage() {
     });
   }, [currentChat, currentMessages]);
 
+  const leftControlsContainer = document.getElementById('chat-left-controls');
+  const rightControlsContainer = document.getElementById('chat-right-controls');
+
   return (
-    <div className="h-full w-full overflow-hidden">
+    <div className="h-full w-full flex flex-col overflow-hidden">
+      {leftControlsContainer && createPortal(
+        <div className="flex items-center gap-2">
+          <Button
+            className="menu-button"
+            onClick={toggleSidebar}
+          >
+            <MenuIcon size={20} />
+          </Button>
+          <div>
+            <Menu>
+              <MenuButton className="inline-flex items-center menu-button">
+                {currentModel?.name ?? currentModel?.id ?? "Select Model"}
+              </MenuButton>
+              <MenuItems
+                transition
+                anchor="bottom start"
+                className="!max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg"
+              >
+                {models.map((model) => (
+                  <MenuItem key={model.id}>
+                    <Button
+                      onClick={() => setCurrentModel(model)}
+                      title={model.description}
+                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
+                    >
+                      {model.name ?? model.id}
+                    </Button>
+                  </MenuItem>
+                ))}
+              </MenuItems>
+            </Menu>
+          </div>
+        </div>,
+        leftControlsContainer
+      )}
+
+      {rightControlsContainer && createPortal(
+        <Button
+          className="menu-button"
+          onClick={handleCreateChat}
+        >
+          <PlusIcon size={20} />
+        </Button>,
+        rightControlsContainer
+      )}
+
       <aside
-        className={`${showSidebar ? "translate-x-0" : "-translate-x-full"} transition-all duration-300 fixed top-0 bottom-0 left-0 w-64 z-30`}
+        className={`${showSidebar ? "translate-x-0" : "-translate-x-full"} transition-all duration-300 fixed top-0 bottom-0 left-0 w-64 z-50`}
+        style={{ zIndex: 60 }}
       >
         <Sidebar
           isVisible={showSidebar}
@@ -163,65 +214,21 @@ export function ChatPage() {
         />
       </aside>
 
-      <div
-        className="fixed top-2 left-2 flex items-center gap-2 transition-transform duration-300 z-20"
-        style={{ transform: showSidebar ? 'translateX(264px)' : 'translateX(0)' }}
-      >
-        <Button
-          className="menu-button"
-          onClick={toggleSidebar}
-        >
-          <MenuIcon size={20} />
-        </Button>
-        <div>
-          <Menu>
-            <MenuButton className="inline-flex items-center menu-button">
-              {currentModel?.name ?? currentModel?.id ?? "Select Model"}
-            </MenuButton>
-            <MenuItems
-              transition
-              anchor="bottom start"
-              className="!max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg"
-            >
-              {models.map((model) => (
-                <MenuItem key={model.id}>
-                  <Button
-                    onClick={() => setCurrentModel(model)}
-                    title={model.description}
-                    className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
-                  >
-                    {model.name ?? model.id}
-                  </Button>
-                </MenuItem>
-              ))}
-            </MenuItems>
-          </Menu>
-        </div>
-      </div>
-
-      <div className="fixed top-2 right-2 z-20">
-        <Button
-          className="menu-button"
-          onClick={handleCreateChat}
-        >
-          <PlusIcon size={20} />
-        </Button>
-      </div>
-
-      <main className="h-full flex flex-col">
+      <main className="flex-1 flex flex-col overflow-hidden pb-24">
         {showSidebar && (
           <div
-            className="fixed inset-0 z-10 bg-black/10 dark:bg-black/50 backdrop-blur-xs"
+            className="fixed inset-0 z-50 bg-black/10 dark:bg-black/50 backdrop-blur-xs"
+            style={{ zIndex: 55 }}
             onClick={toggleSidebar}
           />
         )}
 
         <div
-          className="flex-1 overflow-auto p-4 pt-16" /* Added padding-top to avoid content being hidden under fixed nav */
+          className="flex-1 overflow-auto px-4 py-2 ios-scroll"
           ref={messageContainerRef}
         >
           {currentMessages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="flex flex-col items-center justify-center min-h-full text-center">
               <img src="/logo.svg" className="w-48 h-48 mb-4" />
             </div>
           ) : (
@@ -230,11 +237,11 @@ export function ChatPage() {
             ))
           )}
         </div>
-
-        <footer className="border-t border-[#3a3a3c] p-4">
-          <ChatInput onSend={sendMessage} />
-        </footer>
       </main>
+
+      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-300 dark:border-neutral-700 p-4">
+        <ChatInput onSend={sendMessage} />
+      </footer>
     </div>
   );
 }
