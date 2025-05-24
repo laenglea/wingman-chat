@@ -1,241 +1,223 @@
 import OpenAI from "openai";
 import { Tool } from "../models/chat";
+import { Message, Model, Role, AttachmentType, Partition } from "../models/chat";
 
-import {
-  Message,
-  Model,
-  Role,
-  Partition,
-  AttachmentType,
-} from "../models/chat";
-import { callTool } from "./mcp";
+export class Client {
+  private oai: OpenAI;
 
-const client = new OpenAI({
-  baseURL: new URL("/api/v1", window.location.origin).toString(),
-  apiKey: "sk-",
-  dangerouslyAllowBrowser: true,
-});
-
-export async function listModels(): Promise<Model[]> {
-  const models = await client.models.list();
-
-  return models.data.map((model) => {
-    return {
-      id: model.id,
-      name: model.id,
-    };
-  });
-}
-
-export const textTypes = [
-  "text/csv",
-  "text/markdown",
-  "text/plain",
-
-  "application/json",
-  "application/sql",
-  "application/toml",
-  "application/x-yaml",
-  "application/xml",
-  "text/css",
-  "text/html",
-  "text/xml",
-  "text/yaml",
-
-  ".c",
-  ".cpp",
-  ".cs",
-  ".go",
-  ".html",
-  ".java",
-  ".js",
-  ".kt",
-  ".py",
-  ".rs",
-  ".ts",
-];
-
-export const imageTypes = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-];
-
-export const partitionTypes = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-];
-
-export const supportedTypes = [...textTypes, ...imageTypes, ...partitionTypes];
-
-export async function partition(blob: Blob): Promise<Partition[]> {
-  const data = new FormData();
-  data.append("files", blob);
-
-  const resp = await fetch("/api/v1/partition", {
-    method: "POST",
-    headers: {
-      accept: "application/json",
-    },
-    body: data,
-  });
-
-  return resp.json() as Promise<Partition[]>;
-}
-
-export async function translate(lang: string, text: string): Promise<string> {
-  const data = new FormData();
-  data.append("lang", lang);
-  data.append("text", text);
-
-  const resp = await fetch("/api/v1/translate", {
-    method: "POST",
-    body: data,
-  });
-
-  return resp.text();
-}
-
-export async function complete(
-  model: string,
-  tools: Tool[],
-  input: Message[],
-  handler?: (delta: string, snapshot: string) => void
-): Promise<Message> {
-  const messages = [];
-
-  for (const m of input) {
-    const content = [];
-
-    if (m.content) {
-      content.push({ type: "text", text: m.content });
-    }
-
-    for (const a of m.attachments ?? []) {
-      if (a.type == AttachmentType.Text) {
-        content.push({
-          type: "text",
-          text: a.name + ":\n```" + a.data + "\n```",
-        });
-      }
-
-      if (a.type == AttachmentType.File) {
-        content.push({
-          type: "file_url",
-          file_url: {
-            url: a.data,
-          },
-        });
-      }
-
-      if (a.type == AttachmentType.Image) {
-        content.push({
-          type: "image_url",
-          image_url: {
-            url: a.data,
-          },
-        });
-      }
-    }
-
-    messages.push({
-      role: m.role as OpenAI.Chat.ChatCompletionRole,
-      content: content,
+  constructor(apiKey: string = "sk-") {
+    this.oai = new OpenAI({
+      baseURL: new URL("/api/v1", window.location.origin).toString(),
+      apiKey: apiKey,
+      dangerouslyAllowBrowser: true,
     });
   }
 
-  const stream = client.beta.chat.completions.stream({
-    model: model,
-    stream: true,
+  async listModels(): Promise<Model[]> {
+    const models = await this.oai.models.list();
+    return models.data.map((model) => ({
+      id: model.id,
+      name: model.id,
+    }));
+  }
 
-    stream_options: {
-      include_usage: true,
-    },
+  async complete(model: string, tools: Tool[], input: Message[], handler?: (delta: string, snapshot: string) => void): Promise<Message> {
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
 
-    tools: toOpenAITools(tools),
-    messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-  });
+    for (const m of input) {
+      const content: OpenAI.Chat.ChatCompletionContentPart[] = [];
 
-  stream.on("content", (delta, snapshot) => {
-    if (handler) {
-      handler(delta, snapshot);
+      if (m.content) {
+        content.push({ type: "text", text: m.content });
+      }
+
+      for (const a of m.attachments ?? []) {
+        if (a.type === AttachmentType.Text) {
+          content.push({
+            type: "text",
+            text: a.name + ":\n```" + a.data + "\n```",
+          });
+        }
+
+        if (a.type === AttachmentType.File) {
+          content.push({
+            type: "file",
+            file: { file_data: a.data },
+          });
+        }
+
+        if (a.type === AttachmentType.Image) {
+          content.push({
+            type: "image_url",
+            image_url: { url: a.data },
+          });
+        }
+      }
+
+      switch (m.role) {
+        case Role.User:
+          messages.push({
+            role: Role.User,
+            content: content,
+          });
+          break;
+
+        case Role.Assistant:
+          messages.push({
+            role: Role.Assistant,
+            content: content.filter((c) => c.type === "text"),
+          });
+          break;
+      }
     }
-  });
 
-  let completion = await stream.finalChatCompletion();
-  messages.push(completion.choices[0].message);
+    const stream = this.oai.beta.chat.completions.stream({
+      model: model,
 
-  while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
-    for (const toolCall of completion.choices[0].message.tool_calls ?? []) {
-      const content = await callTool(toolCall.function.name, JSON.parse(toolCall.function.arguments));
+      tools: this.toTools(tools),
+      messages: messages,
 
-      messages.push({
-        role: "tool",
-        content: content,
-        tool_call_id: toolCall.id,
-      });
+      stream: true,
+      stream_options: { include_usage: true },
+    });
 
-      completion = await client.beta.chat.completions.parse({
+    if (handler) {
+      stream.on("content", handler);
+    }
+
+    let completion = await stream.finalChatCompletion() as OpenAI.ChatCompletion;
+    messages.push(completion.choices[0].message);
+
+    while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
+      for (const toolCall of completion.choices[0].message.tool_calls ?? []) {
+        const tool = tools.find((t) => t.name === toolCall.function.name);
+
+        if (!tool) {
+          messages.push({
+            tool_call_id: toolCall.id,
+
+            role: "tool",
+            content: `Error: Tool "${toolCall.function.name}" not found or not executable.`,
+          });
+
+          continue;
+        }
+
+        try {
+          const args = JSON.parse(toolCall.function.arguments || "{}");
+          const result = await tool.function(args);
+
+          messages.push({
+            role: "tool",
+            content: result,
+
+            tool_call_id: toolCall.id,
+          });
+        }
+        catch (error) {
+          console.error("Tool failed", error);
+
+          messages.push({
+            role: "tool",
+            content: "error: tool execution failed.",
+
+            tool_call_id: toolCall.id,
+          });
+        }
+      }
+
+      completion = await this.oai.chat.completions.create({
         model: model,
 
-        tools: toOpenAITools(tools),
-        messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
+        tools: this.toTools(tools),
+        messages: messages,
       });
 
       messages.push(completion.choices[0].message);
-      console.log(completion.choices[0].message);
     }
+
+    const message = completion.choices[0].message;
+
+    return {
+      role: Role.Assistant,
+
+      content: message.content ?? "",
+      refusal: message.refusal ?? "",
+
+      inputTokens: completion.usage?.prompt_tokens ?? 0,
+      outputTokens: completion.usage?.completion_tokens ?? 0,
+    };
   }
-  
-  const result = {
-    role: Role.Assistant,
 
-    content: completion.choices[0].message.content ?? "",
-    refusal: completion.choices[0].message.refusal ?? "",
+  async summarize(model: string, input: Message[]): Promise<string> {
+    const history = input
+      .slice(-6)
+      .map((m) => `${m.role}: ${m.content}`)
+      .join("\\n");
 
-    inputTokens: completion.usage?.prompt_tokens ?? 0,
-    outputTokens: completion.usage?.completion_tokens ?? 0,
-  };
+    const completion = await this.oai.chat.completions.create({
+      model: model,
+      messages: [
+        {
+          role: "user",
+          content: `Summarize the following conversation into a short title (less than 10 words). Return only the title itself, without any introductory phrases, explanations, or quotation marks.\n\nConversation:\n${history}`,
+        },
+      ]
+    });
 
-  return result;
-}
+    return completion.choices[0].message.content?.trim() ?? "Summary not available";
+  }
 
-export async function summarize(
-  model: string,
-  input: Message[]
-): Promise<string> {
-  const history = input
-    .slice(-6)
-    .map((m) => m.content)
-    .join("\n");
+  async partition(blob: Blob): Promise<Partition[]> {
+    const data = new FormData();
+    data.append("files", blob);
 
-  const completion = await client.chat.completions.create({
-    model: model,
-    messages: [
-      {
-        role: "user",
-        content: `Your Task is to summarize the conversation to a short title.\nReturn only the title without explaination or quotes:\n${history}`,
+    const resp = await fetch(new URL("/api/v1/partition", window.location.origin), {
+      method: "POST",
+      headers: {
+        accept: "application/json",
       },
-    ],
-  });
+      body: data,
+    });
 
-  return completion.choices[0].message.content ?? "";
+    if (!resp.ok) {
+      throw new Error(`Partition request failed with status ${resp.status}`);
+    }
+
+    return resp.json() as Promise<Partition[]>;
+  }
+
+  async translate(lang: string, text: string): Promise<string> {
+    const data = new FormData();
+    data.append("lang", lang);
+    data.append("text", text);
+
+    const resp = await fetch(new URL("/api/v1/translate", window.location.origin), {
+      method: "POST",
+      body: data,
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Translate request failed with status ${resp.status}`);
+    }
+
+    return resp.text();
+  }
+
+  private toTools(tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {
+    if (!tools || tools.length === 0) {
+      return undefined;
+    }
+
+    return tools.map((tool) => ({
+      type: 'function',
+      function: {
+        name: tool.name,
+        description: tool.description,
+
+        strict: true,
+        parameters: tool.parameters,
+      },
+    }));
+  }
 }
-
-const toOpenAITools = (tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] => {
-  return tools.map((tool) => ({
-    type: 'function',
-
-    function: {
-      name: tool.name,
-      description: tool.description,
-
-      strict: true,
-      parameters: tool.parameters,
-
-    },
-  }));
-};
