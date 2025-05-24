@@ -1,11 +1,32 @@
+import { Bridge } from "./lib/bridge";
+import { Client } from "./lib/client";
 import { Model } from "./models/chat";
+
+interface config {
+  title: string;
+
+  models: modelConfig[];
+  bridge?: bridgeConfig;
+}
+
+interface modelConfig {
+  id: string;
+  name: string;
+
+  description?: string;
+}
+
+interface bridgeConfig {
+  url: string;
+}
 
 interface Config {
   title: string;
 
-  models: Model[];
+  client: Client;
+  bridge: Bridge;
 
-  modelsFilter: string[];
+  models: Model[];
 }
 
 let config: Config;
@@ -18,7 +39,30 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       throw new Error(`failed to load config.json: ${resp.statusText}`);
     }
 
-    return config = await resp.json();
+    const cfg : config = await resp.json();
+
+    const bridgeUrl = cfg.bridge?.url ?? ""
+
+    const client = new Client();
+    const bridge = await Bridge.create(bridgeUrl);
+
+    config = {
+      title : cfg.title,
+      
+      client: client,
+      bridge: bridge,
+
+      models: cfg.models?.map((model) => {
+        return {
+          id: model.id,
+
+          name: model.name,
+          description: model.description,
+        };
+      }),
+    }
+
+    return config;
   } catch (error) {
     console.error("unable to load config", error);
   }

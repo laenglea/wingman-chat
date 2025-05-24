@@ -2,6 +2,26 @@
 
 /* @custom-variant dark (&:where(.dark, .dark *)); */
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  position: fixed;
+  width: 100%;
+}
+
+#root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+@supports (-webkit-touch-callout: none) {
+  #root {
+    height: -webkit-fill-available;
+  }
+}
+
 body {
   @apply text-black bg-neutral-50 dark:text-white dark:bg-neutral-950;
 }
@@ -44,4 +64,10 @@ body {
 
 .chat-input-attachment {
   @apply p-2 text-white dark:text-neutral-200 hover:text-gray-300 bg-neutral-800 dark:bg-neutral-700 rounded cursor-default;
+}
+
+.ios-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
+  overflow-anchor: none;
 }
