@@ -23,9 +23,31 @@ export function ChatPage() {
   const [currentModel, setCurrentModel] = useState<Model>();
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
   const messageContainerRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
 
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
+  };
+
+  const checkIfAtBottom = () => {
+    const container = messageContainerRef.current;
+    if (!container) return false;
+    
+    const threshold = 50;
+    const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
+    setIsAtBottom(atBottom);
+    return atBottom;
+  };
+
+  const scrollToBottom = () => {
+    messageContainerRef.current?.scrollTo({
+      top: messageContainerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  };
+
+  const handleScroll = () => {
+    checkIfAtBottom();
   };
 
   const handleCreateChat = () => {
@@ -141,14 +163,19 @@ export function ChatPage() {
   useEffect(() => {
     setCurrentModel(currentChat?.model ?? currentModel);
     setCurrentMessages(currentChat?.messages ?? []);
+    
+    setIsAtBottom(true);
   }, [currentChat, currentModel]);
 
   useEffect(() => {
-    messageContainerRef.current?.scrollTo({
-      top: messageContainerRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [currentChat, currentMessages]);
+    if (isAtBottom) {
+      scrollToBottom();
+    }
+  }, [currentChat, currentMessages, isAtBottom]);
+
+  useEffect(() => {
+    checkIfAtBottom();
+  }, []);
 
   const leftControlsContainer = document.getElementById('chat-left-controls');
   const rightControlsContainer = document.getElementById('chat-right-controls');
@@ -226,6 +253,7 @@ export function ChatPage() {
         <div
           className="flex-1 overflow-auto px-4 py-2 ios-scroll"
           ref={messageContainerRef}
+          onScroll={handleScroll}
         >
           {currentMessages.length === 0 ? (
             <div className="flex flex-col items-center justify-center min-h-full text-center">
