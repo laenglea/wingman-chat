@@ -29,9 +29,15 @@ export function Sidebar({
 
   return (
     <div
-      className={`fixed top-0 left-0 h-full w-64 sidebar transition-transform duration-300 ${
+      className={`fixed h-full w-64 sidebar transition-transform duration-300 pt-safe-top pl-safe-left ${
         isVisible ? "translate-x-0" : "-translate-x-full"
       }`}
+      style={{ 
+        top: 0, 
+        left: 0, 
+        height: '100vh',
+        paddingTop: `calc(env(safe-area-inset-top) + 0rem)`
+      }}
     >
       <div className="flex flex-col h-full gap-4 p-4">
         <h2 className="text-xl font-semibold">{config.title}</h2>

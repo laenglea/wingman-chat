@@ -241,7 +241,7 @@ export function ChatPage() {
         />
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden pb-24">
+      <main className="flex-1 flex flex-col overflow-hidden" style={{ paddingBottom: `calc(6rem + env(safe-area-inset-bottom))` }}>
         {showSidebar && (
           <div
             className="fixed inset-0 z-50 bg-black/10 dark:bg-black/50 backdrop-blur-xs"
@@ -267,7 +267,7 @@ export function ChatPage() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-300 dark:border-neutral-700 p-4">
+      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-300 dark:border-neutral-700 p-4 pb-safe-bottom pl-safe-left pr-safe-right">
         <ChatInput onSend={sendMessage} />
       </footer>
     </div>
