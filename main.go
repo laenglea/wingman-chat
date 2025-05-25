@@ -78,17 +78,20 @@ func main() {
 			"short_name":       title,
 			"start_url":        "/",
 			"display":          "standalone",
-			"background_color": "rgb(14, 17, 23)",
+			"background_color": "#0a0a0a",
+			"theme_color":      "#0a0a0a",
+			"orientation":      "portrait",
 			"icons": []map[string]any{
 				{
-					"src":   "/logo.svg",
-					"type":  "image/svg+xml",
-					"sizes": "any",
+					"src":     "/icon.png",
+					"sizes":   "512x512",
+					"type":    "image/png",
+					"purpose": "any maskable",
 				},
 				{
-					"src":   "/icon.png",
-					"type":  "image/png",
-					"sizes": "512x512",
+					"src":   "/logo.svg",
+					"sizes": "any",
+					"type":  "image/svg+xml",
 				},
 			},
 		}

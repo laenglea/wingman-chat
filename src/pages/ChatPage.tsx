@@ -33,7 +33,7 @@ export function ChatPage() {
     const container = messageContainerRef.current;
     if (!container) return false;
     
-    const threshold = 50;
+    const threshold = 100;
     const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
     setIsAtBottom(atBottom);
     return atBottom;
@@ -241,7 +241,7 @@ export function ChatPage() {
         />
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden" style={{ paddingBottom: `calc(6rem + env(safe-area-inset-bottom))` }}>
+      <main className="flex-1 flex flex-col overflow-hidden" style={{ paddingBottom: `calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))` }}>
         {showSidebar && (
           <div
             className="fixed inset-0 z-50 bg-black/10 dark:bg-black/50 backdrop-blur-xs"
