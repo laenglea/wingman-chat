@@ -14,7 +14,7 @@ function App() {
 
   return (
     <div className="h-dvh w-dvw flex flex-col overflow-hidden">
-      <nav className="fixed top-0 left-0 right-0 z-50 p-2 bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-300 dark:border-neutral-700">
+      <nav className="fixed top-0 left-0 right-0 z-50 p-2 pt-safe-top pl-safe-left pr-safe-right bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-300 dark:border-neutral-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 w-1/3">
             {currentPage === "chat" && <div id="chat-left-controls"></div>}
@@ -43,7 +43,7 @@ function App() {
           </div>
         </div>
       </nav>
-      <div className="flex-grow pt-16 overflow-hidden">
+      <div className="flex-grow overflow-hidden" style={{ paddingTop: `calc(4rem + env(safe-area-inset-top))` }}>
         {currentPage === "chat" && <ChatPage />}
         {currentPage === "translate" && <TranslatePage />}
       </div>
