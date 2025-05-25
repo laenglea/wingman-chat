@@ -26,20 +26,29 @@ body {
   @apply text-black bg-neutral-50 dark:text-white dark:bg-neutral-950;
 }
 
+/* Remove focus outlines from all buttons and interactive elements */
+button:focus,
+button:focus-visible,
+[role="button"]:focus,
+[role="button"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .sidebar {
   @apply bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-200;
 }
 
 .sidebar-item {
-  @apply p-2 hover:bg-neutral-400 dark:hover:text-gray-300 dark:hover:bg-neutral-800 rounded cursor-pointer;
+  @apply p-2 hover:bg-neutral-400 dark:hover:text-gray-300 dark:hover:bg-neutral-800 rounded cursor-pointer focus:outline-none;
 }
 
 .sidebar-item-selected {
-  @apply p-2 bg-neutral-300 dark:bg-neutral-800;
+  @apply p-2 bg-neutral-300 dark:bg-neutral-800 focus:outline-none;
 }
 
 .menu-button {
-  @apply p-2 dark:text-neutral-200 hover:text-neutral-600 bg-neutral-300 dark:bg-neutral-800 dark:hover:text-neutral-400 rounded cursor-pointer;  
+  @apply p-2 dark:text-neutral-200 hover:text-neutral-600 bg-neutral-300 dark:bg-neutral-800 dark:hover:text-neutral-400 rounded cursor-pointer focus:outline-none;  
 }
 
 .chat-bubble {
@@ -59,7 +68,7 @@ body {
 }
 
 .chat-input-button {
-  @apply p-2 text-neutral-900 hover:text-neutral-500 dark:text-neutral-100 cursor-pointer;
+  @apply p-2 text-neutral-900 hover:text-neutral-500 dark:text-neutral-100 cursor-pointer focus:outline-none;
 }
 
 .chat-input-attachment {
