@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon } from "lucide-react";
@@ -20,6 +20,11 @@ export function TranslatePage() {
   const [translatedText, setTranslatedText] = useState("");
   const [targetLang, setTargetLang] = useState("en");
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const performTranslate = async (langToUse: string, textToTranslate: string) => {
     if (!textToTranslate.trim()) {
@@ -57,34 +62,37 @@ export function TranslatePage() {
     setTranslatedText("");
   };
 
-  const leftControlsContainer = document.getElementById('translate-left-controls');
-  const rightControlsContainer = document.getElementById('translate-right-controls');
+  // Simple portal approach - only render portals after component is mounted
+  const leftControlsContainer = mounted ? document.getElementById('translate-left-controls') : null;
+  const rightControlsContainer = mounted ? document.getElementById('translate-right-controls') : null;
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden bg-neutral-100 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {leftControlsContainer && createPortal(
-        <Menu>
-          <MenuButton className="inline-flex items-center menu-button">
-            <GlobeIcon size={16} className="mr-1" />
-            <span>{languages.find(l => l.code === targetLang)?.name}</span>
-          </MenuButton>
-          <MenuItems
-            transition
-            anchor="bottom start"
-            className="!max-h-[50vh] mt-2 w-48 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg"
-          >
-            {languages.map((lang) => (
-              <MenuItem key={lang.code}>
-                <Button
-                  onClick={() => handleLanguageChange(lang.code)}
-                  className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
-                >
-                  {lang.name}
-                </Button>
-              </MenuItem>
-            ))}
-          </MenuItems>
-        </Menu>,
+        <div className="flex items-center gap-2">
+          <Menu>
+            <MenuButton className="inline-flex items-center menu-button">
+              <GlobeIcon size={16} className="mr-1" />
+              <span>{languages.find(l => l.code === targetLang)?.name}</span>
+            </MenuButton>
+            <MenuItems
+              transition
+              anchor="bottom start"
+              className="!max-h-[50vh] mt-2 w-48 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg"
+            >
+              {languages.map((lang) => (
+                <MenuItem key={lang.code}>
+                  <Button
+                    onClick={() => handleLanguageChange(lang.code)}
+                    className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
+                  >
+                    {lang.name}
+                  </Button>
+                </MenuItem>
+              ))}
+            </MenuItems>
+          </Menu>
+        </div>,
         leftControlsContainer
       )}
 
@@ -130,7 +138,7 @@ export function TranslatePage() {
               value={translatedText}
               readOnly
               placeholder={"Translation will appear here..."}
-              className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 focus:ring-2 focus:ring-blue-500 mb-2 ios-scroll"
+              className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 ios-scroll"
             />
           </div>
         </div>
