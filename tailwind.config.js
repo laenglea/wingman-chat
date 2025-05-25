@@ -7,23 +7,23 @@ export default {
   theme: {
     extend: {
       spacing: {
-        'safe-top': 'env(safe-area-inset-top)',
-        'safe-bottom': 'env(safe-area-inset-bottom)',
-        'safe-left': 'env(safe-area-inset-left)',
-        'safe-right': 'env(safe-area-inset-right)',
+        'safe-top': 'var(--safe-area-inset-top, env(safe-area-inset-top, 0px))',
+        'safe-bottom': 'var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))',
+        'safe-left': 'var(--safe-area-inset-left, env(safe-area-inset-left, 0px))',
+        'safe-right': 'var(--safe-area-inset-right, env(safe-area-inset-right, 0px))',
       },
       padding: {
-        'safe': 'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)',
-        'safe-top': 'env(safe-area-inset-top)',
-        'safe-bottom': 'env(safe-area-inset-bottom)',
-        'safe-left': 'env(safe-area-inset-left)',
-        'safe-right': 'env(safe-area-inset-right)',
+        'safe': 'var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) var(--safe-area-inset-right, env(safe-area-inset-right, 0px)) var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) var(--safe-area-inset-left, env(safe-area-inset-left, 0px))',
+        'safe-top': 'var(--safe-area-inset-top, env(safe-area-inset-top, 0px))',
+        'safe-bottom': 'var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))',
+        'safe-left': 'var(--safe-area-inset-left, env(safe-area-inset-left, 0px))',
+        'safe-right': 'var(--safe-area-inset-right, env(safe-area-inset-right, 0px))',
       },
       margin: {
-        'safe-top': 'env(safe-area-inset-top)',
-        'safe-bottom': 'env(safe-area-inset-bottom)',
-        'safe-left': 'env(safe-area-inset-left)',
-        'safe-right': 'env(safe-area-inset-right)',
+        'safe-top': 'var(--safe-area-inset-top, env(safe-area-inset-top, 0px))',
+        'safe-bottom': 'var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))',
+        'safe-left': 'var(--safe-area-inset-left, env(safe-area-inset-left, 0px))',
+        'safe-right': 'var(--safe-area-inset-right, env(safe-area-inset-right, 0px))',
       }
     },
   },

@@ -29,14 +29,15 @@ export function Sidebar({
 
   return (
     <div
-      className={`fixed h-full w-64 sidebar transition-transform duration-300 pt-safe-top pl-safe-left ${
+      className={`fixed h-full w-64 sidebar transition-transform duration-300 ${
         isVisible ? "translate-x-0" : "-translate-x-full"
       }`}
       style={{ 
         top: 0, 
         left: 0, 
         height: '100vh',
-        paddingTop: `calc(env(safe-area-inset-top) + 0rem)`
+        paddingTop: `calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 4rem)`,
+        paddingLeft: 'var(--safe-area-inset-left, env(safe-area-inset-left, 0px))'
       }}
     >
       <div className="flex flex-col h-full gap-4 p-4">

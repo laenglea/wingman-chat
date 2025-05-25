@@ -2,6 +2,25 @@
 
 /* @custom-variant dark (&:where(.dark, .dark *)); */
 
+@import "tailwindcss";
+
+/* @custom-variant dark (&:where(.dark, .dark *)); */
+
+/* iOS PWA Safe Area Support */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+}
+
+/* iOS PWA specific overrides */
+@supports (height: -webkit-fill-available) {
+  :root {
+    --viewport-height: -webkit-fill-available;
+  }
+}
+
 html, body {
   height: 100%;
   overflow: hidden;
@@ -9,16 +28,30 @@ html, body {
   overscroll-behavior: none;
   position: fixed;
   width: 100%;
+  /* Prevent iOS zoom on input focus */
+  -webkit-text-size-adjust: 100%;
 }
 
 #root {
   height: 100vh;
+  height: var(--viewport-height, 100vh);
   overflow: hidden;
 }
 
-@supports (-webkit-touch-callout: none) {
+/* iOS standalone PWA detection and adjustments */
+@media all and (display-mode: standalone) {
+  /* Reset body padding in standalone mode - we'll handle safe areas in components */
+  body {
+    padding: 0;
+  }
+  
   #root {
-    height: -webkit-fill-available;
+    margin: 0;
+  }
+  
+  /* Ensure navigation respects safe areas in PWA mode */
+  nav {
+    padding-top: calc(0.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) !important;
   }
 }
 
