@@ -1,4 +1,5 @@
 import { Trash } from "lucide-react";
+import { Button } from "@headlessui/react";
 import { Chat } from "../models/chat";
 import { getConfig } from "../config";
 
@@ -52,12 +53,12 @@ export function Sidebar({
             >
               <div
                 onClick={() => onSelectChat(chat)}
-                className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap cursor-pointer"
                 title={chat.title ?? "Untitled"}
               >
                 {chat.title ?? "Untitled"}
               </div>
-              <button
+              <Button
                 onClick={(e) => {
                   e.stopPropagation();
                   onDeleteChat(chat);
@@ -65,7 +66,7 @@ export function Sidebar({
                 className="cursor-pointer"
               >
                 <Trash size={16} />
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

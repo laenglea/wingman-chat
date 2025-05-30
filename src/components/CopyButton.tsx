@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Copy as CopyIcon, CopyCheck as CopyCheckIcon } from "lucide-react";
+import { Button } from "@headlessui/react";
 
 export const CopyButton = ({ text }: { text: string }) => {
     const [copied, setCopied] = useState(false);
@@ -15,7 +16,7 @@ export const CopyButton = ({ text }: { text: string }) => {
     };
 
     return (
-        <button
+        <Button
             onClick={handleCopy}
             className="text-neutral-300 hover:text-white transition-colors"
             title="Copy code to clipboard"
@@ -25,6 +26,6 @@ export const CopyButton = ({ text }: { text: string }) => {
             ) : (
                 <CopyIcon className="h-4" />
             )}
-        </button>
+        </Button>
     );
 };
