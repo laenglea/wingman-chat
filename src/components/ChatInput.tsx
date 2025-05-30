@@ -1,9 +1,9 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
-import { Textarea, Button } from '@headlessui/react'
+import { Textarea, Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { Send, Paperclip, ScreenShare, Image, X } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain } from "lucide-react";
 
-import { Attachment, AttachmentType, Message, Role } from "../models/chat";
+import { Attachment, AttachmentType, Message, Role, Model } from "../models/chat";
 import {
   captureScreenshot,
   getFileExt,
@@ -20,9 +20,12 @@ import { getConfig } from "../config";
 
 type ChatInputProps = {
   onSend: (message: Message) => void;
+  models: Model[];
+  currentModel: Model | undefined;
+  onModelChange: (model: Model) => void;
 };
 
-export function ChatInput({ onSend }: ChatInputProps) {
+export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatInputProps) {
   const config = getConfig();
   const client = config.client;
 
@@ -132,7 +135,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="flex py-2 items-center gap-1">
+      <div className="border border-neutral-400 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 rounded flex flex-col min-h-[3rem]">
         <input
           type="file"
           multiple
@@ -144,43 +147,75 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         <Textarea
           ref={textInputRef}
-          className="flex-1 chat-input max-h-[40vh] overflow-y-auto resize-none"
+          className="p-2 pr-0 bg-transparent dark:text-neutral-200 resize-none focus:outline-none flex-1 max-h-[40vh] overflow-y-auto"
           style={{ scrollbarWidth: "thin" }}
-          placeholder="we need to talk..."
+          placeholder="Ask anything"
           value={content}
           rows={1}
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
         />
 
-        {supportsScreenshot() && (
-          <Button
-            type="button"
-            className="chat-input-button"
-            onClick={handleScreenshotClick}
-          >
-            <ScreenShare size={20} />
-          </Button>
-        )}
+        <div className="flex items-center justify-between gap-1 p-2 pt-0">
+          <div className="flex items-center">
+            <Menu>
+              <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none text-sm">
+                <Brain size={14} />
+                <span>
+                  {currentModel?.name ?? currentModel?.id ?? "Select Model"}
+                </span>
+              </MenuButton>
+              <MenuItems
+                transition
+                anchor="bottom start"
+                className="!max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg z-50"
+              >
+                {models.map((model) => (
+                  <MenuItem key={model.id}>
+                    <Button
+                      onClick={() => onModelChange(model)}
+                      title={model.description}
+                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
+                    >
+                      {model.name ?? model.id}
+                    </Button>
+                  </MenuItem>
+                ))}
+              </MenuItems>
+            </Menu>
+          </div>
 
-        <Button
-          type="button"
-          className="chat-input-button"
-          onClick={handleAttachmentClick}
-        >
-          <Paperclip size={20} />
-        </Button>
+          <div className="flex items-center gap-1">
+            {supportsScreenshot() && (
+              <Button
+                type="button"
+                className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+                onClick={handleScreenshotClick}
+              >
+                <ScreenShare size={16} />
+              </Button>
+            )}
 
-        <Button
-          className="chat-input-button"
-          type="submit"
-        >
-          <Send size={20} />
-        </Button>
+            <Button
+              type="button"
+              className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+              onClick={handleAttachmentClick}
+            >
+              <Paperclip size={16} />
+            </Button>
+
+            <Button
+              className="pl-1.5 pr-0 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+              type="submit"
+            >
+              <Send size={16} />
+            </Button>
+          </div>
+        </div>
       </div>
 
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mr-30">
+        <div className="flex flex-wrap gap-2 mt-2">
           {attachments.map((val, i) => (
             <div key={i} className="flex items-center gap-1 chat-input-attachment">
               <Image size={16} />
