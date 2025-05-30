@@ -24,6 +24,8 @@ export function ChatPage() {
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const isProgrammaticScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
@@ -33,21 +35,36 @@ export function ChatPage() {
     const container = messageContainerRef.current;
     if (!container) return false;
     
-    const threshold = 100;
+    const threshold = 20;
     const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
     setIsAtBottom(atBottom);
     return atBottom;
   };
 
   const scrollToBottom = () => {
-    messageContainerRef.current?.scrollTo({
-      top: messageContainerRef.current.scrollHeight,
+    const container = messageContainerRef.current;
+    if (!container) return;
+    
+    isProgrammaticScrollRef.current = true;
+    
+    container.scrollTo({
+      top: container.scrollHeight,
       behavior: "smooth",
     });
+    
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    
+    scrollTimeoutRef.current = setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 500);
   };
 
   const handleScroll = () => {
-    checkIfAtBottom();
+    if (!isProgrammaticScrollRef.current) {
+      checkIfAtBottom();
+    }
   };
 
   const handleCreateChat = () => {
@@ -165,6 +182,7 @@ export function ChatPage() {
     setCurrentMessages(currentChat?.messages ?? []);
     
     setIsAtBottom(true);
+    isProgrammaticScrollRef.current = false;
   }, [currentChat, currentModel]);
 
   useEffect(() => {
@@ -175,6 +193,14 @@ export function ChatPage() {
 
   useEffect(() => {
     checkIfAtBottom();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, []);
 
   const leftControlsContainer = document.getElementById('chat-left-controls');
