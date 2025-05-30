@@ -131,7 +131,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg flex flex-col min-h-[3rem]">
+      <div className="border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 drop-shadow-2xl">
         <input
           type="file"
           multiple

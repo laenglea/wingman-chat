@@ -197,7 +197,7 @@ export function ChatPage() {
         )}
 
         <div
-          className="flex-1 overflow-auto px-2 py-2 ios-scroll"
+          className="flex-1 overflow-auto px-2 pt-4 pb-0 ios-scroll"
           ref={messageContainerRef}
           onScroll={handleScroll}
         >
