@@ -16,7 +16,7 @@ function App() {
 
   return (
     <div className="h-dvh w-dvw flex flex-col overflow-hidden">
-      <nav className="fixed top-0 left-0 right-0 z-50 p-2 pl-safe-left pr-safe-right bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-300 dark:border-neutral-700" style={{paddingTop: `calc(0.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))`}}>
+      <nav className="fixed top-0 left-0 right-0 z-50 px-3 py-2 pl-safe-left pr-safe-right bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700" style={{paddingTop: `calc(0.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))`}}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 w-1/3">
             {currentPage === "chat" && <div id="chat-left-controls"></div>}
@@ -31,7 +31,7 @@ function App() {
                 className={`px-2 py-2 sm:px-4 font-medium rounded transition-colors flex items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
                   currentPage === key
                     ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-200"
-                    : "bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700"
+                    : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700"
                 }`}
               >
                 {icon}

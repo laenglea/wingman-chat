@@ -49,7 +49,6 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
       setContent("");
       setAttachments([]);
       
-      // Clear the contenteditable div
       if (contentEditableRef.current) {
         contentEditableRef.current.textContent = "";
       }
@@ -132,7 +131,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="border border-neutral-400 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 rounded flex flex-col min-h-[3rem]">
+      <div className="border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg flex flex-col min-h-[3rem]">
         <input
           type="file"
           multiple
