@@ -7,7 +7,7 @@ import { useAutoScroll } from "../hooks/useAutoScroll";
 import { Sidebar } from "../components/Sidebar";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
-import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
+import { Button } from "@headlessui/react";
 import { Menu as MenuIcon, Plus as PlusIcon } from "lucide-react";
 import { getConfig } from "../config";
 
@@ -161,30 +161,6 @@ export function ChatPage() {
           >
             <MenuIcon size={20} />
           </Button>
-          <div>
-            <Menu>
-              <MenuButton className="inline-flex items-center menu-button">
-                {currentModel?.name ?? currentModel?.id ?? "Select Model"}
-              </MenuButton>
-              <MenuItems
-                transition
-                anchor="bottom start"
-                className="!max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg"
-              >
-                {models.map((model) => (
-                  <MenuItem key={model.id}>
-                    <Button
-                      onClick={() => setCurrentModel(model)}
-                      title={model.description}
-                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
-                    >
-                      {model.name ?? model.id}
-                    </Button>
-                  </MenuItem>
-                ))}
-              </MenuItems>
-            </Menu>
-          </div>
         </div>,
         leftControlsContainer
       )}
@@ -239,7 +215,12 @@ export function ChatPage() {
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-300 dark:border-neutral-700 py-4 px-2 pb-safe-bottom pl-safe-left pr-safe-right">
-        <ChatInput onSend={sendMessage} />
+        <ChatInput 
+          onSend={sendMessage} 
+          models={models}
+          currentModel={currentModel}
+          onModelChange={setCurrentModel}
+        />
       </footer>
     </div>
   );

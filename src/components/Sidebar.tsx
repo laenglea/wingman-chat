@@ -37,12 +37,25 @@ export function Sidebar({
         top: 0, 
         left: 0, 
         height: '100vh',
-        paddingTop: `calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 4rem)`,
         paddingLeft: 'var(--safe-area-inset-left, env(safe-area-inset-left, 0px))'
       }}
     >
-      <div className="flex flex-col h-full gap-4 p-4">
-        <h2 className="text-xl font-semibold">{config.title}</h2>
+      <div 
+        className="flex items-center px-2 py-2"
+        style={{ 
+          paddingTop: `calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 0.5rem)`,
+          height: `calc(4rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))`
+        }}
+      >
+        <h2 className="text-xl font-semibold px-2">{config.title}</h2>
+      </div>
+      
+      <div 
+        className="flex flex-col flex-1 overflow-hidden px-2"
+        style={{ 
+          paddingTop: '0'
+        }}
+      >
         <ul className="flex flex-col gap-2 flex-1 overflow-auto">
           {sortedChats.map((chat) => (
             <li

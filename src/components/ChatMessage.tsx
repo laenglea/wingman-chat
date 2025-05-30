@@ -1,4 +1,5 @@
 import { Markdown } from './Markdown';
+import { CopyButton } from './CopyButton';
 import { Bot, User, File } from "lucide-react";
 
 import { AttachmentType, Message, Role } from "../models/chat";
@@ -21,7 +22,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       )}
 
       <div
-        className={`max-w-[80%] rounded-lg p-3 ${isUser ? "chat-bubble-user" : "chat-bubble-assistant"} break-words overflow-x-auto`}
+        className={`max-w-[80%] rounded-lg p-3 ${isUser ? "chat-bubble-user" : "chat-bubble-assistant group"} break-words overflow-x-auto`}
       >
         <Markdown>{message.content}</Markdown>
 
@@ -58,8 +59,19 @@ export function ChatMessage({ message }: ChatMessageProps) {
         )}
         
         {!isUser && (message.inputTokens !== undefined && message.outputTokens !== undefined) && (
-          <div className="text-[9px] text-neutral-500 dark:text-neutral-400 mt-2">
-            Usage: {message.inputTokens} / {message.outputTokens} tokens
+          <div className="flex justify-between items-center mt-2">
+            <div className="text-[9px] text-neutral-500 dark:text-neutral-400">
+              Usage: {message.inputTokens} / {message.outputTokens} tokens
+            </div>
+            <div className="ml-2">
+              <CopyButton text={message.content} subtle={true} />
+            </div>
+          </div>
+        )}
+
+        {!isUser && (message.inputTokens === undefined || message.outputTokens === undefined) && (
+          <div className="flex justify-end mt-2 group-hover:opacity-100 opacity-0 transition-opacity">
+            <CopyButton text={message.content} subtle={true} />
           </div>
         )}
       </div>

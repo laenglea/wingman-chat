@@ -44,7 +44,7 @@ export const loadConfig = async (): Promise<Config | undefined> => {
     const bridgeUrl = cfg.bridge?.url ?? ""
 
     const client = new Client();
-    const bridge = await Bridge.create(bridgeUrl);
+    const bridge = Bridge.create(bridgeUrl);
 
     config = {
       title : cfg.title,
