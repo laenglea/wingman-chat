@@ -1,5 +1,5 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
-import { Textarea } from '@headlessui/react'
+import { Textarea, Button } from '@headlessui/react'
 
 import { Send, Paperclip, ScreenShare, Image, X } from "lucide-react";
 
@@ -154,29 +154,29 @@ export function ChatInput({ onSend }: ChatInputProps) {
         />
 
         {supportsScreenshot() && (
-          <button
+          <Button
             type="button"
             className="chat-input-button"
             onClick={handleScreenshotClick}
           >
             <ScreenShare size={20} />
-          </button>
+          </Button>
         )}
 
-        <button
+        <Button
           type="button"
           className="chat-input-button"
           onClick={handleAttachmentClick}
         >
           <Paperclip size={20} />
-        </button>
+        </Button>
 
-        <button
+        <Button
           className="chat-input-button"
           type="submit"
         >
           <Send size={20} />
-        </button>
+        </Button>
       </div>
 
       {attachments.length > 0 && (
@@ -187,13 +187,13 @@ export function ChatInput({ onSend }: ChatInputProps) {
               <span className="text-sm break-all">
                 {val.name}
               </span>
-              <button
+              <Button
                 type="button"
                 className="cursor-pointer"
                 onClick={() => handleRemoveAttachment(i)}
               >
                 <X size={16} />
-              </button>
+              </Button>
             </div>
           ))}
         </div>

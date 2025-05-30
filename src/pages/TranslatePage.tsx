@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon } from "lucide-react";
@@ -27,7 +27,17 @@ export function TranslatePage() {
     setMounted(true);
   }, []);
 
-  const performTranslate = async (langToUse: string, textToTranslate: string) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (sourceText.trim()) {
+        performTranslate(targetLang, sourceText);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [sourceText, targetLang]);
+
+  const performTranslate = useCallback(async (langToUse: string, textToTranslate: string) => {
     if (!textToTranslate.trim()) {
       setTranslatedText("");
       return;
@@ -44,7 +54,7 @@ export function TranslatePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [client]);
 
   const handleTranslateButtonClick = () => {
     performTranslate(targetLang, sourceText);
@@ -63,7 +73,6 @@ export function TranslatePage() {
     setTranslatedText("");
   };
 
-  // Simple portal approach - only render portals after component is mounted
   const leftControlsContainer = mounted ? document.getElementById('translate-left-controls') : null;
   const rightControlsContainer = mounted ? document.getElementById('translate-right-controls') : null;
 
@@ -109,43 +118,48 @@ export function TranslatePage() {
       )}
 
       <main className="flex-1 flex flex-col pb-4 overflow-hidden">
-        <div className="w-full flex flex-col md:flex-row items-stretch gap-4 flex-grow p-4 overflow-hidden">
-          <div className="flex-1 flex flex-col gap-2 relative">
-            <textarea
-              value={sourceText}
-              onChange={(e) => setSourceText(e.target.value)}
-              placeholder="Enter text to translate..."
-              className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 ios-scroll"
-            />
-          </div>
+        <div className="w-full flex-grow py-2 px-2 overflow-hidden">
+          <div className="relative h-full bg-neutral-200 dark:bg-neutral-800 rounded-lg overflow-hidden flex flex-col md:flex-row">
+            <div className="flex-1 flex flex-col relative">
+              <textarea
+                value={sourceText}
+                onChange={(e) => setSourceText(e.target.value)}
+                placeholder="Enter text to translate..."
+                className="w-full h-full p-4 bg-transparent border-none resize-none focus:outline-none ios-scroll"
+              />
+            </div>
 
-          <div className="flex flex-col items-center justify-center px-2">
-            <button
-              onClick={handleTranslateButtonClick}
-              className="px-3 py-2 font-semibold rounded menu-button transition-colors focus:outline-none disabled:opacity-50"
-              title={`Translate to ${languages.find(l => l.code === targetLang)?.name}`}
-              disabled={isLoading || !sourceText.trim()}
-            >
-              {isLoading ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <PilcrowRightIcon />
+            <div className="relative flex items-center justify-center">
+              <div className="hidden md:block absolute inset-y-0 w-px bg-neutral-300 dark:bg-neutral-600"></div>
+              <div className="block md:hidden absolute inset-x-0 h-px bg-neutral-300 dark:bg-neutral-600"></div>
+              
+              <Button
+                onClick={handleTranslateButtonClick}
+                className="menu-button !bg-neutral-400 dark:!bg-neutral-900 z-10 relative"
+                title={`Translate to ${languages.find(l => l.code === targetLang)?.name}`}
+                disabled={isLoading || !sourceText.trim()}
+              >
+                {isLoading ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <PilcrowRightIcon />
+                )}
+              </Button>
+            </div>
+
+            <div className="flex-1 flex flex-col relative">
+              <textarea
+                value={translatedText}
+                readOnly
+                placeholder="Translation will appear here..."
+                className="w-full h-full p-4 bg-transparent border-none resize-none focus:outline-none ios-scroll"
+              />
+              {translatedText && (
+                <div className="absolute top-2 right-2">
+                  <CopyButton text={translatedText} />
+                </div>
               )}
-            </button>
-          </div>
-
-          <div className="flex-1 flex flex-col gap-2 relative">
-            <textarea
-              value={translatedText}
-              readOnly
-              placeholder={"Translation will appear here..."}
-              className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 ios-scroll"
-            />
-            {translatedText && (
-              <div className="absolute top-2 right-2">
-                <CopyButton text={translatedText} />
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </main>

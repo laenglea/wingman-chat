@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { MessageCircle, Languages } from "lucide-react";
+import { Button } from "@headlessui/react";
 import { ChatPage } from "./pages/ChatPage";
 import { TranslatePage } from "./pages/TranslatePage";
 
@@ -7,9 +9,9 @@ type Page = "chat" | "translate";
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
 
-  const pages: { key: Page; label: string }[] = [
-    { key: "chat", label: "Chat" },
-    { key: "translate", label: "Translate" },
+  const pages: { key: Page; label: string; icon: React.ReactNode }[] = [
+    { key: "chat", label: "Chat", icon: <MessageCircle size={20} /> },
+    { key: "translate", label: "Translate", icon: <Languages size={20} /> },
   ];
 
   return (
@@ -21,19 +23,20 @@ function App() {
             {currentPage === "translate" && <div id="translate-left-controls"></div>}
           </div>
           
-          <div className="flex space-x-2">
-            {pages.map(({ key, label }) => (
-              <button
+          <div className="flex space-x-1 sm:space-x-2">
+            {pages.map(({ key, label, icon }) => (
+              <Button
                 key={key}
                 onClick={() => setCurrentPage(key)}
-                className={`px-4 p-2 font-medium rounded transition-colors ${
+                className={`px-2 py-2 sm:px-4 font-medium rounded transition-colors flex items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
                   currentPage === key
                     ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-200"
                     : "bg-neutral-50 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-700"
                 }`}
               >
-                {label}
-              </button>
+                {icon}
+                <span className="hidden sm:inline">{label}</span>
+              </Button>
             ))}
           </div>
           

@@ -215,14 +215,14 @@ export function ChatPage() {
       <main className="flex-1 flex flex-col overflow-hidden" style={{ paddingBottom: `calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))` }}>
         {showSidebar && (
           <div
-            className="fixed inset-0 z-50 bg-black/10 dark:bg-black/50 backdrop-blur-xs"
+            className="fixed inset-0 z-50 bg-black/10 dark:bg-black/50 backdrop-blur-xs cursor-pointer"
             style={{ zIndex: 55 }}
             onClick={toggleSidebar}
           />
         )}
 
         <div
-          className="flex-1 overflow-auto px-4 py-2 ios-scroll"
+          className="flex-1 overflow-auto px-2 py-2 ios-scroll"
           ref={messageContainerRef}
           onScroll={handleScroll}
         >
@@ -238,7 +238,7 @@ export function ChatPage() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-300 dark:border-neutral-700 p-4 pb-safe-bottom pl-safe-left pr-safe-right">
+      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-300 dark:border-neutral-700 py-4 px-2 pb-safe-bottom pl-safe-left pr-safe-right">
         <ChatInput onSend={sendMessage} />
       </footer>
     </div>
