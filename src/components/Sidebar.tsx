@@ -30,21 +30,19 @@ export function Sidebar({
 
   return (
     <div
-      className={`fixed h-full w-64 sidebar transition-transform duration-300 ${
+      className={`fixed h-full w-64 sidebar transition-transform duration-300 pl-safe-left ${
         isVisible ? "translate-x-0" : "-translate-x-full"
       }`}
       style={{ 
         top: 0, 
         left: 0, 
-        height: '100vh',
-        paddingLeft: 'var(--safe-area-inset-left, env(safe-area-inset-left, 0px))'
+        height: '100vh'
       }}
     >
       <div 
-        className="flex items-center px-2 py-2"
+        className="flex items-center px-2 py-2 pt-safe-top"
         style={{ 
-          paddingTop: `calc(var(--safe-area-inset-top, env(safe-area-inset-top, 0px)) + 0.5rem)`,
-          height: `calc(4rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))`
+          height: `calc(3rem + env(safe-area-inset-top, 0px))`
         }}
       >
         <h2 className="text-xl font-semibold px-2">{config.title}</h2>
