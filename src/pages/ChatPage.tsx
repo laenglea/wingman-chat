@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Chat, Message, Model, Role } from "../models/chat";
 import { useChats } from "../hooks/useChats";
 import { useModels } from "../hooks/useModels";
+import { useAutoScroll } from "../hooks/useAutoScroll";
 import { Sidebar } from "../components/Sidebar";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
@@ -22,49 +23,14 @@ export function ChatPage() {
   const [currentChat, setCurrentChat] = useState<Chat | null>(null);
   const [currentModel, setCurrentModel] = useState<Model>();
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
-  const messageContainerRef = useRef<HTMLDivElement>(null);
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const isProgrammaticScrollRef = useRef(false);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Auto-scroll hook handles all scroll behavior
+  const { containerRef: messageContainerRef, handleScroll } = useAutoScroll({
+    dependencies: [currentChat, currentMessages],
+  });
 
   const toggleSidebar = () => {
     setShowSidebar(!showSidebar);
-  };
-
-  const checkIfAtBottom = () => {
-    const container = messageContainerRef.current;
-    if (!container) return false;
-    
-    const threshold = 20;
-    const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - threshold;
-    setIsAtBottom(atBottom);
-    return atBottom;
-  };
-
-  const scrollToBottom = () => {
-    const container = messageContainerRef.current;
-    if (!container) return;
-    
-    isProgrammaticScrollRef.current = true;
-    
-    container.scrollTo({
-      top: container.scrollHeight,
-      behavior: "smooth",
-    });
-    
-    if (scrollTimeoutRef.current) {
-      clearTimeout(scrollTimeoutRef.current);
-    }
-    
-    scrollTimeoutRef.current = setTimeout(() => {
-      isProgrammaticScrollRef.current = false;
-    }, 500);
-  };
-
-  const handleScroll = () => {
-    if (!isProgrammaticScrollRef.current) {
-      checkIfAtBottom();
-    }
   };
 
   const handleCreateChat = () => {
@@ -180,28 +146,7 @@ export function ChatPage() {
   useEffect(() => {
     setCurrentModel(currentChat?.model ?? currentModel);
     setCurrentMessages(currentChat?.messages ?? []);
-    
-    setIsAtBottom(true);
-    isProgrammaticScrollRef.current = false;
   }, [currentChat, currentModel]);
-
-  useEffect(() => {
-    if (isAtBottom) {
-      scrollToBottom();
-    }
-  }, [currentChat, currentMessages, isAtBottom]);
-
-  useEffect(() => {
-    checkIfAtBottom();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const leftControlsContainer = document.getElementById('chat-left-controls');
   const rightControlsContainer = document.getElementById('chat-right-controls');
