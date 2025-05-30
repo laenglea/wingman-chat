@@ -1,5 +1,5 @@
-import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
-import { Textarea, Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
+import { ChangeEvent, useState, FormEvent, useRef } from "react";
+import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
 import { Send, Paperclip, ScreenShare, Image, X, Brain } from "lucide-react";
 
@@ -33,15 +33,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textInputRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (textInputRef.current) {
-      textInputRef.current.style.height = "auto";
-      const newHeight = Math.min(textInputRef.current.scrollHeight, window.innerHeight * 0.4) + 2;
-      textInputRef.current.style.height = newHeight + "px";
-    }
-  }, [content]);
+  const contentEditableRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -56,6 +48,11 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
       onSend(message);
       setContent("");
       setAttachments([]);
+      
+      // Clear the contenteditable div
+      if (contentEditableRef.current) {
+        contentEditableRef.current.textContent = "";
+      }
     }
   };
 
@@ -126,7 +123,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
     setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e as unknown as FormEvent);
@@ -145,14 +142,18 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
           onChange={handleFileChange}
         />
 
-        <Textarea
-          ref={textInputRef}
-          className="p-2 pr-0 bg-transparent dark:text-neutral-200 resize-none focus:outline-none flex-1 max-h-[40vh] overflow-y-auto"
+        <div
+          ref={contentEditableRef}
+          className="p-2 pr-0 bg-transparent dark:text-neutral-200 focus:outline-none flex-1 max-h-[40vh] overflow-y-auto min-h-[2.5rem] whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:dark:text-neutral-400"
           style={{ scrollbarWidth: "thin" }}
-          placeholder="Ask anything"
-          value={content}
-          rows={1}
-          onChange={(e) => setContent(e.target.value)}
+          role="textbox"
+          contentEditable
+          suppressContentEditableWarning={true}
+          data-placeholder="Ask anything"
+          onInput={(e) => {
+            const target = e.target as HTMLDivElement;
+            setContent(target.textContent || "");
+          }}
           onKeyDown={handleKeyDown}
         />
 
