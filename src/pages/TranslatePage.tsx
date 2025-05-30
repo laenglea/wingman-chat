@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon } from "lucide-react";
 import { getConfig } from "../config";
+import { CopyButton } from "../components/CopyButton";
 
 const languages = [
   { code: "en", name: "English" },
@@ -140,6 +141,11 @@ export function TranslatePage() {
               placeholder={"Translation will appear here..."}
               className="w-full flex-grow p-4 border rounded shadow-sm resize-none bg-neutral-50 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 ios-scroll"
             />
+            {translatedText && (
+              <div className="absolute top-2 right-2">
+                <CopyButton text={translatedText} />
+              </div>
+            )}
           </div>
         </div>
       </main>
