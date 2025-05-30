@@ -89,8 +89,8 @@ export function TranslatePage() {
       )}
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <div className="w-full flex-grow py-4 px-2 pb-safe-bottom overflow-hidden">
-          <div className="relative h-full border border-neutral-400 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 rounded overflow-hidden flex flex-col md:flex-row">
+        <div className="w-full flex-grow py-4 px-3 pb-safe-bottom overflow-hidden">
+          <div className="relative h-full border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg overflow-hidden flex flex-col md:flex-row">
             <div className="flex-1 flex flex-col relative">
               <textarea
                 value={sourceText}

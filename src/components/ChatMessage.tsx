@@ -1,6 +1,6 @@
 import { Markdown } from './Markdown';
 import { CopyButton } from './CopyButton';
-import { Bot, User, File } from "lucide-react";
+import { Bot, User, File, Brain } from "lucide-react";
 
 import { AttachmentType, Message, Role } from "../models/chat";
 
@@ -10,6 +10,19 @@ type ChatMessageProps = {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === Role.User;
+
+  if (!isUser && !message.content) {
+    return (
+      <div className="flex justify-start mb-4">
+        <div className="mr-3 pt-3">
+          <Bot className="w-6 h-6" />
+        </div>
+        <div className="flex items-center pt-5">
+          <Brain className="w-5 h-5 animate-bounce text-neutral-600 dark:text-neutral-400" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -66,12 +79,6 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <div className="ml-2">
               <CopyButton text={message.content} subtle={true} />
             </div>
-          </div>
-        )}
-
-        {!isUser && (message.inputTokens === undefined || message.outputTokens === undefined) && (
-          <div className="flex justify-end mt-2 group-hover:opacity-100 opacity-0 transition-opacity">
-            <CopyButton text={message.content} subtle={true} />
           </div>
         )}
       </div>

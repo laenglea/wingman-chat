@@ -24,7 +24,6 @@ export function ChatPage() {
   const [currentModel, setCurrentModel] = useState<Model>();
   const [currentMessages, setCurrentMessages] = useState<Message[]>([]);
   
-  // Auto-scroll hook handles all scroll behavior
   const { containerRef: messageContainerRef, handleScroll } = useAutoScroll({
     dependencies: [currentChat, currentMessages],
   });
@@ -68,7 +67,7 @@ export function ChatPage() {
       ...messages,
       {
         role: Role.Assistant,
-        content: "...",
+        content: "",
       },
     ]);
 
@@ -214,7 +213,7 @@ export function ChatPage() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-300 dark:border-neutral-700 py-4 px-2 pb-safe-bottom pl-safe-left pr-safe-right">
+      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 pb-4 px-3 pb-safe-bottom pl-safe-left pr-safe-right">
         <ChatInput 
           onSend={sendMessage} 
           models={models}
