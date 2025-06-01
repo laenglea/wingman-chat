@@ -26,7 +26,7 @@ export function ChatPage() {
   const currentChat = chats.find(c => c.id === currentChatId) ?? null;
   const messages = currentChat?.messages ?? [];
 
-  const { containerRef: messageContainerRef, handleScroll } = useAutoScroll({
+  const { containerRef, bottomRef, handleScroll, enableAutoScroll } = useAutoScroll({
     dependencies: [currentChat, messages],
   });
 
@@ -59,6 +59,9 @@ export function ChatPage() {
   };
 
   const sendMessage = async (message: Message) => {
+    // Re-enable auto-scroll when user sends a message
+    enableAutoScroll();
+    
     let chat = currentChat;
     const model = currentModel;
 
@@ -173,13 +176,15 @@ export function ChatPage() {
         ) : (
           <div
             className="flex-1 overflow-auto ios-scroll"
-            ref={messageContainerRef}
+            ref={containerRef}
             onScroll={handleScroll}
           >
             <div className="max-content-width px-2 pt-4">
               {messages.map((message, idx) => (
                 <ChatMessage key={idx} message={message} />
               ))}
+              {/* sentinel for scrollIntoView */}
+              <div ref={bottomRef} />
             </div>
           </div>
         )}
