@@ -164,30 +164,36 @@ export function ChatPage() {
           />
         )}
 
-        <div
-          className="flex-1 overflow-auto px-2 pt-4 pb-0 ios-scroll"
-          ref={messageContainerRef}
-          onScroll={handleScroll}
-        >
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-full text-center">
-              <img src="/logo.svg" className="w-48 h-48 mb-4" />
+        {messages.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex flex-col items-center text-center">
+              <img src="/logo.svg" className="w-32 h-32 dark:opacity-80" alt="Wingman Chat" />
             </div>
-          ) : (
-            messages.map((message, idx) => (
-              <ChatMessage key={idx} message={message} />
-            ))
-          )}
-        </div>
+          </div>
+        ) : (
+          <div
+            className="flex-1 overflow-auto ios-scroll"
+            ref={messageContainerRef}
+            onScroll={handleScroll}
+          >
+            <div className="max-content-width px-2 pt-4">
+              {messages.map((message, idx) => (
+                <ChatMessage key={idx} message={message} />
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 pb-4 px-3 pb-safe-bottom pl-safe-left pr-safe-right">
-        <ChatInput 
-          onSend={sendMessage} 
-          models={models}
-          currentModel={currentModel}
-          onModelChange={onSelectModel}
-        />
+        <div className="max-content-width">
+          <ChatInput 
+            onSend={sendMessage} 
+            models={models}
+            currentModel={currentModel}
+            onModelChange={onSelectModel}
+          />
+        </div>
       </footer>
     </div>
   );
