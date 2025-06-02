@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { Tool } from "../models/chat";
-import { Message, Model, Role, AttachmentType, Partition } from "../models/chat";
+import { Message, Model, Role, AttachmentType } from "../models/chat";
 
 export class Client {
   private oai: OpenAI;
@@ -168,23 +168,21 @@ export class Client {
     return completion.choices[0].message.content?.trim() ?? "Summary not available";
   }
 
-  async partition(blob: Blob): Promise<Partition[]> {
+  async extractText(blob: Blob): Promise<string> {
     const data = new FormData();
-    data.append("files", blob);
+    data.append("file", blob);
+    data.append("format", "text");
 
-    const resp = await fetch(new URL("/api/v1/partition", window.location.origin), {
+    const resp = await fetch(new URL("/api/v1/extract", window.location.origin), {
       method: "POST",
-      headers: {
-        accept: "application/json",
-      },
       body: data,
     });
 
     if (!resp.ok) {
-      throw new Error(`Partition request failed with status ${resp.status}`);
+      throw new Error(`Extract request failed with status ${resp.status}`);
     }
 
-    return resp.json() as Promise<Partition[]>;
+    return resp.text();
   }
 
   async translate(lang: string, text: string): Promise<string> {

@@ -165,11 +165,11 @@ export const imageTypes = [
   "image/webp",
 ];
 
-export const partitionTypes = [
+export const documentTypes = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
-export const supportedTypes = [...textTypes, ...imageTypes, ...partitionTypes];
+export const supportedTypes = [...textTypes, ...imageTypes, ...documentTypes];
