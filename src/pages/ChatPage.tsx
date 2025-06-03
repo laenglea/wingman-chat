@@ -1,14 +1,16 @@
-import { useState, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Plus as PlusIcon, Maximize2, Minimize2 } from "lucide-react";
+import { Button } from "@headlessui/react";
 import { Message, Model, Role } from "../models/chat";
-import { useChats } from "../hooks/useChats";
 import { useModels } from "../hooks/useModels";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { Sidebar } from "../components/Sidebar";
+import { useChats } from "../hooks/useChats";
+import { useSidebar } from "../contexts/SidebarContext";
+import { useNavigation } from "../contexts/NavigationContext";
+import { useResponsiveness } from "../hooks/useResponsiveness";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
-import { Button } from "@headlessui/react";
-import { Menu as MenuIcon, Plus as PlusIcon } from "lucide-react";
+import { ChatSidebar } from "../components/ChatSidebar";
 import { getConfig } from "../config";
 
 export function ChatPage() {
@@ -16,12 +18,17 @@ export function ChatPage() {
   const client = config.client;
   const bridge = config.bridge;
 
-  const { chats, createChat, updateChat, deleteChat } = useChats();
   const { models } = useModels();
-
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<Model>();
+  const { isResponsive, toggleResponsiveness } = useResponsiveness();
+  
+  // Chat state management
+  const { chats, createChat, updateChat, deleteChat } = useChats();
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+  
+  // Sidebar integration (now only controls visibility)
+  const { setShowSidebar, setSidebarContent } = useSidebar();
+  const { setRightActions } = useNavigation();
 
   const currentChat = chats.find(c => c.id === currentChatId) ?? null;
   const messages = currentChat?.messages ?? [];
@@ -30,26 +37,72 @@ export function ChatPage() {
     dependencies: [currentChat, messages],
   });
 
-  const toggleSidebar = () => {
-    setShowSidebar(!showSidebar);
-  };
+  // Use refs to maintain stable references for frequently changing values
+  const chatsRef = useRef(chats);
+  const currentChatIdRef = useRef(currentChatId);
+  
+  // Update refs when values change
+  useEffect(() => {
+    chatsRef.current = chats;
+  }, [chats]);
+  
+  useEffect(() => {
+    currentChatIdRef.current = currentChatId;
+  }, [currentChatId]);
 
-  const onCreateChat = () => {
+  // Handler functions with stable references
+  const onCreateChat = useCallback(() => {
     setCurrentChatId(null);
-  };
+  }, []);
 
-  const onSelectChat = (chatId: string) => {
+  const onSelectChat = useCallback((chatId: string) => {
     setCurrentChatId(chatId);
-    setShowSidebar(false);
-  };
-
-  const onDeleteChat = (chatId: string) => {
-    deleteChat(chatId);
-
-    if (currentChat?.id === chatId) {
-      onCreateChat();
+    // Don't auto-close sidebar on larger screens, but close on mobile
+    if (window.innerWidth < 768) {
+      setShowSidebar(false);
     }
-  };
+  }, [setShowSidebar]);
+
+  const onDeleteChat = useCallback((chatId: string) => {
+    deleteChat(chatId);
+    if (chatsRef.current.find(c => c.id === currentChatIdRef.current)?.id === chatId) {
+      setCurrentChatId(null);
+    }
+  }, [deleteChat]); // Now only depends on deleteChat, not chats or currentChatId
+
+  // Set up navigation actions (only once on mount)
+  useEffect(() => {
+    setRightActions(
+      <Button
+        className="menu-button"
+        onClick={onCreateChat}
+      >
+        <PlusIcon size={20} />
+      </Button>
+    );
+
+    // Cleanup when component unmounts
+    return () => {
+      setRightActions(null);
+    };
+  }, [setRightActions, onCreateChat]);
+
+  // Create sidebar content with useMemo to avoid infinite re-renders
+  const sidebarContent = useMemo(() => (
+    <ChatSidebar
+      chats={chats}
+      selectedChatId={currentChatId}
+      onSelectChat={onSelectChat}
+      onDeleteChat={onDeleteChat}
+    />
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [chats, currentChatId]); // Intentionally not including callbacks to prevent infinite loops
+
+  // Set up sidebar content when it changes
+  useEffect(() => {
+    setSidebarContent(sidebarContent);
+    return () => setSidebarContent(null);
+  }, [sidebarContent, setSidebarContent]);
 
   const onSelectModel = (model: Model) => {
     setCurrentModel(model);
@@ -113,60 +166,19 @@ export function ChatPage() {
     setCurrentModel(next);
   }, [currentChat, models]);
 
-  useEffect(() => {
-    if (chats.length == 0) {
-      setShowSidebar(false);
-    }
-  }, [chats]);
-
-  const leftControlsContainer = document.getElementById('chat-left-controls');
-  const rightControlsContainer = document.getElementById('chat-right-controls');
-
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
-      {leftControlsContainer && createPortal(
-        <div className="flex items-center gap-2">
-          <Button
-            className="menu-button"
-            onClick={toggleSidebar}
-          >
-            <MenuIcon size={20} />
-          </Button>
-        </div>,
-        leftControlsContainer
-      )}
-
-      {rightControlsContainer && createPortal(
+    <div className="h-full w-full flex flex-col overflow-hidden relative">
+      {/* Toggle button - positioned at page level */}
+      <div className="hidden md:block absolute top-4 right-4 z-20">
         <Button
-          className="menu-button"
-          onClick={onCreateChat}
+          onClick={toggleResponsiveness}
+          className="menu-button !p-1.5"
+          title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
         >
-          <PlusIcon size={20} />
-        </Button>,
-        rightControlsContainer
-      )}
-
-      <aside
-        className={`${showSidebar ? "translate-x-0" : "-translate-x-full"} transition-all duration-300 fixed top-0 bottom-0 left-0 w-64 z-50`}
-        style={{ zIndex: 60 }}
-      >
-        <Sidebar
-          chats={chats}
-          selectedChatId={currentChatId}
-          onSelectChat={onSelectChat}
-          onDeleteChat={onDeleteChat}
-        />
-      </aside>
-
-      <main className="flex-1 flex flex-col overflow-hidden" style={{ paddingBottom: `calc(6rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))` }}>
-        {showSidebar && (
-          <div
-            className="fixed inset-0 z-50 bg-black/10 dark:bg-black/50 backdrop-blur-xs cursor-pointer"
-            style={{ zIndex: 55 }}
-            onClick={toggleSidebar}
-          />
-        )}
-
+          {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </Button>
+      </div>
+      <main className="flex-1 flex flex-col overflow-hidden">
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center text-center">
@@ -175,11 +187,15 @@ export function ChatPage() {
           </div>
         ) : (
           <div
-            className="flex-1 overflow-auto ios-scroll"
+            className="flex-1 overflow-auto ios-scroll sidebar-scroll"
             ref={containerRef}
             onScroll={handleScroll}
           >
-            <div className="max-content-width px-2 pt-4">
+            <div className={`px-2 pt-4 ${
+              isResponsive 
+                ? 'max-w-[80vw] mx-auto' 
+                : 'max-content-width'
+            }`}>
               {messages.map((message, idx) => (
                 <ChatMessage key={idx} message={message} />
               ))}
@@ -190,8 +206,8 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-20 bg-neutral-50 dark:bg-neutral-950 pb-4 px-3 pb-safe-bottom pl-safe-left pr-safe-right">
-        <div className="max-content-width">
+      <footer className="bg-neutral-50 dark:bg-neutral-950 pb-4 px-3 pb-safe-bottom pl-safe-left pr-safe-right">
+        <div className={isResponsive ? 'max-w-[80vw] mx-auto' : 'max-content-width'}>
           <ChatInput 
             onSend={sendMessage} 
             models={models}

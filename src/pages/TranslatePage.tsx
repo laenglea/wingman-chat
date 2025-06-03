@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
-import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon } from "lucide-react";
+import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, Maximize2, Minimize2 } from "lucide-react";
 import { getConfig } from "../config";
+import { useNavigation } from "../contexts/NavigationContext";
+import { useResponsiveness } from "../hooks/useResponsiveness";
 import { CopyButton } from "../components/CopyButton";
 
 const languages = [
@@ -16,16 +17,13 @@ const languages = [
 export function TranslatePage() {
   const config = getConfig();
   const client = config.client;
+  const { setRightActions } = useNavigation();
 
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [targetLang, setTargetLang] = useState("en");
   const [isLoading, setIsLoading] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const { isResponsive, toggleResponsiveness } = useResponsiveness();
 
   const performTranslate = useCallback(async (langToUse: string, textToTranslate: string) => {
     if (!textToTranslate.trim()) {
@@ -68,30 +66,50 @@ export function TranslatePage() {
     })();
   };
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setSourceText("");
     setTranslatedText("");
-  };
+  }, []);
 
-  const rightControlsContainer = mounted ? document.getElementById('translate-right-controls') : null;
+  // Set up navigation actions when component mounts
+  useEffect(() => {
+    setRightActions(
+      <Button
+        className="menu-button"
+        onClick={handleReset}
+        title="Clear translation"
+      >
+        <PlusIcon size={20} />
+      </Button>
+    );
+
+    // Cleanup when component unmounts
+    return () => {
+      setRightActions(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleReset]);
 
   return (
-    <div className="h-full w-full flex flex-col overflow-hidden">
-      {rightControlsContainer && createPortal(
+    <div className="h-full w-full flex flex-col overflow-hidden relative">
+      {/* Toggle button - positioned at page level */}
+      <div className="hidden md:block absolute top-4 right-4 z-20">
         <Button
-          className="menu-button"
-          onClick={handleReset}
-          title="Clear translation"
+          onClick={toggleResponsiveness}
+          className="menu-button !p-1.5"
+          title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
         >
-          <PlusIcon size={20} />
-        </Button>,
-        rightControlsContainer
-      )}
-
+          {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+        </Button>
+      </div>
       <main className="flex-1 flex flex-col overflow-hidden">
-        <div className="w-full flex-grow py-4 px-3 pb-safe-bottom overflow-hidden flex items-center">
-          <div className="max-content-width w-full h-3/4">
-            <div className="relative h-full w-full border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg overflow-hidden flex flex-col md:flex-row shadow-md">
+        <div className="w-full flex-grow py-0 px-0 md:py-4 md:px-3 pb-safe-bottom overflow-hidden flex items-center justify-center">
+          <div className={`w-full md:mx-auto ${
+            isResponsive 
+              ? 'h-full md:h-[80vh] md:max-w-[80vw] md:aspect-[3/2]' 
+              : 'h-full md:h-auto md:max-w-[900px] md:aspect-[3/2]'
+          }`}>
+            <div className="relative h-full w-full border-0 md:border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-none md:rounded-lg overflow-hidden flex flex-col md:flex-row shadow-none md:shadow-md">
             <div className="flex-1 flex flex-col relative">
               <textarea
                 value={sourceText}
