@@ -232,7 +232,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
             {attachments.map((attachment, index) => (
               <div
                 key={index}
-                className="relative w-14 h-14 bg-white dark:bg-neutral-600 rounded-xl border border-neutral-300 dark:border-neutral-500 shadow-sm flex items-center justify-center group hover:shadow-md hover:border-neutral-400 dark:hover:border-neutral-400 transition-all duration-200 cursor-pointer overflow-hidden"
+                className="relative w-14 h-14 bg-white dark:bg-neutral-600 rounded-xl border border-neutral-300 dark:border-neutral-500 shadow-sm flex items-center justify-center group hover:shadow-md hover:border-neutral-400 dark:hover:border-neutral-400 transition-all duration-200"
                 title={attachment.name}
               >
                 {attachment.type === AttachmentType.Image ? (
@@ -248,10 +248,10 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
                 )}
                 <button
                   type="button"
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  className="absolute top-0.5 right-0.5 w-5 h-5 bg-neutral-800/80 hover:bg-neutral-900 dark:bg-neutral-200/80 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-sm shadow-sm cursor-pointer"
                   onClick={() => handleRemoveAttachment(index)}
                 >
-                  <X size={14} />
+                  <X size={10} />
                 </button>
               </div>
             ))}
@@ -276,7 +276,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
         <div className="flex items-center justify-between gap-1 px-2 pb-2 md:px-4 md:pb-2 pt-0">
           <div className="flex items-center gap-2">
             <Menu>
-              <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none text-sm">
+              <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none focus:ring-0 focus:border-none text-sm">
                 <Brain size={14} />
                 <span>
                   {currentModel?.name ?? currentModel?.id ?? "Select Model"}
@@ -285,14 +285,14 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
               <MenuItems
                 transition
                 anchor="bottom start"
-                className="!max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg z-50"
+                className="sidebar-scroll !max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg z-50"
               >
                 {models.map((model) => (
                   <MenuItem key={model.id}>
                     <Button
                       onClick={() => onModelChange(model)}
                       title={model.description}
-                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
+                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer focus:outline-none focus:ring-0"
                     >
                       {model.name ?? model.id}
                     </Button>
