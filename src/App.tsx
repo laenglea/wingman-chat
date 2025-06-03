@@ -5,6 +5,8 @@ import { ChatPage } from "./pages/ChatPage";
 import { TranslatePage } from "./pages/TranslatePage";
 import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { NavigationProvider, useNavigation } from "./contexts/NavigationContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 type Page = "chat" | "translate";
 
@@ -115,6 +117,7 @@ function AppContent() {
             </div>
             
             <div className="flex items-center gap-2 w-1/3 justify-end">
+              <ThemeToggle />
               {rightActions}
             </div>
           </div>
@@ -131,11 +134,13 @@ function AppContent() {
 
 function App() {
   return (
-    <SidebarProvider>
-      <NavigationProvider>
-        <AppContent />
-      </NavigationProvider>
-    </SidebarProvider>
+    <ThemeProvider>
+      <SidebarProvider>
+        <NavigationProvider>
+          <AppContent />
+        </NavigationProvider>
+      </SidebarProvider>
+    </ThemeProvider>
   );
 }
 
