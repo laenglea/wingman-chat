@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, Link } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, Link, File, Loader2, FileText } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role, Model, Tool } from "../models/chat";
 import {
@@ -32,10 +32,25 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
 
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState<Set<string>>(new Set());
   const [bridgeTools, setBridgeTools] = useState<Tool[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contentEditableRef = useRef<HTMLDivElement>(null);
+
+  // Helper function to get the appropriate icon for each attachment type
+  const getAttachmentIcon = (attachment: Attachment) => {
+    switch (attachment.type) {
+      case AttachmentType.Image:
+        return <Image size={24} />;
+      case AttachmentType.Text:
+        return <FileText size={24} />;
+      case AttachmentType.File:
+        return <File size={24} />;
+      default:
+        return <File size={24} />;
+    }
+  };
 
   // Fetch bridge tools when bridge is connected
   useEffect(() => {
@@ -86,57 +101,87 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
   };
 
   const handleScreenshotClick = async () => {
-    const data = await captureScreenshot();
+    const screenshotId = `screenshot-${Date.now()}`;
+    setLoadingAttachments(prev => new Set([...prev, screenshotId]));
+    
+    try {
+      const data = await captureScreenshot();
 
-    const attachment = {
-      type: AttachmentType.Image,
-      name: "screenshot.png",
-      data: data,
-    };
+      const attachment = {
+        type: AttachmentType.Image,
+        name: "screenshot.png",
+        data: data,
+      };
 
-    setAttachments((prev) => [...prev, attachment]);
+      setAttachments((prev) => [...prev, attachment]);
+    } catch (error) {
+      console.error("Error capturing screenshot:", error);
+    } finally {
+      setLoadingAttachments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(screenshotId);
+        return newSet;
+      });
+    }
   };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
 
     if (files) {
-      const newAttachments: Attachment[] = [];
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
+        const fileId = `${file.name}-${Date.now()}-${i}`;
+        
+        // Add to loading state
+        setLoadingAttachments(prev => new Set([...prev, fileId]));
+        
+        try {
+          let attachment: Attachment | null = null;
 
-        if (textTypes.includes(file.type) || textTypes.includes(getFileExt(file.name))) {
-          const text = await readAsText(file);
-          newAttachments.push({
-            type: AttachmentType.Text,
-            name: file.name,
-            data: text,
-          });
-        }
+          if (textTypes.includes(file.type) || textTypes.includes(getFileExt(file.name))) {
+            const text = await readAsText(file);
+            attachment = {
+              type: AttachmentType.Text,
+              name: file.name,
+              data: text,
+            };
+          }
 
-        if (imageTypes.includes(file.type) || imageTypes.includes(getFileExt(file.name))) {
-          const blob = await resizeImageBlob(file, 1920, 1920);
-          const url = await readAsDataURL(blob);
-          newAttachments.push({
-            type: AttachmentType.Image,
-            name: file.name,
-            data: url,
-          });
-        }
+          if (imageTypes.includes(file.type) || imageTypes.includes(getFileExt(file.name))) {
+            const blob = await resizeImageBlob(file, 1920, 1920);
+            const url = await readAsDataURL(blob);
+            attachment = {
+              type: AttachmentType.Image,
+              name: file.name,
+              data: url,
+            };
+          }
 
-        if (documentTypes.includes(file.type) || documentTypes.includes(getFileExt(file.name))) {
-          const text = await client.extractText(file);
+          if (documentTypes.includes(file.type) || documentTypes.includes(getFileExt(file.name))) {
+            const text = await client.extractText(file);
+            attachment = {
+              type: AttachmentType.Text,
+              name: file.name,
+              data: text,
+            };
+          }
 
-          newAttachments.push({
-            type: AttachmentType.Text,
-            name: file.name,
-            data: text,
+          if (attachment) {
+            setAttachments((prev) => [...prev, attachment!]);
+          }
+        } catch (error) {
+          console.error("Error processing file:", error);
+        } finally {
+          // Remove from loading state
+          setLoadingAttachments(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(fileId);
+            return newSet;
           });
         }
       }
 
-      setAttachments((prev) => [...prev, ...newAttachments]);
       e.target.value = "";
     }
   };
@@ -163,6 +208,55 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
           className="hidden"
           onChange={handleFileChange}
         />
+
+        {/* Attachments display at the top of the input */}
+        {(attachments.length > 0 || loadingAttachments.size > 0) && (
+          <div className="flex flex-wrap gap-3 p-3">
+            {/* Loading attachments */}
+            {Array.from(loadingAttachments).map((fileId, index) => (
+              <div
+                key={fileId}
+                className="relative w-14 h-14 bg-neutral-100 dark:bg-neutral-700 rounded-xl border-2 border-dashed border-neutral-400 dark:border-neutral-500 flex items-center justify-center animate-pulse"
+                title="Processing file..."
+              >
+                <Loader2 size={18} className="animate-spin text-neutral-500 dark:text-neutral-400" />
+                {loadingAttachments.size > 1 && (
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {index + 1}
+                  </div>
+                )}
+              </div>
+            ))}
+            
+            {/* Processed attachments */}
+            {attachments.map((attachment, index) => (
+              <div
+                key={index}
+                className="relative w-14 h-14 bg-white dark:bg-neutral-600 rounded-xl border border-neutral-300 dark:border-neutral-500 shadow-sm flex items-center justify-center group hover:shadow-md hover:border-neutral-400 dark:hover:border-neutral-400 transition-all duration-200 cursor-pointer overflow-hidden"
+                title={attachment.name}
+              >
+                {attachment.type === AttachmentType.Image ? (
+                  <img 
+                    src={attachment.data} 
+                    alt={attachment.name}
+                    className="w-full h-full object-cover rounded-xl"
+                  />
+                ) : (
+                  <div className="text-neutral-600 dark:text-neutral-300">
+                    {getAttachmentIcon(attachment)}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                  onClick={() => handleRemoveAttachment(index)}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div
           ref={contentEditableRef}
@@ -263,26 +357,6 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
           </div>
         </div>
       </div>
-
-      {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-2">
-          {attachments.map((val, i) => (
-            <div key={i} className="flex items-center gap-1 chat-input-attachment">
-              <Image size={16} />
-              <span className="text-sm break-all">
-                {val.name}
-              </span>
-              <Button
-                type="button"
-                className="cursor-pointer"
-                onClick={() => handleRemoveAttachment(i)}
-              >
-                <X size={16} />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
     </form>
   );
 }
