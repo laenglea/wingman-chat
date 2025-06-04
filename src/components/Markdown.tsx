@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CopyButton } from './CopyButton';
 import { MermaidRenderer } from './MermaidRenderer';
+import { AdaptiveCardRenderer } from './AdaptiveCardRenderer';
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
@@ -20,6 +21,9 @@ const languageMap: Record<string, string> = {
   'rs': 'rust',
   'mermaid': 'mermaid',
   'mmd': 'mermaid',
+  'adaptivecard': 'adaptivecard',
+  'adaptive-card': 'adaptivecard',
+  'json': 'json',
 };
 
 const components: Partial<Components> = {
@@ -190,6 +194,22 @@ const components: Partial<Components> = {
 
         if (language === "mermaid") {
             return <MermaidRenderer chart={text} language={language} />;
+        }
+
+        if (language === "adaptivecard") {
+            return <AdaptiveCardRenderer cardJson={text} />;
+        }
+
+        // Auto-detect Adaptive Cards in JSON blocks
+        if (language === "json") {
+            try {
+                const parsed = JSON.parse(text);
+                if (parsed.type === "AdaptiveCard" && parsed.version) {
+                    return <AdaptiveCardRenderer cardJson={text} />;
+                }
+            } catch {
+                // If parsing fails, fall through to regular JSON syntax highlighting
+            }
         }
 
         // Filter out problematic props for SyntaxHighlighter
