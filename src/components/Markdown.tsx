@@ -2,6 +2,7 @@ import { memo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CopyButton } from './CopyButton';
+import { MermaidRenderer } from './MermaidRenderer';
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
@@ -17,6 +18,8 @@ const languageMap: Record<string, string> = {
   'sh': 'shell',
   'md': 'markdown',
   'rs': 'rust',
+  'mermaid': 'mermaid',
+  'mmd': 'mermaid',
 };
 
 const components: Partial<Components> = {
@@ -25,35 +28,35 @@ const components: Partial<Components> = {
             {children}
         </>;
     },
-    ol: ({ node, children, ...props }) => {
+    ol: ({ children, ...props }) => {
         return (
             <ol className="list-decimal list-inside ml-2" {...props}>
                 {children}
             </ol>
         );
     },
-    li: ({ node, children, ...props }) => {
+    li: ({ children, ...props }) => {
         return (
             <li className="py-1" {...props}>
                 {children}
             </li>
         );
     },
-    ul: ({ node, children, ...props }) => {
+    ul: ({ children, ...props }) => {
         return (
             <ul className="list-disc list-inside ml-2" {...props}>
                 {children}
             </ul>
         );
     },
-    strong: ({ node, children, ...props }) => {
+    strong: ({ children, ...props }) => {
         return (
             <span className="font-semibold" {...props}>
                 {children}
             </span>
         );
     },
-    a: ({ node, children, href, ...props }) => {
+    a: ({ children, href, ...props }) => {
         let url = href || '';
 
         if (url && !url.startsWith('http') && !url.startsWith('#')) {
@@ -72,42 +75,42 @@ const components: Partial<Components> = {
             </a>
         );
     },
-    h1: ({ node, children, ...props }) => {
+    h1: ({ children, ...props }) => {
         return (
             <h1 className="text-3xl font-semibold mt-6 mb-2" {...props}>
                 {children}
             </h1>
         );
     },
-    h2: ({ node, children, ...props }) => {
+    h2: ({ children, ...props }) => {
         return (
             <h2 className="text-2xl font-semibold mt-6 mb-2" {...props}>
                 {children}
             </h2>
         );
     },
-    h3: ({ node, children, ...props }) => {
+    h3: ({ children, ...props }) => {
         return (
             <h3 className="text-xl font-semibold mt-6 mb-2" {...props}>
                 {children}
             </h3>
         );
     },
-    h4: ({ node, children, ...props }) => {
+    h4: ({ children, ...props }) => {
         return (
             <h4 className="text-lg font-semibold mt-6 mb-2" {...props}>
                 {children}
             </h4>
         );
     },
-    h5: ({ node, children, ...props }) => {
+    h5: ({ children, ...props }) => {
         return (
             <h5 className="text-base font-semibold mt-6 mb-2" {...props}>
                 {children}
             </h5>
         );
     },
-    h6: ({ node, children, ...props }) => {
+    h6: ({ children, ...props }) => {
         return (
             <h6 className="text-sm font-semibold mt-6 mb-2" {...props}>
                 {children}
@@ -163,7 +166,7 @@ const components: Partial<Components> = {
             />
         );
     },
-    code({ children, className, node, ref, ...rest }) {
+    code({ children, className, ...rest }) {
         const match = /language-(\w+)/.exec(className || "");
         
         if (!match) {
@@ -185,6 +188,14 @@ const components: Partial<Components> = {
             return <Markdown>{text}</Markdown>;
         }
 
+        if (language === "mermaid") {
+            return <MermaidRenderer chart={text} language={language} />;
+        }
+
+        // Filter out problematic props for SyntaxHighlighter
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { ref, node, ...syntaxProps } = rest;
+
         return (
             <div className="relative my-4">
                 <div className="flex justify-between items-center bg-neutral-800 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-neutral-300">
@@ -192,7 +203,7 @@ const components: Partial<Components> = {
                     <CopyButton text={text} />
                 </div>
                 <SyntaxHighlighter
-                    {...rest}
+                    {...syntaxProps}
                     className="rounded-t-none rounded-b-md !mt-0"
                     children={text}
                     PreTag="div"
