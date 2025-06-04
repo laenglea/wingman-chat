@@ -71,7 +71,7 @@ export class Client {
       }
     }
 
-    const stream = this.oai.beta.chat.completions.stream({
+    const stream = this.oai.chat.completions.stream({
       model: model,
 
       tools: this.toTools(tools),
