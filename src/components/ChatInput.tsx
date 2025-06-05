@@ -37,6 +37,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contentEditableRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Helper function to get the appropriate icon for each attachment type
   const getAttachmentIcon = (attachment: Attachment) => {
@@ -73,6 +74,40 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
     const interval = setInterval(fetchTools, 5000);    
     return () => clearInterval(interval);
   }, [bridge]);
+
+  // Force layout recalculation on mount to fix initial sizing issues
+  useEffect(() => {
+    const forceLayout = () => {
+      if (containerRef.current) {
+        // Force a repaint by reading offsetHeight
+        containerRef.current.offsetHeight;
+      }
+      if (contentEditableRef.current) {
+        // Force a repaint for the content editable area
+        contentEditableRef.current.offsetHeight;
+      }
+    };
+
+    // Run immediately and on next tick to ensure DOM is ready
+    forceLayout();
+    const timer = setTimeout(forceLayout, 0);
+    
+    // Also force layout on window load to handle CSS custom properties
+    const handleLoad = () => forceLayout();
+    window.addEventListener('load', handleLoad);
+    
+    // Handle resize events to maintain proper sizing
+    const handleResize = () => {
+      requestAnimationFrame(forceLayout);
+    };
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('load', handleLoad);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -199,7 +234,10 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 drop-shadow-2xl">
+      <div 
+        ref={containerRef}
+        className="chat-input-container border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 drop-shadow-2xl"
+      >
         <input
           type="file"
           multiple
@@ -261,7 +299,11 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
         <div
           ref={contentEditableRef}
           className="pt-2 px-2 pb-2 md:pt-4 md:px-4 md:pb-2 pr-0 bg-transparent dark:text-neutral-200 focus:outline-none flex-1 max-h-[40vh] overflow-y-auto min-h-[2.5rem] whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:dark:text-neutral-400"
-          style={{ scrollbarWidth: "thin" }}
+          style={{ 
+            scrollbarWidth: "thin",
+            minHeight: "2.5rem", // Explicit fallback for min-height
+            height: "auto" // Ensure height is calculated properly
+          }}
           role="textbox"
           contentEditable
           suppressContentEditableWarning={true}

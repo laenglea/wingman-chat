@@ -120,6 +120,12 @@ button:focus-visible,
   margin: 0 auto;
 }
 
+/* Ensure proper initial layout for chat input */
+.chat-input-container {
+  contain: layout style;
+  will-change: height;
+}
+
 /* Subtle scrollbar styling for sidebar */
 .sidebar-scroll {
   -webkit-overflow-scrolling: touch;
