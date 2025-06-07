@@ -45,15 +45,17 @@ function AppContent() {
 
       {/* Mobile floating toggle button when sidebar is closed */}
       {sidebarContent && !showSidebar && (
-        <div className="fixed top-0 left-0 z-50 md:hidden p-3 pt-safe-top pl-safe-left">
-          <Button
-            className="menu-button bg-white dark:bg-neutral-900 shadow-lg transition-opacity duration-200"
-            onClick={() => {
-              toggleSidebar();
-            }}
-          >
-            <MenuIcon size={20} />
-          </Button>
+        <div className="fixed top-0 left-0 z-50 md:hidden">
+          <div className="p-3 pt-safe-top pl-safe-left">
+            <Button
+              className="menu-button bg-white dark:bg-neutral-900 shadow-lg transition-opacity duration-200"
+              onClick={() => {
+                toggleSidebar();
+              }}
+            >
+              <MenuIcon size={20} />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -70,13 +72,15 @@ function AppContent() {
         >
           {/* Toggle button inside sidebar on mobile when open */}
           {showSidebar && (
-            <div className="absolute top-0 right-0 z-10 md:hidden p-3 pt-safe-top pr-3">
-              <Button
-                className="menu-button bg-neutral-100 dark:bg-neutral-800 shadow-lg"
-                onClick={toggleSidebar}
-              >
-                <MenuIcon size={20} />
-              </Button>
+            <div className="absolute top-0 right-0 z-10 md:hidden">
+              <div className="p-3 pt-safe-top pr-safe-right">
+                <Button
+                  className="menu-button bg-neutral-100 dark:bg-neutral-800 shadow-lg"
+                  onClick={toggleSidebar}
+                >
+                  <MenuIcon size={20} />
+                </Button>
+              </div>
             </div>
           )}
           {sidebarContent}

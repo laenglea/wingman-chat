@@ -1,4 +1,7 @@
+import { z } from "zod";
 import OpenAI from "openai";
+import { zodResponseFormat } from "openai/helpers/zod";
+
 import { Tool } from "../models/chat";
 import { Message, Model, Role, AttachmentType } from "../models/chat";
 
@@ -166,6 +169,50 @@ export class Client {
     });
 
     return completion.choices[0].message.content?.trim() ?? "Summary not available";
+  }
+
+  async relatedPrompts(model: string, prompt: string): Promise<string[]> {
+    const Prompt = z.object({
+      prompt: z.string(),
+    });
+
+    const PromptList = z.object({
+      prompts: z.array(Prompt),
+    });
+
+    if (!prompt) {
+      prompt= "No conversation history provided. Please generate common prompts based on general topics.";
+    }
+
+    try {
+      const completion = await this.oai.chat.completions.parse({
+        model: model,
+        messages: [
+          {
+            role: "system",
+            content: `Based on the conversation history provided, generate 5-7 related follow-up prompts that would help the user explore the topic more deeply. The prompts should be:
+- Specific and actionable
+- Build upon the current conversation context
+- Encourage deeper exploration or different perspectives
+- Be concise but clear (10-50 words each)
+- Vary in type (clarifying questions, requests for examples, deeper analysis, practical applications, etc.)
+
+Return only the prompts themselves, without numbering or bullet points.`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: zodResponseFormat(PromptList, "list"),
+      });
+
+      const list = completion.choices[0].message.parsed;
+      return list?.prompts.map((p) => p.prompt) ?? [];
+    } catch (error) {
+      console.error("Error generating related prompts:", error);
+      return [];
+    }
   }
 
   async extractText(blob: Blob): Promise<string> {
