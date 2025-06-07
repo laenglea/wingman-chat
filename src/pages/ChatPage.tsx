@@ -207,7 +207,7 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className="bg-neutral-50 dark:bg-neutral-950 pb-4 px-3 pb-safe-bottom pl-safe-left pr-safe-right">
+      <footer className="bg-neutral-50 dark:bg-neutral-950 md:pb-4 pb-safe-bottom md:px-3 md:pl-safe-left md:pr-safe-right">
         <div className={isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'}>
           <ChatInput 
             onSend={sendMessage} 

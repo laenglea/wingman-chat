@@ -1,30 +1,9 @@
 import { memo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { CopyButton } from './CopyButton';
 import { MermaidRenderer } from './MermaidRenderer';
 import { AdaptiveCardRenderer } from './AdaptiveCardRenderer';
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
-
-const languageMap: Record<string, string> = {
-  'js': 'javascript',
-  'jsx': 'jsx',
-  'ts': 'typescript',
-  'tsx': 'tsx',
-  'py': 'python',
-  'rb': 'ruby',
-  'cs': 'csharp',
-  'yml': 'yaml',
-  'sh': 'shell',
-  'md': 'markdown',
-  'rs': 'rust',
-  'mermaid': 'mermaid',
-  'mmd': 'mermaid',
-  'adaptivecard': 'adaptivecard',
-  'adaptive-card': 'adaptivecard',
-  'json': 'json',
-};
+import { CodeRenderer } from './CodeRenderer';
 
 const components: Partial<Components> = {
     pre: ({ children }) => {
@@ -183,8 +162,7 @@ const components: Partial<Components> = {
             );
         }
 
-        let language = match[1].toLowerCase();
-        language = languageMap[language] || language;
+        const language = match[1].toLowerCase();
         
         const text = String(children).replace(/\n$/, "");
 
@@ -192,11 +170,11 @@ const components: Partial<Components> = {
             return <Markdown>{text}</Markdown>;
         }
 
-        if (language === "mermaid") {
+        if (language === "mermaid" || language === "mmd") {
             return <MermaidRenderer chart={text} language={language} />;
         }
 
-        if (language === "adaptivecard") {
+        if (language === "adaptivecard" || language === "adaptive-card") {
             return <AdaptiveCardRenderer cardJson={text} />;
         }
 
@@ -212,31 +190,8 @@ const components: Partial<Components> = {
             }
         }
 
-        // Filter out problematic props for SyntaxHighlighter
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { ref, node, ...syntaxProps } = rest;
-
-        return (
-            <div className="relative my-4">
-                <div className="flex justify-between items-center bg-neutral-800 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-neutral-300">
-                    <span>{language}</span>
-                    <CopyButton text={text} />
-                </div>
-                <SyntaxHighlighter
-                    {...syntaxProps}
-                    className="rounded-t-none rounded-b-md !mt-0"
-                    children={text}
-                    PreTag="div"
-                    style={vscDarkPlus}
-                    language={Object.values(languageMap).includes(language) ? language : 'text'}
-                    wrapLines
-                    customStyle={{
-                        margin: 0,
-                        borderRadius: '0 0 6px 6px',
-                    }}
-                />
-            </div>
-        );
+        // Use CodeRenderer for all other code blocks
+        return <CodeRenderer code={text} language={language} />;
     },
 };
 

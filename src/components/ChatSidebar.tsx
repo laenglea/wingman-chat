@@ -25,7 +25,7 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, onDeleteChat 
         className="flex items-center px-2 py-2 pt-safe-top pl-safe-left flex-shrink-0"
         style={{ height: `calc(3rem + env(safe-area-inset-top, 0px))` }}
       >
-        <h2 className="text-xl font-semibold px-2">{config.title}</h2>
+        <h2 className="text-xl font-semibold px-2 whitespace-nowrap overflow-hidden text-ellipsis">{config.title}</h2>
       </div>
       
       <ul className="flex flex-col gap-2 py-2 px-2 pl-safe-left">
