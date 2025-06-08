@@ -1,4 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
+import { Eye, Code } from 'lucide-react';
+import { Button } from '@headlessui/react';
 import { useTheme } from '../contexts/ThemeContext';
 import { CopyButton } from './CopyButton';
 
@@ -17,9 +19,35 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [mermaidLoaded, setMermaidLoaded] = useState(false);
+  const [showPreview, setShowPreview] = useState(true);
   const elementId = useRef(`mermaid-${Math.random().toString(36).substr(2, 9)}`);
   const mermaidRef = useRef<MermaidAPI | null>(null);
   const { isDark } = useTheme();
+
+  // Basic Mermaid validation check
+  const isValidMermaid = (chartString: string): boolean => {
+    const trimmed = chartString.trim();
+    return trimmed.length > 0 && (
+      trimmed.includes('graph') || 
+      trimmed.includes('flowchart') || 
+      trimmed.includes('sequenceDiagram') ||
+      trimmed.includes('classDiagram') ||
+      trimmed.includes('stateDiagram') ||
+      trimmed.includes('erDiagram') ||
+      trimmed.includes('journey') ||
+      trimmed.includes('gantt') ||
+      trimmed.includes('pie') ||
+      trimmed.includes('gitGraph') ||
+      trimmed.includes('mindmap') ||
+      trimmed.includes('timeline') ||
+      trimmed.includes('sankey') ||
+      trimmed.includes('requirement') ||
+      trimmed.includes('C4') ||
+      trimmed.includes('quadrant')
+    );
+  };
+
+  const hasValidMermaid = isValidMermaid(chart);
 
   // Dynamically import and configure mermaid
   useEffect(() => {
@@ -209,7 +237,10 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
       <div className="relative my-4">
         <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{language}</span>
-          <span className="text-xs text-red-500 dark:text-red-400 opacity-70">render failed</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-red-500 dark:text-red-400 opacity-70">render failed</span>
+            <CopyButton text={chart} />
+          </div>
         </div>
         <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
           <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
@@ -243,13 +274,38 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
       <div className="relative my-4">
         <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{language}</span>
-          <CopyButton text={chart} />
+          <div className="flex items-center gap-2">
+            {hasValidMermaid && (
+              <Button
+                onClick={() => setShowPreview(!showPreview)}
+                className="text-neutral-300 hover:text-white transition-colors"
+                title={showPreview ? 'Show code' : 'Show preview'}
+              >
+                {showPreview ? (
+                  <Code className="h-4" />
+                ) : (
+                  <Eye className="h-4" />
+                )}
+              </Button>
+            )}
+            <CopyButton text={chart} />
+          </div>
         </div>
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700 overflow-x-auto">
-          <div 
-            className="mermaid-diagram flex justify-center"
-            dangerouslySetInnerHTML={{ __html: svg }}
-          />
+        <div className="bg-white dark:bg-neutral-800 rounded-b-md">
+          {hasValidMermaid && showPreview ? (
+            <div className="p-4 overflow-x-auto">
+              <div 
+                className="mermaid-diagram flex justify-center"
+                dangerouslySetInnerHTML={{ __html: svg }}
+              />
+            </div>
+          ) : (
+            <div className="p-4">
+              <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
+                <code>{chart}</code>
+              </pre>
+            </div>
+          )}
         </div>
       </div>
     );

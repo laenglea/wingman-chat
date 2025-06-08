@@ -1,4 +1,9 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, useContext } from 'react';
+import { Eye, Code } from 'lucide-react';
+import { Button } from '@headlessui/react';
+import { CopyButton } from './CopyButton';
+import { ChatContext } from '../contexts/ChatContext';
+import { Role } from '../models/chat';
 
 interface AdaptiveCardRendererProps {
     cardJson: string;
@@ -19,7 +24,11 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
     const [librariesLoaded, setLibrariesLoaded] = useState(false);
+    const [showPreview, setShowPreview] = useState(true);
     const adaptiveCardsRef = useRef<AdaptiveCardsModule | null>(null);
+    
+    // Get ChatContext for sending messages
+    const chatContext = useContext(ChatContext);
 
     // Dynamic import of adaptive cards and markdown-it
     useEffect(() => {
@@ -63,6 +72,8 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
             return false;
         }
     };
+
+    const hasValidJson = isValidCompleteJson(cardJson);
 
     // Helper function to check if JSON appears to be streaming (incomplete)
     const isStreamingJson = (jsonString: string): boolean => {
@@ -143,6 +154,49 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
                 const cardPayload = JSON.parse(cardJson);
                 card.parse(cardPayload);
 
+                // Handle Action.OpenUrl, Action.Execute, and Action.Submit events
+                card.onExecuteAction = (action: any) => {
+                    const actionType = action.getJsonTypeName();
+                    
+                    if (actionType === 'Action.OpenUrl') {
+                        const url = action.url;
+                        if (url) {
+                            // Open URL in a new tab/window
+                            window.open(url, '_blank', 'noopener,noreferrer');
+                        }
+                    } else if (actionType === 'Action.Execute' || actionType === 'Action.Submit') {
+                        // Handle Execute and Submit actions by sending message via ChatContext
+                        if (chatContext?.sendMessage) {
+                            let messageContent = '';
+                            
+                            if (actionType === 'Action.Execute') {
+                                // For Execute actions, use the verb as the message
+                                const verb = action.verb || 'execute';
+                                const data = action.data || {};
+                                messageContent = `Execute action: ${verb}`;
+                                if (Object.keys(data).length > 0) {
+                                    messageContent += `\nData: ${JSON.stringify(data, null, 2)}`;
+                                }
+                            } else if (actionType === 'Action.Submit') {
+                                // For Submit actions, format the submitted data
+                                const data = action.data || {};
+                                messageContent = 'Form submitted';
+                                if (Object.keys(data).length > 0) {
+                                    messageContent += `:\n${JSON.stringify(data, null, 2)}`;
+                                }
+                            }
+                            
+                            // Send the message
+                            chatContext.sendMessage({
+                                role: Role.User,
+                                content: messageContent
+                            }).catch(error => {
+                                console.error('Failed to send action message:', error);
+                            });
+                        }
+                    }
+                };
+
                 const renderedElement = card.render();
                 
                 if (renderedElement) {
@@ -171,16 +225,18 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
         return () => {
             clearTimeout(timeoutId);
         };
-    }, [cardJson, librariesLoaded]);
+    }, [cardJson, librariesLoaded, chatContext]);
 
-    // Mount the rendered card when it changes
+    // Mount the rendered card when it changes or when toggling views
     useEffect(() => {
         if (containerRef.current && renderedCard) {
             // Clear previous content
             containerRef.current.innerHTML = '';
-            containerRef.current.appendChild(renderedCard);
+            if (showPreview) {
+                containerRef.current.appendChild(renderedCard);
+            }
         }
-    }, [renderedCard]);
+    }, [renderedCard, showPreview]);
 
     // Show loading state while libraries are loading
     if (!librariesLoaded) {
@@ -221,7 +277,10 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
             <div className="relative my-4">
                 <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
                     <span>adaptivecard</span>
-                    <span className="text-xs text-red-500 dark:text-red-400 opacity-70">{error}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-red-500 dark:text-red-400 opacity-70">{error}</span>
+                        <CopyButton text={cardJson} />
+                    </div>
                 </div>
                 <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
                     <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
@@ -249,24 +308,43 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
         );
     }
 
-    // Render the adaptive card
-    if (renderedCard) {
-        return (
-            <div className="relative my-4">
-                <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
-                    <span>adaptivecard</span>
-                </div>
-                <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
-                    <div 
-                        ref={containerRef}
-                        className="adaptive-card-container [&_.ac-container]:!bg-transparent [&_.ac-container]:!border-none [&_*]:text-gray-900 [&_*]:dark:text-neutral-100"
-                    />
+    // Main render - always check if we have content to show
+    return (
+        <div className="relative my-4">
+            <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+                <span>adaptivecard</span>
+                <div className="flex items-center gap-2">
+                    {hasValidJson && (
+                        <Button
+                            onClick={() => setShowPreview(!showPreview)}
+                            className="text-neutral-300 hover:text-white transition-colors"
+                            title={showPreview ? 'Show code' : 'Show preview'}
+                        >
+                            {showPreview ? (
+                                <Code className="h-4" />
+                            ) : (
+                                <Eye className="h-4" />
+                            )}
+                        </Button>
+                    )}
+                    <CopyButton text={cardJson} />
                 </div>
             </div>
-        );
-    }
-
-    return null;
+            <div className="bg-white dark:bg-neutral-800 rounded-b-md p-4">
+                <div 
+                    ref={containerRef}
+                    className={`adaptive-card-container [&_.ac-container]:!bg-transparent [&_.ac-container]:!border-none [&_*]:text-gray-900 [&_*]:dark:text-neutral-100 ${
+                        hasValidJson && showPreview && renderedCard ? 'block' : 'hidden'
+                    }`}
+                />
+                <pre className={`text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto ${
+                    hasValidJson && showPreview && renderedCard ? 'hidden' : 'block'
+                }`}>
+                    <code>{cardJson}</code>
+                </pre>
+            </div>
+        </div>
+    );
 };
 
 export const AdaptiveCardRenderer = memo(
