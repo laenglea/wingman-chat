@@ -1,18 +1,15 @@
 import { Trash } from "lucide-react";
 import { Button } from "@headlessui/react";
-import { Chat } from "../models/chat";
 import { getConfig } from "../config";
 import { useMemo } from "react";
+import { useChat } from "../hooks/useChat";
+import { useSidebar } from "../contexts/SidebarContext";
 
-type ChatSidebarProps = {
-  chats: Chat[];
-  selectedChatId: string | null;
-  onSelectChat: (chatId: string) => void;
-  onDeleteChat: (chatId: string) => void;
-};
-
-export function ChatSidebar({ chats, selectedChatId, onSelectChat, onDeleteChat }: ChatSidebarProps) {
+export function ChatSidebar() {
   const config = getConfig();
+  const { chats, chat, selectChat, deleteChat } = useChat();
+  const { setShowSidebar } = useSidebar();
+  
   // sort once per chats change
   const sortedChats = useMemo(
     () => [...chats].sort((a, b) => new Date(b.updated || b.created || 0).getTime() - new Date(a.updated || a.created || 0).getTime()),
@@ -28,24 +25,30 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, onDeleteChat 
       </div>
       
       <ul className="flex flex-col gap-2 py-2 px-2 pl-safe-left">
-        {sortedChats.map((chat) => (
+        {sortedChats.map((chatItem) => (
           <li
-            key={chat.id}
-            onClick={() => onSelectChat(chat.id)}
+            key={chatItem.id}
+            onClick={() => {
+              selectChat(chatItem.id);
+              // Close sidebar on mobile when chat is selected
+              if (window.innerWidth < 768) {
+                setShowSidebar(false);
+              }
+            }}
             className={`flex items-center justify-between sidebar-item cursor-pointer relative flex-shrink-0 ${
-              chat.id === selectedChatId ? "sidebar-item-selected" : ""
+              chatItem.id === chat?.id ? "sidebar-item-selected" : ""
             }`}
           >
             <div
               className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2"
-              title={chat.title ?? "Untitled"}
+              title={chatItem.title ?? "Untitled"}
             >
-              {chat.title ?? "Untitled"}
+              {chatItem.title ?? "Untitled"}
             </div>
             <Button
               onClick={(e) => {
                 e.stopPropagation();
-                onDeleteChat(chat.id);
+                deleteChat(chatItem.id);
               }}
               className="opacity-0 hover:opacity-100 transition-opacity duration-200 cursor-pointer shrink-0"
             >

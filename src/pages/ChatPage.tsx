@@ -1,81 +1,38 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import { Plus as PlusIcon, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@headlessui/react";
-import { Message, Model, Role } from "../models/chat";
-import { useModels } from "../hooks/useModels";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { useChats } from "../hooks/useChats";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useNavigation } from "../contexts/NavigationContext";
 import { useResponsiveness } from "../hooks/useResponsiveness";
+import { useChat } from "../hooks/useChat";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
-import { getConfig } from "../config";
 
 export function ChatPage() {
-  const config = getConfig();
-  const client = config.client;
-  const bridge = config.bridge;
-
-  const { models, selectedModel, setSelectedModel } = useModels();
+  const {
+    chat,
+    messages,
+    createChat
+  } = useChat();
+  
   const { isResponsive, toggleResponsiveness } = useResponsiveness();
   
-  // Chat state management
-  const { chats, createChat, updateChat, deleteChat } = useChats();
-  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-  
   // Sidebar integration (now only controls visibility)
-  const { setShowSidebar, setSidebarContent } = useSidebar();
+  const { setSidebarContent } = useSidebar();
   const { setRightActions } = useNavigation();
 
-  const currentChat = chats.find(c => c.id === currentChatId) ?? null;
-  const currentModel = currentChat?.model ?? selectedModel ?? models[0];
-  const currentMessages = currentChat?.messages ?? [];
-
-  const { containerRef, bottomRef, handleScroll, enableAutoScroll } = useAutoScroll({
-    dependencies: [currentChat, currentMessages],
+  const { containerRef, bottomRef, handleScroll } = useAutoScroll({
+    dependencies: [chat, messages],
   });
-
-  // Use refs to maintain stable references for frequently changing values
-  const chatsRef = useRef(chats);
-  const currentChatIdRef = useRef(currentChatId);
-  
-  // Update refs when values change
-  useEffect(() => {
-    chatsRef.current = chats;
-  }, [chats]);
-  
-  useEffect(() => {
-    currentChatIdRef.current = currentChatId;
-  }, [currentChatId]);
-
-  // Handler functions with stable references
-  const onCreateChat = useCallback(() => {
-    setCurrentChatId(null);
-  }, []);
-
-  const onSelectChat = useCallback((chatId: string) => {
-    setCurrentChatId(chatId);
-    // Don't auto-close sidebar on larger screens, but close on mobile
-    if (window.innerWidth < 768) {
-      setShowSidebar(false);
-    }
-  }, [setShowSidebar]);
-
-  const onDeleteChat = useCallback((chatId: string) => {
-    deleteChat(chatId);
-    if (chatsRef.current.find(c => c.id === currentChatIdRef.current)?.id === chatId) {
-      setCurrentChatId(null);
-    }
-  }, [deleteChat]); // Now only depends on deleteChat, not chats or currentChatId
 
   // Set up navigation actions (only once on mount)
   useEffect(() => {
     setRightActions(
       <Button
         className="menu-button"
-        onClick={onCreateChat}
+        onClick={createChat}
       >
         <PlusIcon size={20} />
       </Button>
@@ -85,86 +42,18 @@ export function ChatPage() {
     return () => {
       setRightActions(null);
     };
-  }, [setRightActions, onCreateChat]);
+  }, [setRightActions, createChat]);
 
   // Create sidebar content with useMemo to avoid infinite re-renders
   const sidebarContent = useMemo(() => (
-    <ChatSidebar
-      chats={chats}
-      selectedChatId={currentChatId}
-      onSelectChat={onSelectChat}
-      onDeleteChat={onDeleteChat}
-    />
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [chats, currentChatId]); // Intentionally not including callbacks to prevent infinite loops
+    <ChatSidebar />
+  ), []);
 
   // Set up sidebar content when it changes
   useEffect(() => {
     setSidebarContent(sidebarContent);
     return () => setSidebarContent(null);
   }, [sidebarContent, setSidebarContent]);
-
-  const onSelectModel = (model: Model) => {
-    if (currentChat) {
-      // Update existing chat's model
-      updateChat(currentChat.id, { model });
-    } else {
-      // Store selected model for when a new chat is created
-      setSelectedModel(model);
-    }
-  };
-
-  const sendMessage = async (message: Message) => {
-    // Re-enable auto-scroll when user sends a message
-    enableAutoScroll();
-    
-    let chat = currentChat;
-    const model = currentModel;
-
-    if (!model) throw new Error("no model selected");
-
-    if (!chat) {
-      chat = createChat();
-      chat.model = model;
-      setCurrentChatId(chat.id);
-      // Update the chat with the model and clear the selected model
-      updateChat(chat.id, { model });
-      // Don't clear the selected model anymore since it's persisted
-    }
-
-    const base = [...chat.messages, message];
-    const updateMessages = (msgs: typeof base) => updateChat(chat.id, { messages: msgs });
-    updateMessages([...base, { role: Role.Assistant, content: "" }]);
-
-    try {
-      const tools = await bridge.listTools();
-
-      const completion = await client.complete(
-        model.id,
-        tools,
-        base,
-        (_, snapshot) => updateMessages([...base, { role: Role.Assistant, content: snapshot }])
-      );
-
-      updateMessages([...base, completion]);
-
-      if (!chat.title || base.length % 3 === 0) {
-        client
-          .summarize(model.id, base)
-          .then((title) => updateChat(chat.id, { title }));
-      }
-    } catch (error) {
-      console.error(error);
-
-      if (error?.toString().includes("missing finish_reason")) return;
-
-      const errorMessage = {
-        role: Role.Assistant,
-        content: `An error occurred:\n${error}`,
-      };
-      updateMessages([...base, errorMessage]);
-    }
-  };
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
@@ -179,7 +68,7 @@ export function ChatPage() {
         </Button>
       </div>
       <main className="flex-1 flex flex-col overflow-hidden">
-        {currentMessages.length === 0 ? (
+        {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center text-center">
               <img src="/logo.svg" className="w-32 h-32 dark:opacity-80" alt="Wingman Chat" />
@@ -196,7 +85,7 @@ export function ChatPage() {
                 ? 'max-w-full md:max-w-[80vw] mx-auto' 
                 : 'max-content-width'
             }`}>
-              {currentMessages.map((message, idx) => (
+              {messages.map((message, idx) => (
                 <ChatMessage key={idx} message={message} />
               ))}
               
@@ -209,13 +98,7 @@ export function ChatPage() {
 
       <footer className="bg-neutral-50 dark:bg-neutral-950 md:pb-4 pb-safe-bottom md:px-3 md:pl-safe-left md:pr-safe-right">
         <div className={isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'}>
-          <ChatInput 
-            onSend={sendMessage} 
-            models={models}
-            currentModel={currentModel}
-            onModelChange={onSelectModel}
-            messages={currentMessages}
-          />
+          <ChatInput />
         </div>
       </footer>
     </div>

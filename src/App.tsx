@@ -6,6 +6,8 @@ import { TranslatePage } from "./pages/TranslatePage";
 import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { NavigationProvider, useNavigation } from "./contexts/NavigationContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { ChatProvider } from "./contexts/ChatContext";
+import { TranslateProvider } from "./contexts/TranslateContext";
 import { ThemeToggle } from "./components/ThemeToggle";
 
 type Page = "chat" | "translate";
@@ -152,7 +154,11 @@ function App() {
     <ThemeProvider>
       <SidebarProvider>
         <NavigationProvider>
-          <AppContent />
+          <ChatProvider>
+            <TranslateProvider>
+              <AppContent />
+            </TranslateProvider>
+          </ChatProvider>
         </NavigationProvider>
       </SidebarProvider>
     </ThemeProvider>

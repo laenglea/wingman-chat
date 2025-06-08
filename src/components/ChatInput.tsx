@@ -3,7 +3,7 @@ import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react
 
 import { Send, Paperclip, ScreenShare, Image, X, Brain, Link, File, Loader2, FileText, Lightbulb } from "lucide-react";
 
-import { Attachment, AttachmentType, Message, Role, Model, Tool } from "../models/chat";
+import { Attachment, AttachmentType, Message, Role, Tool } from "../models/chat";
 import {
   captureScreenshot,
   getFileExt,
@@ -17,19 +17,15 @@ import {
   documentTypes,
 } from "../lib/utils";
 import { getConfig } from "../config";
+import { useChat } from "../hooks/useChat";
 
-type ChatInputProps = {
-  onSend: (message: Message) => void;
-  models: Model[];
-  currentModel: Model | undefined;
-  onModelChange: (model: Model) => void;
-  messages: Message[];
-};
-
-export function ChatInput({ onSend, models, currentModel, onModelChange, messages }: ChatInputProps) {
+export function ChatInput() {
   const config = getConfig();
   const client = config.client;
   const bridge = config.bridge;
+
+  // Use only context values
+  const { sendMessage: onSend, models, model, setModel: onModelChange, messages } = useChat();
 
   const [content, setContent] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -47,7 +43,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange, message
 
   // Handle prompt suggestions click
   const handlePromptSuggestionsClick = async () => {
-    if (!currentModel) return;
+    if (!model) return;
 
     if (showPromptSuggestions) {
       setShowPromptSuggestions(false);
@@ -62,7 +58,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange, message
       
       if (messages.length === 0) {
         // For new chats, get common/popular prompts
-        suggestions = await client.relatedPrompts(currentModel.id, "");
+        suggestions = await client.relatedPrompts(model.id, "");
       } else {
         // Get the last few messages for context
         const contextMessages = messages.slice(-6);
@@ -70,7 +66,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange, message
           .map(msg => `${msg.role}: ${msg.content}`)
           .join('\n');
         
-        suggestions = await client.relatedPrompts(currentModel.id, contextText);
+        suggestions = await client.relatedPrompts(model.id, contextText);
       }
       
       setPromptSuggestions(suggestions);
@@ -422,7 +418,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange, message
               <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none focus:ring-0 focus:border-none text-sm">
                 <Brain size={14} />
                 <span>
-                  {currentModel?.name ?? currentModel?.id ?? "Select Model"}
+                  {model?.name ?? model?.id ?? "Select Model"}
                 </span>
               </MenuButton>
               <MenuItems
