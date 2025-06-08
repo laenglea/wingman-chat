@@ -22,8 +22,7 @@ export function ChatSidebar({ chats, selectedChatId, onSelectChat, onDeleteChat 
   return (
     <div className="flex flex-col h-full w-full overflow-y-auto sidebar-scroll bg-white dark:bg-neutral-900">
       <div 
-        className="flex items-center px-2 py-2 pt-safe-top pl-safe-left flex-shrink-0"
-        style={{ height: `calc(3rem + env(safe-area-inset-top, 0px))` }}
+        className="flex items-center px-2 py-2 pt-safe-top pl-safe-left flex-shrink-0 min-h-12"
       >
         <h2 className="text-xl font-semibold px-2 whitespace-nowrap overflow-hidden text-ellipsis">{config.title}</h2>
       </div>
