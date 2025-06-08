@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { MermaidRenderer } from './MermaidRenderer';
 import { AdaptiveCardRenderer } from './AdaptiveCardRenderer';
 import { CodeRenderer } from './CodeRenderer';
+import { HtmlRenderer } from './HtmlRenderer';
 
 const components: Partial<Components> = {
     pre: ({ children }) => {
@@ -172,6 +173,10 @@ const components: Partial<Components> = {
 
         if (language === "mermaid" || language === "mmd") {
             return <MermaidRenderer chart={text} language={language} />;
+        }
+
+        if (language === "html" || language === "htm") {
+            return <HtmlRenderer html={text} language={language} />;
         }
 
         if (language === "adaptivecard" || language === "adaptive-card") {
