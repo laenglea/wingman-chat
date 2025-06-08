@@ -1,5 +1,4 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import mermaid from 'mermaid';
 import { useTheme } from '../contexts/ThemeContext';
 import { CopyButton } from './CopyButton';
 
@@ -8,15 +7,43 @@ interface MermaidRendererProps {
   language: string;
 }
 
+interface MermaidAPI {
+  initialize: (config: any) => void;
+  render: (id: string, definition: string) => Promise<{ svg: string }>;
+}
+
 const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) => {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [mermaidLoaded, setMermaidLoaded] = useState(false);
   const elementId = useRef(`mermaid-${Math.random().toString(36).substr(2, 9)}`);
+  const mermaidRef = useRef<MermaidAPI | null>(null);
   const { isDark } = useTheme();
 
-  // Configure mermaid theme based on current theme
+  // Dynamically import and configure mermaid
   useEffect(() => {
+    const loadMermaid = async () => {
+      if (!mermaidRef.current) {
+        try {
+          const mermaidModule = await import('mermaid');
+          mermaidRef.current = mermaidModule.default;
+          setMermaidLoaded(true);
+        } catch (error) {
+          console.error('Failed to load Mermaid:', error);
+          setError('Failed to load diagram renderer');
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadMermaid();
+  }, []);
+
+  // Configure mermaid theme when loaded or theme changes
+  useEffect(() => {
+    if (!mermaidRef.current || !mermaidLoaded) return;
+
     const themeConfig = {
       startOnLoad: false,
       securityLevel: 'loose' as const,
@@ -96,11 +123,13 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
       }
     };
 
-    mermaid.initialize(themeConfig);
-  }, [isDark]);
+    mermaidRef.current.initialize(themeConfig);
+  }, [isDark, mermaidLoaded]);
 
   useEffect(() => {
     const renderMermaid = async () => {
+      if (!mermaidRef.current || !mermaidLoaded) return;
+      
       if (!chart.trim()) {
         setIsLoading(true);
         setError('');
@@ -123,7 +152,7 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
         elementId.current = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
         
         // Validate and render the chart
-        const { svg: renderedSvg } = await mermaid.render(elementId.current, chart);
+        const { svg: renderedSvg } = await mermaidRef.current.render(elementId.current, chart);
         setSvg(renderedSvg);
         setIsLoading(false);
       } catch {
@@ -140,7 +169,24 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [chart, isDark]);
+  }, [chart, isDark, mermaidLoaded]);
+
+  // Show loading placeholder while mermaid is loading
+  if (!mermaidLoaded) {
+    return (
+      <div className="relative my-4">
+        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+          <span>{language}</span>
+        </div>
+        <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+          <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+            <span className="ml-2">Loading diagram renderer...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading placeholder while streaming or processing
   if (isLoading && !chart.trim()) {
