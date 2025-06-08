@@ -47,33 +47,32 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
     const themeConfig = {
       startOnLoad: false,
       securityLevel: 'loose' as const,
-      fontFamily: 'Fira Code, Monaco, Cascadia Code, Roboto Mono, monospace',
       suppressErrorRendering: true,
       theme: 'base' as const,
       themeVariables: isDark ? {
         // Dark mode configuration
-        primaryColor: '#3b82f6',        // Blue-500
-        primaryBorderColor: '#2563eb',  // Blue-600
-        lineColor: '#60a5fa',          // Blue-400
-        secondaryColor: '#1e40af',     // Blue-800
-        tertiaryColor: '#1d4ed8',      // Blue-700
+        primaryColor: '#64748b',        // Slate-500
+        primaryBorderColor: '#475569',  // Slate-600
+        lineColor: '#94a3b8',          // Slate-400
+        secondaryColor: '#1e293b',     // Slate-800
+        tertiaryColor: '#334155',      // Slate-700
         background: '#1f2937',         // Gray-800 (dark background)
         mainBkg: '#1f2937',           // Gray-800
         secondBkg: '#374151',         // Gray-700
         tertiaryBkg: '#4b5563',       // Gray-600
-        // Pie chart specific colors - bright blues for dark mode
-        pie1: '#60a5fa',              // Blue-400 (bright)
-        pie2: '#3b82f6',              // Blue-500 (bright)
-        pie3: '#2563eb',              // Blue-600 (bright)
-        pie4: '#1d4ed8',              // Blue-700 (bright)
-        pie5: '#1e40af',              // Blue-800 (bright)
-        pie6: '#93c5fd',              // Blue-300 (very bright)
-        pie7: '#38bdf8',              // Sky-400 (bright)
-        pie8: '#0ea5e9',              // Sky-500 (bright)
-        pie9: '#0284c7',              // Sky-600 (bright)
-        pie10: '#0369a1',             // Sky-700 (bright)
-        pie11: '#67e8f9',             // Cyan-300 (bright)
-        pie12: '#22d3ee',             // Cyan-400 (bright)
+        // Pie chart specific colors - slate palette for dark mode
+        pie1: '#f8fafc',              // Slate-50 (brightest)
+        pie2: '#f1f5f9',              // Slate-100 (very bright)
+        pie3: '#e2e8f0',              // Slate-200 (bright)
+        pie4: '#cbd5e1',              // Slate-300 (bright)
+        pie5: '#94a3b8',              // Slate-400 (medium bright)
+        pie6: '#64748b',              // Slate-500 (medium)
+        pie7: '#475569',              // Slate-600 (medium dark)
+        pie8: '#334155',              // Slate-700 (dark)
+        pie9: '#1e293b',              // Slate-800 (darker)
+        pie10: '#0f172a',             // Slate-900 (darkest)
+        pie11: '#f3f4f6',             // Gray-100 (light variant)
+        pie12: '#9ca3af',             // Gray-400 (medium variant)
         // Text colors - white/light for dark mode
         pieTitleTextSize: '24px',
         pieTitleTextColor: '#ffffff',  // White
@@ -87,28 +86,28 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
         tertiaryTextColor: '#d1d5db',  // Gray-300 (light)
       } : {
         // Light mode configuration
-        primaryColor: '#1e40af',        // Blue-800 (darker)
-        primaryBorderColor: '#1e3a8a',  // Blue-900 (darker)
-        lineColor: '#3b82f6',          // Blue-500 (darker than before)
-        secondaryColor: '#93c5fd',     // Blue-300 (darker)
-        tertiaryColor: '#dbeafe',      // Blue-100 (darker)
+        primaryColor: '#64748b',        // Slate-500
+        primaryBorderColor: '#475569',  // Slate-600
+        lineColor: '#94a3b8',          // Slate-400
+        secondaryColor: '#1e293b',     // Slate-800
+        tertiaryColor: '#334155',      // Slate-700
         background: '#ffffff',         // White background (matching main container)
         mainBkg: '#ffffff',           // White
         secondBkg: '#f8fafc',         // Slate-50
         tertiaryBkg: '#f1f5f9',       // Slate-100
-        // Pie chart specific colors - darker blues
-        pie1: '#1e40af',              // Blue-800 (darker)
-        pie2: '#1e3a8a',              // Blue-900 (darker)
-        pie3: '#1d4ed8',              // Blue-700 (darker)
-        pie4: '#2563eb',              // Blue-600 (darker)
-        pie5: '#3b82f6',              // Blue-500 (darker)
-        pie6: '#0f172a',              // Slate-900 (very dark)
-        pie7: '#0c4a6e',              // Sky-900 (darker)
-        pie8: '#075985',              // Sky-700 (darker)
-        pie9: '#0284c7',              // Sky-600 (darker)
-        pie10: '#0369a1',             // Sky-700 (darker)
-        pie11: '#164e63',             // Cyan-800 (darker)
-        pie12: '#155e75',             // Cyan-700 (darker)
+        // Pie chart specific colors - slate palette for light mode
+        pie1: '#0f172a',              // Slate-900 (darkest)
+        pie2: '#1e293b',              // Slate-800 (darker)
+        pie3: '#334155',              // Slate-700 (dark)
+        pie4: '#475569',              // Slate-600 (medium dark)
+        pie5: '#64748b',              // Slate-500 (medium)
+        pie6: '#94a3b8',              // Slate-400 (medium bright)
+        pie7: '#cbd5e1',              // Slate-300 (bright)
+        pie8: '#e2e8f0',              // Slate-200 (very bright)
+        pie9: '#f1f5f9',              // Slate-100 (brightest)
+        pie10: '#f8fafc',             // Slate-50 (very bright)
+        pie11: '#374151',             // Gray-700 (dark variant)
+        pie12: '#6b7280',             // Gray-500 (medium variant)
         // Text colors - darker for better contrast
         pieTitleTextSize: '24px',
         pieTitleTextColor: '#0f172a',  // Slate-900 (very dark)
