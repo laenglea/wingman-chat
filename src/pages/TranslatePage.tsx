@@ -1,75 +1,31 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, Maximize2, Minimize2 } from "lucide-react";
-import { getConfig } from "../config";
 import { useNavigation } from "../contexts/NavigationContext";
 import { useResponsiveness } from "../hooks/useResponsiveness";
+import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
 
-const languages = [
-  { code: "en", name: "English" },
-  { code: "de", name: "German" },
-  { code: "fr", name: "French" },
-  { code: "it", name: "Italian" },
-  { code: "es", name: "Spanish" },
-];
-
 export function TranslatePage() {
-  const config = getConfig();
-  const client = config.client;
   const { setRightActions } = useNavigation();
-
-  const [sourceText, setSourceText] = useState("");
-  const [translatedText, setTranslatedText] = useState("");
-  const [targetLang, setTargetLang] = useState("en");
-  const [isLoading, setIsLoading] = useState(false);
   const { isResponsive, toggleResponsiveness } = useResponsiveness();
-
-  const performTranslate = useCallback(async (langToUse: string, textToTranslate: string) => {
-    if (!textToTranslate.trim()) {
-      setTranslatedText("");
-      return;
-    }
-
-    setIsLoading(true);
-    setTranslatedText("");
-
-    try {
-      const result = await client.translate(langToUse, textToTranslate);
-      setTranslatedText(result);
-    } catch (err) {
-      setTranslatedText(err instanceof Error ? err.message : "An unknown error occurred during translation.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [client]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (sourceText.trim()) {
-        performTranslate(targetLang, sourceText);
-      }
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [sourceText, targetLang, performTranslate]);
+  
+  // Use translate context
+  const {
+    sourceText,
+    translatedText,
+    isLoading,
+    languages,
+    selectedLanguage,
+    setSourceText,
+    setTargetLang,
+    performTranslate,
+    handleReset
+  } = useTranslate();
 
   const handleTranslateButtonClick = () => {
-    performTranslate(targetLang, sourceText);
+    performTranslate();
   };
-
-  const handleLanguageChange = (newLangCode: string) => {
-    setTargetLang(newLangCode);
-
-    (async () => {
-      await performTranslate(newLangCode, sourceText);
-    })();
-  };
-
-  const handleReset = useCallback(() => {
-    setSourceText("");
-    setTranslatedText("");
-  }, []);
 
   // Set up navigation actions when component mounts
   useEffect(() => {
@@ -87,8 +43,7 @@ export function TranslatePage() {
     return () => {
       setRightActions(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handleReset]);
+  }, [setRightActions, handleReset]);
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
@@ -126,7 +81,7 @@ export function TranslatePage() {
               <Button
                 onClick={handleTranslateButtonClick}
                 className="menu-button !bg-neutral-400 dark:!bg-neutral-900 z-10 relative"
-                title={`Translate to ${languages.find(l => l.code === targetLang)?.name}`}
+                title={`Translate to ${selectedLanguage?.name || 'Selected Language'}`}
                 disabled={isLoading || !sourceText.trim()}
               >
                 {isLoading ? (
@@ -143,7 +98,7 @@ export function TranslatePage() {
                   <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none text-sm">
                     <GlobeIcon size={14} />
                     <span>
-                      {languages.find(l => l.code === targetLang)?.name}
+                      {selectedLanguage?.name || 'Select Language'}
                     </span>
                   </MenuButton>
                   <MenuItems
@@ -154,7 +109,7 @@ export function TranslatePage() {
                     {languages.map((lang) => (
                       <MenuItem key={lang.code}>
                         <Button
-                          onClick={() => handleLanguageChange(lang.code)}
+                          onClick={() => setTargetLang(lang.code)}
                           className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
                         >
                           {lang.name}
