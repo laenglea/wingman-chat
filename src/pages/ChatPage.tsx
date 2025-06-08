@@ -18,8 +18,7 @@ export function ChatPage() {
   const client = config.client;
   const bridge = config.bridge;
 
-  const { models } = useModels();
-  const [currentModel, setCurrentModel] = useState<Model>();
+  const { models, selectedModel, setSelectedModel } = useModels();
   const { isResponsive, toggleResponsiveness } = useResponsiveness();
   
   // Chat state management
@@ -31,10 +30,11 @@ export function ChatPage() {
   const { setRightActions } = useNavigation();
 
   const currentChat = chats.find(c => c.id === currentChatId) ?? null;
-  const messages = currentChat?.messages ?? [];
+  const currentModel = currentChat?.model ?? selectedModel ?? models[0];
+  const currentMessages = currentChat?.messages ?? [];
 
   const { containerRef, bottomRef, handleScroll, enableAutoScroll } = useAutoScroll({
-    dependencies: [currentChat, messages],
+    dependencies: [currentChat, currentMessages],
   });
 
   // Use refs to maintain stable references for frequently changing values
@@ -105,9 +105,12 @@ export function ChatPage() {
   }, [sidebarContent, setSidebarContent]);
 
   const onSelectModel = (model: Model) => {
-    setCurrentModel(model);
     if (currentChat) {
+      // Update existing chat's model
       updateChat(currentChat.id, { model });
+    } else {
+      // Store selected model for when a new chat is created
+      setSelectedModel(model);
     }
   };
 
@@ -124,6 +127,9 @@ export function ChatPage() {
       chat = createChat();
       chat.model = model;
       setCurrentChatId(chat.id);
+      // Update the chat with the model and clear the selected model
+      updateChat(chat.id, { model });
+      // Don't clear the selected model anymore since it's persisted
     }
 
     const base = [...chat.messages, message];
@@ -160,12 +166,6 @@ export function ChatPage() {
     }
   };
 
-  useEffect(() => {
-    if (models.length === 0) return;
-    const next = currentChat?.model ?? models[0];
-    setCurrentModel(next);
-  }, [currentChat, models]);
-
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
       {/* Toggle button - positioned at page level */}
@@ -179,7 +179,7 @@ export function ChatPage() {
         </Button>
       </div>
       <main className="flex-1 flex flex-col overflow-hidden">
-        {messages.length === 0 ? (
+        {currentMessages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="flex flex-col items-center text-center">
               <img src="/logo.svg" className="w-32 h-32 dark:opacity-80" alt="Wingman Chat" />
@@ -193,12 +193,13 @@ export function ChatPage() {
           >
             <div className={`px-2 pt-4 ${
               isResponsive 
-                ? 'max-w-[80vw] mx-auto' 
+                ? 'max-w-full md:max-w-[80vw] mx-auto' 
                 : 'max-content-width'
             }`}>
-              {messages.map((message, idx) => (
+              {currentMessages.map((message, idx) => (
                 <ChatMessage key={idx} message={message} />
               ))}
+              
               {/* sentinel for scrollIntoView */}
               <div ref={bottomRef} />
             </div>
@@ -206,13 +207,14 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className="bg-neutral-50 dark:bg-neutral-950 pb-4 px-3 pb-safe-bottom pl-safe-left pr-safe-right">
-        <div className={isResponsive ? 'max-w-[80vw] mx-auto' : 'max-content-width'}>
+      <footer className="bg-neutral-50 dark:bg-neutral-950 md:pb-4 pb-safe-bottom md:px-3 md:pl-safe-left md:pr-safe-right">
+        <div className={isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'}>
           <ChatInput 
             onSend={sendMessage} 
             models={models}
             currentModel={currentModel}
             onModelChange={onSelectModel}
+            messages={currentMessages}
           />
         </div>
       </footer>

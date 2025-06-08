@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 
-const RESPONSIVE_MODE_KEY = 'app_responsiveness';
+const STORAGE_KEY = 'app_responsiveness';
 
 export function useResponsiveness() {
   const [isResponsive, setIsResponsive] = useState<boolean>(() => {
     // Initialize from localStorage or default to true
     try {
-      const stored = localStorage.getItem(RESPONSIVE_MODE_KEY);
+      const stored = localStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) : true;
     } catch {
       return true;
@@ -18,7 +18,7 @@ export function useResponsiveness() {
       const newValue = !prev;
       // Persist to localStorage
       try {
-        localStorage.setItem(RESPONSIVE_MODE_KEY, JSON.stringify(newValue));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newValue));
       } catch {
         // Silently fail if localStorage is not available
       }
@@ -29,7 +29,7 @@ export function useResponsiveness() {
   // Sync with localStorage when the hook mounts
   useEffect(() => {
     try {
-      localStorage.setItem(RESPONSIVE_MODE_KEY, JSON.stringify(isResponsive));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(isResponsive));
     } catch {
       // Silently fail if localStorage is not available
     }

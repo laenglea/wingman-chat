@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, Link, File, Loader2, FileText } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, Link, File, Loader2, FileText, Lightbulb } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role, Model, Tool } from "../models/chat";
 import {
@@ -23,9 +23,10 @@ type ChatInputProps = {
   models: Model[];
   currentModel: Model | undefined;
   onModelChange: (model: Model) => void;
+  messages: Message[];
 };
 
-export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatInputProps) {
+export function ChatInput({ onSend, models, currentModel, onModelChange, messages }: ChatInputProps) {
   const config = getConfig();
   const client = config.client;
   const bridge = config.bridge;
@@ -34,9 +35,70 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState<Set<string>>(new Set());
   const [bridgeTools, setBridgeTools] = useState<Tool[]>([]);
+  
+  // Prompt suggestions state
+  const [showPromptSuggestions, setShowPromptSuggestions] = useState(false);
+  const [promptSuggestions, setPromptSuggestions] = useState<string[]>([]);
+  const [loadingPrompts, setLoadingPrompts] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contentEditableRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Handle prompt suggestions click
+  const handlePromptSuggestionsClick = async () => {
+    if (!currentModel) return;
+
+    if (showPromptSuggestions) {
+      setShowPromptSuggestions(false);
+      return;
+    }
+
+    setLoadingPrompts(true);
+    setShowPromptSuggestions(true);
+    
+    try {
+      let suggestions: string[];
+      
+      if (messages.length === 0) {
+        // For new chats, get common/popular prompts
+        suggestions = await client.relatedPrompts(currentModel.id, "");
+      } else {
+        // Get the last few messages for context
+        const contextMessages = messages.slice(-6);
+        const contextText = contextMessages
+          .map(msg => `${msg.role}: ${msg.content}`)
+          .join('\n');
+        
+        suggestions = await client.relatedPrompts(currentModel.id, contextText);
+      }
+      
+      setPromptSuggestions(suggestions);
+    } catch (error) {
+      console.error("Error fetching prompt suggestions:", error);
+      setPromptSuggestions([]);
+    } finally {
+      setLoadingPrompts(false);
+    }
+  };
+
+  // Handle selecting a prompt suggestion
+  const handlePromptSelect = (suggestion: string) => {
+    // Create and send message immediately
+    const message: Message = {
+      role: Role.User,
+      content: suggestion,
+      attachments: attachments,
+    };
+
+    onSend(message);
+    
+    // Clear attachments after sending
+    setAttachments([]);
+    
+    // Hide prompt suggestions
+    setShowPromptSuggestions(false);
+  };
 
   // Helper function to get the appropriate icon for each attachment type
   const getAttachmentIcon = (attachment: Attachment) => {
@@ -73,6 +135,40 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
     const interval = setInterval(fetchTools, 5000);    
     return () => clearInterval(interval);
   }, [bridge]);
+
+  // Force layout recalculation on mount to fix initial sizing issues
+  useEffect(() => {
+    const forceLayout = () => {
+      if (containerRef.current) {
+        // Force a repaint by reading offsetHeight
+        void containerRef.current.offsetHeight;
+      }
+      if (contentEditableRef.current) {
+        // Force a repaint for the content editable area
+        void contentEditableRef.current.offsetHeight;
+      }
+    };
+
+    // Run immediately and on next tick to ensure DOM is ready
+    forceLayout();
+    const timer = setTimeout(forceLayout, 0);
+    
+    // Also force layout on window load to handle CSS custom properties
+    const handleLoad = () => forceLayout();
+    window.addEventListener('load', handleLoad);
+    
+    // Handle resize events to maintain proper sizing
+    const handleResize = () => {
+      requestAnimationFrame(forceLayout);
+    };
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('load', handleLoad);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -199,7 +295,10 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className="border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 drop-shadow-2xl">
+      <div 
+        ref={containerRef}
+        className="chat-input-container border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 drop-shadow-2xl"
+      >
         <input
           type="file"
           multiple
@@ -258,10 +357,45 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
           </div>
         )}
 
+        {/* Prompt suggestions display */}
+        {showPromptSuggestions && (
+          <div className="px-3 pt-3 pb-3">
+            {loadingPrompts ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 size={16} className="animate-spin text-neutral-500 dark:text-neutral-400" />
+                <span className="ml-2 text-sm text-neutral-500 dark:text-neutral-400">
+                  Generating suggestions...
+                </span>
+              </div>
+            ) : promptSuggestions.length > 0 ? (
+              <div className="space-y-2">
+                {promptSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => handlePromptSelect(suggestion)}
+                    className="w-full text-left p-3 text-sm bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-150 dark:hover:bg-neutral-600 rounded-lg border border-neutral-200 dark:border-neutral-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-4 text-sm text-neutral-500 dark:text-neutral-400">
+                No suggestions available
+              </div>
+            )}
+          </div>
+        )}
+
         <div
           ref={contentEditableRef}
           className="pt-2 px-2 pb-2 md:pt-4 md:px-4 md:pb-2 pr-0 bg-transparent dark:text-neutral-200 focus:outline-none flex-1 max-h-[40vh] overflow-y-auto min-h-[2.5rem] whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:dark:text-neutral-400"
-          style={{ scrollbarWidth: "thin" }}
+          style={{ 
+            scrollbarWidth: "thin",
+            minHeight: "2.5rem", // Explicit fallback for min-height
+            height: "auto" // Ensure height is calculated properly
+          }}
           role="textbox"
           contentEditable
           suppressContentEditableWarning={true}
@@ -275,6 +409,15 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
 
         <div className="flex items-center justify-between gap-1 px-2 pb-2 md:px-4 md:pb-2 pt-0">
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              className="pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+              onClick={handlePromptSuggestionsClick}
+              title="Show prompt suggestions"
+            >
+              <Lightbulb size={16} />
+            </Button>
+            
             <Menu>
               <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none focus:ring-0 focus:border-none text-sm">
                 <Brain size={14} />
@@ -329,7 +472,7 @@ export function ChatInput({ onSend, models, currentModel, onModelChange }: ChatI
             )}
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 relative">
             {supportsScreenshot() && (
               <Button
                 type="button"

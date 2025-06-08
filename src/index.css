@@ -16,6 +16,89 @@
   }
 }
 
+/* Cool mobile-specific animations */
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%) scale(0.95);
+    opacity: 0;
+  }
+  60% {
+    transform: translateX(-2%) scale(1.02);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutToLeft {
+  from {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%) scale(0.95);
+    opacity: 0;
+  }
+}
+
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes backdropFadeOut {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+}
+
+/* Mobile sidebar animations */
+@media (max-width: 767px) {
+  .mobile-sidebar-enter {
+    animation: slideInFromLeft 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  
+  .mobile-sidebar-exit {
+    animation: slideOutToLeft 0.3s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
+  }
+  
+  .mobile-backdrop-enter {
+    animation: backdropFadeIn 0.3s ease-out forwards;
+  }
+  
+  .mobile-backdrop-exit {
+    animation: backdropFadeOut 0.25s ease-in forwards;
+  }
+  
+  /* Enhanced touch feedback for mobile buttons - preserve existing styles */
+  .menu-button {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+    transition: all 0.15s ease-out;
+  }
+  
+  .menu-button:active {
+    transform: scale(0.95);
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+  
+  .dark .menu-button:active {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
 html, body {
   height: 100%;
   overflow: hidden;
@@ -33,21 +116,20 @@ html, body {
   overflow: hidden;
 }
 
-/* iOS standalone PWA detection and adjustments */
-@media all and (display-mode: standalone) {
-  /* Reset body padding in standalone mode - we'll handle safe areas in components */
-  body {
-    padding: 0;
-  }
-  
-  #root {
-    margin: 0;
-  }
-  
-  /* Ensure navigation respects safe areas in PWA mode */
-  nav {
-    padding-top: calc(0.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px))) !important;
-  }
+/* Navigation header styling */
+.nav-header {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
+}
+
+.dark .nav-header {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+
+/* Ensure proper viewport height on iOS */
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
 }
 
 body {
@@ -92,6 +174,8 @@ button:focus-visible,
   @apply p-1.5 sm:p-2 dark:text-neutral-200 hover:text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-900 dark:hover:text-neutral-400 dark:hover:bg-neutral-800 rounded cursor-pointer focus:outline-none;  
 }
 
+
+
 .chat-bubble {
   @apply text-neutral-900 dark:text-neutral-200
 }
@@ -118,6 +202,12 @@ button:focus-visible,
 .max-content-width {
   max-width: 900px;
   margin: 0 auto;
+}
+
+/* Ensure proper initial layout for chat input */
+.chat-input-container {
+  contain: layout style;
+  will-change: height;
 }
 
 /* Subtle scrollbar styling for sidebar */
