@@ -1,38 +1,117 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import * as AdaptiveCards from 'adaptivecards';
-import markdownit from 'markdown-it'
 
 interface AdaptiveCardRendererProps {
     cardJson: string;
 }
 
-AdaptiveCards.AdaptiveCard.onProcessMarkdown = function (text, result) {
-    result.outputHtml = markdownit().render(text);
-    result.didProcess = true;
-};
+interface AdaptiveCardsModule {
+    AdaptiveCard: any;
+    onProcessMarkdown?: (text: string, result: any) => void;
+}
+
+interface MarkdownItModule {
+    default: any;
+}
 
 const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [renderedCard, setRenderedCard] = useState<HTMLElement | null>(null);
     const [error, setError] = useState<string>('');
     const [isLoading, setIsLoading] = useState(true);
+    const [librariesLoaded, setLibrariesLoaded] = useState(false);
+    const adaptiveCardsRef = useRef<AdaptiveCardsModule | null>(null);
+
+    // Dynamic import of adaptive cards and markdown-it
+    useEffect(() => {
+        const loadLibraries = async () => {
+            try {
+                const [adaptiveCardsModule, markdownItModule] = await Promise.all([
+                    import('adaptivecards') as Promise<AdaptiveCardsModule>,
+                    import('markdown-it') as Promise<MarkdownItModule>
+                ]);
+
+                adaptiveCardsRef.current = adaptiveCardsModule;
+                
+                // Setup markdown processing
+                if (adaptiveCardsModule.AdaptiveCard) {
+                    adaptiveCardsModule.AdaptiveCard.onProcessMarkdown = function (text: string, result: any) {
+                        result.outputHtml = markdownItModule.default().render(text);
+                        result.didProcess = true;
+                    };
+                }
+
+                setLibrariesLoaded(true);
+            } catch (error) {
+                console.error('Failed to load Adaptive Cards libraries:', error);
+                setError('Failed to load card renderer');
+                setIsLoading(false);
+            }
+        };
+
+        loadLibraries();
+    }, []);
 
     // Helper function to validate if JSON is complete and valid
     const isValidCompleteJson = (jsonString: string): boolean => {
-        if (!jsonString || jsonString.trim() === '') return false;
-
+        if (!jsonString.trim()) return false;
+        
         try {
             const parsed = JSON.parse(jsonString);
-            // Check if it's an object and has some basic Adaptive Card structure
-            return typeof parsed === 'object' && parsed !== null &&
-                (parsed.type || parsed.$schema || parsed.body || parsed.actions);
+            // Basic check for adaptive card structure
+            return parsed && typeof parsed === 'object' && (parsed.type || parsed.$schema);
         } catch {
             return false;
         }
     };
 
+    // Helper function to check if JSON appears to be streaming (incomplete)
+    const isStreamingJson = (jsonString: string): boolean => {
+        const trimmed = jsonString.trim();
+        if (!trimmed) return true;
+        
+        // Check for obvious incomplete JSON patterns
+        if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return true;
+        if (!trimmed.endsWith('}') && !trimmed.endsWith(']')) return true;
+        
+        // Count braces to detect incomplete nesting
+        let braceCount = 0;
+        let bracketCount = 0;
+        let inString = false;
+        let escape = false;
+        
+        for (let i = 0; i < trimmed.length; i++) {
+            const char = trimmed[i];
+            
+            if (escape) {
+                escape = false;
+                continue;
+            }
+            
+            if (char === '\\') {
+                escape = true;
+                continue;
+            }
+            
+            if (char === '"') {
+                inString = !inString;
+                continue;
+            }
+            
+            if (!inString) {
+                if (char === '{') braceCount++;
+                else if (char === '}') braceCount--;
+                else if (char === '[') bracketCount++;
+                else if (char === ']') bracketCount--;
+            }
+        }
+        
+        return braceCount !== 0 || bracketCount !== 0;
+    };
+
     useEffect(() => {
-        const renderAdaptiveCard = async () => {
+        const renderCard = async () => {
+            if (!adaptiveCardsRef.current || !librariesLoaded) return;
+            
             if (!cardJson.trim()) {
                 setIsLoading(true);
                 setError('');
@@ -40,10 +119,18 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
                 return;
             }
 
-            // Don't attempt to render if JSON is not valid/complete (still streaming)
-            if (!isValidCompleteJson(cardJson)) {
+            // Check if JSON is still streaming
+            if (isStreamingJson(cardJson)) {
                 setIsLoading(true);
                 setError('');
+                setRenderedCard(null);
+                return;
+            }
+
+            // Validate JSON
+            if (!isValidCompleteJson(cardJson)) {
+                setError('Invalid JSON format');
+                setIsLoading(false);
                 setRenderedCard(null);
                 return;
             }
@@ -52,151 +139,77 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
                 setIsLoading(true);
                 setError('');
 
-                // Parse the JSON
+                const card = new adaptiveCardsRef.current.AdaptiveCard();
                 const cardPayload = JSON.parse(cardJson);
+                card.parse(cardPayload);
 
-                // Create an AdaptiveCard instance
-                const adaptiveCard = new AdaptiveCards.AdaptiveCard();
-
-                // Check if user prefers dark mode
-                const isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches ||
-                    document.documentElement.classList.contains('dark');
-
-                // Set host config for better styling integration with your app
-                adaptiveCard.hostConfig = new AdaptiveCards.HostConfig({
-                    fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-                    spacing: {
-                        small: 4,
-                        default: 8,
-                        medium: 16,
-                        large: 24,
-                        extraLarge: 32,
-                        padding: 12
-                    },
-                    separator: {
-                        lineThickness: 1,
-                        lineColor: isDarkMode ? "#374151" : "#E5E7EB"
-                    },
-                    fontSizes: {
-                        small: 12,
-                        default: 14,
-                        medium: 16,
-                        large: 18,
-                        extraLarge: 20
-                    },
-                    fontWeights: {
-                        lighter: 200,
-                        default: 400,
-                        bolder: 600
-                    },
-                    containerStyles: {
-                        default: {
-                            backgroundColor: isDarkMode ? "#1F2937" : "#FFFFFF",
-                            foregroundColors: {
-                                default: {
-                                    default: isDarkMode ? "#F9FAFB" : "#1F2937",
-                                    subtle: isDarkMode ? "#9CA3AF" : "#6B7280"
-                                },
-                                accent: {
-                                    default: isDarkMode ? "#60A5FA" : "#3B82F6",
-                                    subtle: isDarkMode ? "#93C5FD" : "#60A5FA"
-                                },
-                                attention: {
-                                    default: isDarkMode ? "#F87171" : "#EF4444",
-                                    subtle: isDarkMode ? "#FCA5A5" : "#F87171"
-                                },
-                                good: {
-                                    default: isDarkMode ? "#34D399" : "#10B981",
-                                    subtle: isDarkMode ? "#6EE7B7" : "#34D399"
-                                },
-                                warning: {
-                                    default: isDarkMode ? "#FBBF24" : "#F59E0B",
-                                    subtle: isDarkMode ? "#FCD34D" : "#FBBF24"
-                                }
-                            }
-                        },
-                        emphasis: {
-                            backgroundColor: isDarkMode ? "#374151" : "#F3F4F6",
-                            foregroundColors: {
-                                default: {
-                                    default: isDarkMode ? "#F9FAFB" : "#1F2937",
-                                    subtle: isDarkMode ? "#9CA3AF" : "#6B7280"
-                                }
-                            }
-                        }
-                    },
-                    actions: {
-                        buttonSpacing: 8,
-                        maxActions: 5,
-                        spacing: "Default",
-                        actionAlignment: "Left",
-                        actionsOrientation: "Horizontal",
-                        showCard: {
-                            actionMode: "Inline",
-                            inlineTopMargin: 16,
-                            style: "emphasis"
-                        }
-                    }
-                });
-
-                // Set up action handlers
-                adaptiveCard.onExecuteAction = function (action) {
-                    if (action instanceof AdaptiveCards.OpenUrlAction) {
-                        window.open(action.url, '_blank', 'noopener,noreferrer');
-                    } else if (action instanceof AdaptiveCards.SubmitAction) {
-                        console.log('Adaptive Card Submit action:', action.data);
-                        // You can customize this to handle form submissions as needed
-                        // For example, emit an event or call a callback function
-                    } else if (action instanceof AdaptiveCards.ShowCardAction) {
-                        // ShowCard actions are handled automatically by the SDK
-                        console.log('ShowCard action executed');
-                    }
-                };
-
-                // Parse and render the card
-                adaptiveCard.parse(cardPayload);
-                const renderedCardElement = adaptiveCard.render();
-
-                if (renderedCardElement) {
-                    // Apply additional styling to the rendered card for better integration
-                    renderedCardElement.style.borderRadius = '0';
-                    renderedCardElement.style.border = 'none';
-                    renderedCardElement.style.boxShadow = 'none';
-                    setRenderedCard(renderedCardElement);
+                const renderedElement = card.render();
+                
+                if (renderedElement) {
+                    // Apply custom styling to match the theme
+                    renderedElement.style.backgroundColor = 'transparent';
+                    renderedElement.style.border = 'none';
+                    renderedElement.style.fontFamily = 'inherit';
+                    
+                    setRenderedCard(renderedElement);
+                    setIsLoading(false);
                 } else {
                     setError('Failed to render card');
+                    setIsLoading(false);
                 }
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+                setError(`Card rendering error: ${errorMessage}`);
                 setIsLoading(false);
-            } catch (error) {
-                // Only show error for complete JSON that fails to render
-                setError(error instanceof Error ? error.message : 'Unknown error');
                 setRenderedCard(null);
-                setIsLoading(false);
             }
         };
 
         // Debounce rendering to avoid excessive re-renders during streaming
-        const timeoutId = setTimeout(renderAdaptiveCard, 300);
-
+        const timeoutId = setTimeout(renderCard, 300);
+        
         return () => {
             clearTimeout(timeoutId);
         };
-    }, [cardJson]);
+    }, [cardJson, librariesLoaded]);
 
-    // Effect to update the DOM when renderedCard changes
+    // Mount the rendered card when it changes
     useEffect(() => {
         if (containerRef.current && renderedCard) {
+            // Clear previous content
             containerRef.current.innerHTML = '';
             containerRef.current.appendChild(renderedCard);
         }
     }, [renderedCard]);
 
-    // Show loading placeholder while waiting for content
+    // Show loading state while libraries are loading
+    if (!librariesLoaded) {
+        return (
+            <div className="relative my-4">
+                <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+                    <span>adaptivecard</span>
+                </div>
+                <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+                    <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                        <span className="ml-2">Loading card renderer...</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Show loading placeholder while streaming or processing
     if (isLoading && !cardJson.trim()) {
         return (
-            <div className="my-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200 dark:border-blue-800/50">
-                <div className="flex items-center justify-center h-24 text-neutral-600 dark:text-neutral-400">
-                    <div className="animate-pulse">Waiting for Adaptive Card...</div>
+            <div className="relative my-4">
+                <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+                    <span>adaptivecard</span>
+                </div>
+                <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+                    <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
+                        <div className="animate-pulse">Waiting for card data...</div>
+                    </div>
                 </div>
             </div>
         );
@@ -205,31 +218,32 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
     // Show error fallback with raw JSON
     if (error) {
         return (
-            <div className="my-4 p-4 bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-950/30 dark:to-pink-950/30 rounded-lg border border-red-200 dark:border-red-800/50">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
-                        <svg className="w-3 h-3 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                    </div>
-                    <h4 className="text-red-800 dark:text-red-200 font-medium">Failed to render Adaptive Card</h4>
+            <div className="relative my-4">
+                <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+                    <span>adaptivecard</span>
+                    <span className="text-xs text-red-500 dark:text-red-400 opacity-70">{error}</span>
                 </div>
-                <p className="text-red-700 dark:text-red-300 text-sm mb-3">{error}</p>
-                <details className="text-xs">
-                    <summary className="cursor-pointer text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 font-medium">Show card JSON</summary>
-                    <pre className="mt-2 p-3 bg-red-100 dark:bg-red-900/40 rounded-md text-red-800 dark:text-red-200 overflow-auto text-xs font-mono">{cardJson}</pre>
-                </details>
+                <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+                    <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
+                        <code>{cardJson}</code>
+                    </pre>
+                </div>
             </div>
         );
     }
 
-    // Show loading spinner while processing valid content
+    // Show loading spinner while processing
     if (isLoading && cardJson.trim()) {
         return (
-            <div className="my-4 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200 dark:border-blue-800/50">
-                <div className="flex items-center justify-center h-24 text-neutral-600 dark:text-neutral-400">
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-300 border-t-blue-600 dark:border-blue-700 dark:border-t-blue-400"></div>
-                    <span className="ml-3">Rendering Adaptive Card...</span>
+            <div className="relative my-4">
+                <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+                    <span>adaptivecard</span>
+                </div>
+                <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+                    <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                        <span className="ml-2">Rendering card...</span>
+                    </div>
                 </div>
             </div>
         );
@@ -238,14 +252,16 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
     // Render the adaptive card
     if (renderedCard) {
         return (
-            <div className="my-4 animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
-                <div
-                    ref={containerRef}
-                    style={{
-                        // Ensure the adaptive card styling works well with the container
-                        colorScheme: 'light dark'
-                    }}
-                />
+            <div className="relative my-4">
+                <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+                    <span>adaptivecard</span>
+                </div>
+                <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+                    <div 
+                        ref={containerRef}
+                        className="adaptive-card-container [&_.ac-container]:!bg-transparent [&_.ac-container]:!border-none [&_*]:text-gray-900 [&_*]:dark:text-neutral-100"
+                    />
+                </div>
             </div>
         );
     }
@@ -255,6 +271,5 @@ const NonMemoizedAdaptiveCardRenderer = ({ cardJson }: AdaptiveCardRendererProps
 
 export const AdaptiveCardRenderer = memo(
     NonMemoizedAdaptiveCardRenderer,
-    (prevProps, nextProps) =>
-        prevProps.cardJson === nextProps.cardJson
+    (prevProps, nextProps) => prevProps.cardJson === nextProps.cardJson
 );

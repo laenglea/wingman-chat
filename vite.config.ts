@@ -17,4 +17,36 @@ export default defineConfig({
     react(),
     tailwindcss()
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'markdown': [
+            'react-markdown',
+            'remark-gfm',
+            'markdown-it'
+          ],
+
+          'syntax-highlighting': [
+            'react-syntax-highlighter',
+            'highlight.js'
+          ],
+
+          'adaptive-cards': ['adaptivecards'],
+          'cytoscape': ['cytoscape'],
+          'katex': ['katex'],
+          'mermaid': ['mermaid'],
+        }
+      }
+    },
+    // Increase chunk size warning limit since we're intentionally chunking
+    chunkSizeWarningLimit: 1000,
+
+    // Enable source maps for production debugging (optional)
+    sourcemap: false,
+
+    // Optimize build
+    minify: 'esbuild',
+    target: 'esnext'
+  }
 })
