@@ -172,16 +172,14 @@ export class Client {
   }
 
   async relatedPrompts(model: string, prompt: string): Promise<string[]> {
-    const Prompt = z.object({
-      prompt: z.string(),
-    });
-
-    const PromptList = z.object({
-      prompts: z.array(Prompt),
-    });
+    const Schema = z.object({
+      prompts: z.array(z.object({
+        prompt: z.string(),
+      }).strict()).min(3).max(10),
+    }).strict();
 
     if (!prompt) {
-      prompt= "No conversation history provided. Please generate common prompts based on general topics.";
+      prompt = "No conversation history provided. Please generate common prompts based on general topics.";
     }
 
     try {
@@ -190,7 +188,7 @@ export class Client {
         messages: [
           {
             role: "system",
-            content: `Based on the conversation history provided, generate 5-7 related follow-up prompts that would help the user explore the topic more deeply. The prompts should be:
+            content: `Based on the conversation history provided, generate 3-5 related follow-up prompts that would help the user explore the topic more deeply. The prompts should be:
 - Specific and actionable
 - Build upon the current conversation context
 - Encourage deeper exploration or different perspectives
@@ -204,7 +202,7 @@ Return only the prompts themselves, without numbering or bullet points.`,
             content: prompt,
           },
         ],
-        response_format: zodResponseFormat(PromptList, "list"),
+        response_format: zodResponseFormat(Schema, "list_prompts"),
       });
 
       const list = completion.choices[0].message.parsed;
