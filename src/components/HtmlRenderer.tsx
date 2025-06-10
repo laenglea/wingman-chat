@@ -98,7 +98,7 @@ const NonMemoizedHtmlRenderer = ({ html, language }: HtmlRendererProps) => {
         {hasValidHtml && showPreview ? (
           <iframe
             srcDoc={html}
-            className="w-full aspect-[16/9] rounded-b-md"
+            className="w-full aspect-[4/3] min-w-[280px] sm:min-w-[320px] md:min-w-[400px] rounded-b-md"
             sandbox="allow-scripts allow-same-origin"
             title="HTML Preview"
           />
