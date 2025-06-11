@@ -19,6 +19,8 @@ export interface ChatContextType {
   createChat: () => void;
   selectChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
+  
+  addMessage: (message: Message) => void;
   sendMessage: (message: Message) => Promise<void>;
 
   // Refs for stable references
@@ -85,28 +87,64 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [chat, updateChat, setSelectedModel]);
 
-  const sendMessage = useCallback(async (message: Message) => {
-    let currentChat = chat;
-
+  // Helper function to get or create the current chat
+  const ensureCurrentChat = useCallback(() => {
     if (!model) throw new Error("no model selected");
 
-    if (!currentChat) {
+    let currentChat = chat;
+    let currentChatId = chatIdRef.current;
+
+    // If we don't have a current chat, create one
+    if (!currentChat && !currentChatId) {
       currentChat = createChatHook();
       currentChat.model = model;
       setChatId(currentChat.id);
-      // Update the chat with the model
       updateChat(currentChat.id, { model });
+      currentChatId = currentChat.id;
+    } else if (!currentChat && currentChatId) {
+      // We have a chatId but no chat object, find it in chats
+      currentChat = chatsRef.current.find(c => c.id === currentChatId) || null;
     }
 
-    const base = [...currentChat.messages, message];
-    const updateMessages = (msgs: typeof base) => updateChat(currentChat.id, { messages: msgs });
+    // If we still don't have a chat, something is wrong
+    if (!currentChat || !currentChatId) {
+      throw new Error('Could not determine current chat');
+    }
+
+    return { chat: currentChat, chatId: currentChatId };
+  }, [chat, model, createChatHook, updateChat, setChatId, chatsRef, chatIdRef]);
+
+  const addMessage = useCallback((message: Message) => {
+    if (!message.content.trim()) return;
+    
+    const { chatId } = ensureCurrentChat();
+    
+    // Get the absolute latest chat state to avoid race conditions
+    const latestChat = chatsRef.current.find(c => c.id === chatId);
+    const currentMessages = latestChat?.messages || [];
+    const updatedMessages = [...currentMessages, message];
+    
+    updateChat(chatId, { messages: updatedMessages });
+  }, [ensureCurrentChat, updateChat, chatsRef]);
+
+  const sendMessage = useCallback(async (message: Message) => {
+    const { chat: currentChat, chatId } = ensureCurrentChat();
+
+    // Get current messages and add the user message
+    const latestChat = chatsRef.current.find(c => c.id === chatId);
+    const currentMessages = latestChat?.messages || [];
+    const base = [...currentMessages, message];
+    
+    const updateMessages = (msgs: Message[]) => updateChat(chatId, { messages: msgs });
+    
+    // Add user message and empty assistant message for streaming
     updateMessages([...base, { role: Role.Assistant, content: "" }]);
 
     try {
       const tools = await bridge.listTools();
 
       const completion = await client.complete(
-        model.id,
+        model!.id,
         tools,
         base,
         (_, snapshot) => updateMessages([...base, { role: Role.Assistant, content: snapshot }])
@@ -116,8 +154,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
       if (!currentChat.title || base.length % 3 === 0) {
         client
-          .summarize(model.id, base)
-          .then((title) => updateChat(currentChat.id, { title }));
+          .summarize(model!.id, base)
+          .then((title) => updateChat(chatId, { title }));
       }
     } catch (error) {
       console.error(error);
@@ -130,7 +168,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       };
       updateMessages([...base, errorMessage]);
     }
-  }, [chat, model, createChatHook, updateChat, bridge, client]);
+  }, [ensureCurrentChat, updateChat, bridge, client, model, chatsRef]);
 
   const value: ChatContextType = {
     // Models
@@ -147,6 +185,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
     createChat,
     selectChat,
     deleteChat,
+    
+    addMessage,
     sendMessage,
 
     // Refs
