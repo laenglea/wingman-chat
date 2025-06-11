@@ -6,11 +6,12 @@ import { useSidebar } from "../contexts/SidebarContext";
 import { useNavigation } from "../contexts/NavigationContext";
 import { useResponsiveness } from "../hooks/useResponsiveness";
 import { useChat } from "../hooks/useChat";
-import { useVoiceWebSockets } from "../hooks/useVoiceWebSockets";
+import { useVoiceWebRTC as useVoice } from "../hooks/useVoiceWebRTC";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
 import { VoiceButton } from "../components/VoiceButton";
+import { Role } from "../models/chat";
 
 export function ChatPage() {
   const {
@@ -19,36 +20,36 @@ export function ChatPage() {
     createChat,
     addMessage
   } = useChat();
-  
+
   const [isVoiceActive, setIsVoiceActive] = useState(false);
   const { isResponsive, toggleResponsiveness } = useResponsiveness();
-  
+
   const stopVoiceRef = useRef<(() => void) | null>(null);
-  
+
   // Voice input functionality
-  const { start: startVoice, stop: stopVoice } = useVoiceWebSockets(
+  const { start: startVoice, stop: stopVoice } = useVoice(
     // onUser callback - create user message
     (transcript) => {
       console.log('User transcript received:', transcript);
       if (transcript.trim()) {
-        const userMessage = {
-          role: 'user' as const,
+        const message = {
+          role: Role.User,
           content: transcript.trim(),
         };
-        console.log('Adding user message:', userMessage);
-        addMessage(userMessage);
+
+        addMessage(message);
       }
     },
     // onAssistant callback - create assistant message
     (transcript) => {
       console.log('Assistant transcript received:', transcript);
       if (transcript.trim()) {
-        const assistantMessage = {
-          role: 'assistant' as const,
+        const message = {
+          role: Role.Assistant,
           content: transcript.trim(),
         };
-        console.log('Adding assistant message:', assistantMessage);
-        addMessage(assistantMessage);
+
+        addMessage(message);
       }
     }
   );
@@ -72,9 +73,11 @@ export function ChatPage() {
     } catch (error) {
       console.error('Voice toggle error:', error);
       setIsVoiceActive(false);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(`Voice chat error: ${errorMessage}`);
     }
   }, [isVoiceActive, stopVoice, startVoice]);
-  
+
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent } = useSidebar();
   const { setRightActions } = useNavigation();
@@ -151,15 +154,14 @@ export function ChatPage() {
             ref={containerRef}
             onScroll={handleScroll}
           >
-            <div className={`px-2 pt-4 ${
-              isResponsive 
-                ? 'max-w-full md:max-w-[80vw] mx-auto' 
+            <div className={`px-2 pt-4 ${isResponsive
+                ? 'max-w-full md:max-w-[80vw] mx-auto'
                 : 'max-content-width'
-            }`}>
+              }`}>
               {messages.map((message, idx) => (
                 <ChatMessage key={idx} message={message} />
               ))}
-              
+
               {/* sentinel for scrollIntoView */}
               <div ref={bottomRef} />
             </div>
