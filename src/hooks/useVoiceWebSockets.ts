@@ -11,71 +11,15 @@ export function useVoiceWebSockets(
   const wsRef = useRef<WebSocket | null>(null);
   const wavPlayerRef = useRef<WavStreamPlayer | null>(null);
   const wavRecorderRef = useRef<WavRecorder | null>(null);
-  const isListeningRef = useRef(false);
-
-  // TODO: secure your API key via backend proxy
-
-  // Convert Float32Array of audio data to base64-encoded PCM16
-  const floatTo16BitPCM = (float32Array: Float32Array) => {
-    const buffer = new ArrayBuffer(float32Array.length * 2);
-    const view = new DataView(buffer);
-    let offset = 0;
-    for (let i = 0; i < float32Array.length; i++, offset += 2) {
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-    }
-    return buffer;
-  };
-
-  const base64EncodeAudio = (float32Array: Float32Array) => {
-    const arrayBuffer = floatTo16BitPCM(float32Array);
-    let binary = '';
-    const bytes = new Uint8Array(arrayBuffer);
-    const chunkSize = 0x8000; // 32KB chunk size
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    return btoa(binary);
-  };
-
-  const base64ToArrayBuffer = (base64: string) => {
-    const binary = atob(base64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-    return bytes.buffer;
-  };
-
-  const playAudioChunk = (base64: string) => {
-    const player = wavPlayerRef.current;
-    if (!player) {
-      console.warn('No audio player available');
-      return;
-    }
-    
-    if (!base64) {
-      console.warn('Empty audio data received');
-      return;
-    }
-    
-    try {
-      const buf = base64ToArrayBuffer(base64);
-      const samples = new Int16Array(buf);
-      player.add16BitPCM(samples, 'assistant');
-    } catch (err) {
-      console.error('Audio playback error:', err);
-    }
-  };
+  const isActiveRef = useRef(false);
 
   const start = async () => {
-    if (isListeningRef.current) return;
-    
-    isListeningRef.current = true;
+    if (isActiveRef.current) return;
+
+    isActiveRef.current = true;
 
     // THATS FINE. DO NOT REFACTOR THIS KEY. IT IS FINE.
-      const OPENAI_API_KEY = ""
-    
+
     try {
       // Initialize WavStreamPlayer for audio playback
       const player = new WavStreamPlayer({ sampleRate: 24000 });
@@ -86,9 +30,9 @@ export function useVoiceWebSockets(
       const recorder = new WavRecorder({ sampleRate: 24000 });
       await recorder.begin();
       wavRecorderRef.current = recorder;
-      
-      const realtimeModel = "gpt-4o-realtime-preview-2024-12-17";
-      const transcribeModel = "gpt-4o-mini-transcribe"
+
+      const realtimeModel = "gpt-4o-realtime-preview-2025-06-03";
+      const transcribeModel = "gpt-4o-transcribe"
 
       const ws = new WebSocket(
         `wss://api.openai.com/v1/realtime?model=${realtimeModel}`,
@@ -102,7 +46,7 @@ export function useVoiceWebSockets(
 
       ws.addEventListener('open', () => {
         console.log('WebSocket connected');
-        
+
         // Send session configuration
         const sessionUpdate = {
           type: 'session.update',
@@ -110,35 +54,35 @@ export function useVoiceWebSockets(
             voice: 'alloy',
             input_audio_format: 'pcm16',
             output_audio_format: 'pcm16',
-            input_audio_transcription: { 
-              model: transcribeModel, 
+            input_audio_transcription: {
+              model: transcribeModel,
             },
           }
         };
-        
+
         ws.send(JSON.stringify(sessionUpdate));
-        
+
         // Start recording immediately after WebSocket connects
         console.log('Starting audio recording after WebSocket connection...');
         recorder.record((data) => {
           const { mono } = data;
-          
+
           // Handle ArrayBuffer data properly
-          const monoArray = mono ? new Int16Array(mono) : null;          
-          
+          const monoArray = mono ? new Int16Array(mono) : null;
+
           if (ws.readyState === WebSocket.OPEN && monoArray) {
             try {
               // Convert Int16Array audio data to base64 PCM16
               const float32Array = new Float32Array(monoArray.length);
-              
+
               for (let i = 0; i < monoArray.length; i++) {
                 float32Array[i] = monoArray[i] / (monoArray[i] < 0 ? 0x8000 : 0x7fff);
               }
               const audio = base64EncodeAudio(float32Array);
-              
+
               if (audio) {
-                ws.send(JSON.stringify({ 
-                  type: 'input_audio_buffer.append', 
+                ws.send(JSON.stringify({
+                  type: 'input_audio_buffer.append',
                   audio: audio
                 }));
               }
@@ -157,9 +101,9 @@ export function useVoiceWebSockets(
       ws.addEventListener('message', (e) => {
         const msg = JSON.parse(e.data);
         console.log('Received message:', msg.type);
-        
+
         switch (msg.type) {
-           case 'response.audio.delta':
+          case 'response.audio.delta':
             if (msg.delta) {
               playAudioChunk(msg.delta);
             }
@@ -170,7 +114,7 @@ export function useVoiceWebSockets(
             if (msg.transcript?.trim()) {
               onUser(msg.transcript);
             }
-            break;         
+            break;
 
           case 'response.done':
             console.log('Response complete:', msg.response);
@@ -202,7 +146,7 @@ export function useVoiceWebSockets(
 
   const stop = () => {
     console.log('Stopping voice session...');
-    
+
     // Stop recorder and reset listening state
     if (wavRecorderRef.current) {
       try {
@@ -243,9 +187,9 @@ export function useVoiceWebSockets(
   const setInstructions = (instructions: string) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ 
-        type: 'session.update', 
-        session: { instructions } 
+      ws.send(JSON.stringify({
+        type: 'session.update',
+        session: { instructions }
       }));
       console.log('Instructions updated:', instructions);
     } else {
@@ -256,13 +200,66 @@ export function useVoiceWebSockets(
   const setVoice = (voice: string) => {
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ 
-        type: 'session.update', 
-        session: { voice } 
+      ws.send(JSON.stringify({
+        type: 'session.update',
+        session: { voice }
       }));
       console.log('Voice updated:', voice);
     } else {
       console.warn('Cannot set voice: WebSocket not connected');
+    }
+  };
+
+    // Convert Float32Array of audio data to base64-encoded PCM16
+  const floatTo16BitPCM = (float32Array: Float32Array) => {
+    const buffer = new ArrayBuffer(float32Array.length * 2);
+    const view = new DataView(buffer);
+    let offset = 0;
+    for (let i = 0; i < float32Array.length; i++, offset += 2) {
+      const s = Math.max(-1, Math.min(1, float32Array[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+    }
+    return buffer;
+  };
+
+  const base64EncodeAudio = (float32Array: Float32Array) => {
+    const arrayBuffer = floatTo16BitPCM(float32Array);
+    let binary = '';
+    const bytes = new Uint8Array(arrayBuffer);
+    const chunkSize = 0x8000; // 32KB chunk size
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+  };
+
+  const base64ToArrayBuffer = (base64: string) => {
+    const binary = atob(base64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes.buffer;
+  };
+
+  const playAudioChunk = (base64: string) => {
+    const player = wavPlayerRef.current;
+    if (!player) {
+      console.warn('No audio player available');
+      return;
+    }
+
+    if (!base64) {
+      console.warn('Empty audio data received');
+      return;
+    }
+
+    try {
+      const buf = base64ToArrayBuffer(base64);
+      const samples = new Int16Array(buf);
+      player.add16BitPCM(samples, 'assistant');
+    } catch (err) {
+      console.error('Audio playback error:', err);
     }
   };
 

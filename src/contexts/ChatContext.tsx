@@ -19,7 +19,7 @@ export interface ChatContextType {
   createChat: () => void;
   selectChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
-  
+
   addMessage: (message: Message) => void;
   sendMessage: (message: Message) => Promise<void>;
 
@@ -50,12 +50,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // Use refs to maintain stable references for frequently changing values
   const chatsRef = useRef(chats);
   const chatIdRef = useRef(chatId);
-  
+
   // Update refs when values change
   useEffect(() => {
     chatsRef.current = chats;
   }, [chats]);
-  
+
   useEffect(() => {
     chatIdRef.current = chatId;
   }, [chatId]);
@@ -87,58 +87,44 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [chat, updateChat, setSelectedModel]);
 
-  // Helper function to get or create the current chat
-  const ensureCurrentChat = useCallback(() => {
-    if (!model) throw new Error("no model selected");
-
-    let currentChat = chat;
-    let currentChatId = chatIdRef.current;
-
-    // If we don't have a current chat, create one
-    if (!currentChat && !currentChatId) {
-      currentChat = createChatHook();
-      currentChat.model = model;
-      setChatId(currentChat.id);
-      updateChat(currentChat.id, { model });
-      currentChatId = currentChat.id;
-    } else if (!currentChat && currentChatId) {
-      // We have a chatId but no chat object, find it in chats
-      currentChat = chatsRef.current.find(c => c.id === currentChatId) || null;
+  // Helper to get or create a chat and its id
+  const getOrCreateChat = useCallback(() => {
+    if (!model) {
+      throw new Error('no model selected');
     }
 
-    // If we still don't have a chat, something is wrong
-    if (!currentChat || !currentChatId) {
-      throw new Error('Could not determine current chat');
+    let id = chatIdRef.current;
+    let chat = id ? chatsRef.current.find(c => c.id === id) || null : null;
+
+    if (!chat) {
+      chat = createChatHook();
+      chat.model = model;
+
+      setChatId(chat.id);
+      updateChat(chat.id, { model });
+
+      id = chat.id;
     }
 
-    return { chat: currentChat, chatId: currentChatId };
-  }, [chat, model, createChatHook, updateChat, setChatId, chatsRef, chatIdRef]);
+    return { id: id!, chat: chat! };
+  }, [model, createChatHook, updateChat, setChatId, chatsRef, chatIdRef]);
 
   const addMessage = useCallback((message: Message) => {
     if (!message.content.trim()) return;
-    
-    const { chatId } = ensureCurrentChat();
-    
-    // Get the absolute latest chat state to avoid race conditions
-    const latestChat = chatsRef.current.find(c => c.id === chatId);
-    const currentMessages = latestChat?.messages || [];
-    const updatedMessages = [...currentMessages, message];
-    
-    updateChat(chatId, { messages: updatedMessages });
-  }, [ensureCurrentChat, updateChat, chatsRef]);
+
+    const { id } = getOrCreateChat();
+    const existingMessages = chatsRef.current.find(c => c.id === id)?.messages || [];
+    updateChat(id, { messages: [...existingMessages, message] });
+  }, [getOrCreateChat, updateChat, chatsRef]);
 
   const sendMessage = useCallback(async (message: Message) => {
-    const { chat: currentChat, chatId } = ensureCurrentChat();
+    const { id, chat: chatObj } = getOrCreateChat();
 
-    // Get current messages and add the user message
-    const latestChat = chatsRef.current.find(c => c.id === chatId);
-    const currentMessages = latestChat?.messages || [];
-    const base = [...currentMessages, message];
-    
-    const updateMessages = (msgs: Message[]) => updateChat(chatId, { messages: msgs });
-    
-    // Add user message and empty assistant message for streaming
-    updateMessages([...base, { role: Role.Assistant, content: "" }]);
+    const existingMessages = chatsRef.current.find(c => c.id === id)?.messages || [];
+    const conversation = [...existingMessages, message];
+    const updateMessages = (msgs: Message[]) => updateChat(id, { messages: msgs });
+
+    updateMessages([...conversation, { role: Role.Assistant, content: '' }]);
 
     try {
       const tools = await bridge.listTools();
@@ -146,29 +132,26 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const completion = await client.complete(
         model!.id,
         tools,
-        base,
-        (_, snapshot) => updateMessages([...base, { role: Role.Assistant, content: snapshot }])
+        conversation,
+        (_, snapshot) => updateMessages([...conversation, { role: Role.Assistant, content: snapshot }])
       );
 
-      updateMessages([...base, completion]);
+      updateMessages([...conversation, completion]);
 
-      if (!currentChat.title || base.length % 3 === 0) {
+      if (!chatObj.title || conversation.length % 3 === 0) {
         client
-          .summarize(model!.id, base)
-          .then((title) => updateChat(chatId, { title }));
+          .summarize(model!.id, conversation)
+          .then(title => updateChat(id, { title }));
       }
     } catch (error) {
       console.error(error);
 
-      if (error?.toString().includes("missing finish_reason")) return;
+      if (error?.toString().includes('missing finish_reason')) return;
 
-      const errorMessage = {
-        role: Role.Assistant,
-        content: `An error occurred:\n${error}`,
-      };
-      updateMessages([...base, errorMessage]);
+      const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
+      updateMessages([...conversation, errorMessage]);
     }
-  }, [ensureCurrentChat, updateChat, bridge, client, model, chatsRef]);
+  }, [getOrCreateChat, updateChat, bridge, client, model, chatsRef]);
 
   const value: ChatContextType = {
     // Models
@@ -185,7 +168,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     createChat,
     selectChat,
     deleteChat,
-    
+
     addMessage,
     sendMessage,
 

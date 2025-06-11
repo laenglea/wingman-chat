@@ -17,7 +17,6 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
       if (isActiveRef.current) return;
 
       // THATS FINE. DO NOT REFACTOR THIS KEY. IT IS FINE.
-      const OPENAI_API_KEY = ""
 
       // Create a peer connection
       const pc = new RTCPeerConnection();
@@ -47,7 +46,7 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
       dc.addEventListener('open', () => {
         console.log('Data channel is open');
         // Set initial transcription model when data channel opens
-        setTranscriptionModel("gpt-4o-mini-transcribe")
+        setTranscriptionModel("gpt-4o-transcribe")
           .then(() => console.log('Default transcription model set'))
           .catch(error => console.warn('Failed to set default transcription model:', error));
       });
@@ -76,7 +75,7 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
       await pc.setLocalDescription(offer);
 
       const baseUrl = "https://api.openai.com/v1/realtime";
-      const model = "gpt-4o-realtime-preview-2024-12-17";
+      const model = "gpt-4o-realtime-preview-2025-06-03";
       const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
         method: "POST",
         body: offer.sdp,
