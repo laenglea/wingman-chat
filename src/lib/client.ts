@@ -230,6 +230,11 @@ Return only the prompts themselves, without numbering or bullet points.`,
     return resp.text();
   }
 
+  async translateFile(blob: Blob, lang: string): Promise<Blob> {
+    await new Promise((resolve) => setTimeout(resolve, 8000));
+    return new Blob();
+  }
+
   async translate(lang: string, text: string): Promise<string> {
     const data = new FormData();
     data.append("lang", lang);
