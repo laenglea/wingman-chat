@@ -124,28 +124,24 @@ export function TranslatePage() {
             <div className="relative h-full w-full border-0 md:border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-none md:rounded-lg overflow-hidden flex flex-col md:flex-row shadow-none md:shadow-md">
             <div className="flex-1 flex flex-col relative">
               {/* File upload controls */}
-              <div className="absolute top-2 left-2 z-10 flex items-center gap-2">
+              <div className="absolute top-2 left-2 z-10">
                 {!selectedFile && (
-                  <>
-                    <Button
-                      onClick={handleFileUploadClick}
-                      className="menu-button !p-1.5"
-                      title="Select a file to translate (.docx, .pptx, .xlsx)"
-                    >
-                      <UploadIcon size={14} />
-                    </Button>
-                    <span className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                      Upload file
-                    </span>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".docx,.pptx,.xlsx"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                  </>
+                  <Button
+                    onClick={handleFileUploadClick}
+                    className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none text-sm"
+                    title="Select a file to translate (.docx, .pptx, .xlsx)"
+                  >
+                    <UploadIcon size={14} />
+                    <span>Upload file</span>
+                  </Button>
                 )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".docx,.pptx,.xlsx"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
               </div>
               
               {/* Show selected file in center */}
@@ -172,7 +168,7 @@ export function TranslatePage() {
                   value={sourceText}
                   onChange={(e) => setSourceText(e.target.value)}
                   placeholder="Enter text to translate..."
-                  className="w-full h-full p-2 md:pt-12 bg-transparent border-none resize-none focus:outline-none ios-scroll"
+                  className="w-full h-full p-2 pt-12 bg-transparent border-none resize-none focus:outline-none ios-scroll"
                 />
               )}
             </div>

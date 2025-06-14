@@ -403,7 +403,13 @@ export function ChatInput() {
           data-placeholder="Ask anything"
           onInput={(e) => {
             const target = e.target as HTMLDivElement;
-            setContent(target.textContent || "");
+            const newContent = target.textContent || "";
+            setContent(newContent);
+            
+            // Hide prompt suggestions when user starts typing
+            if (newContent.trim() && showPromptSuggestions) {
+              setShowPromptSuggestions(false);
+            }
           }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
