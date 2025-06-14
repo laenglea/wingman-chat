@@ -6,13 +6,13 @@ interface UseAutoScrollOptions {
    */
   dependencies: unknown[];
   /**
-   * Pixel distance from the very bottom that still counts as “at bottom”.
-   * Defaults to 10 px.
+   * Pixel distance from the very bottom that still counts as "at bottom".
+   * Defaults to 20 px for touchpad-friendly sensitivity.
    */
   bottomThreshold?: number;
 }
 
-export function useAutoScroll({ dependencies, bottomThreshold = 10 }: UseAutoScrollOptions) {
+export function useAutoScroll({ dependencies, bottomThreshold = 20 }: UseAutoScrollOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isAutoScrollEnabledRef = useRef(true);
@@ -35,7 +35,10 @@ export function useAutoScroll({ dependencies, bottomThreshold = 10 }: UseAutoScr
     // Clear the flag on the first scroll event that fires after scrollIntoView.
     container.addEventListener("scroll", clearProgrammatic, { once: true });
 
-    bottom.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Scroll to the very bottom to ensure the last message is fully visible
+    // Use scrollTop for precise control instead of scrollIntoView
+    const targetScrollTop = container.scrollHeight - container.clientHeight;
+    container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
   };
 
   const handleScroll = useCallback(() => {
@@ -44,9 +47,10 @@ export function useAutoScroll({ dependencies, bottomThreshold = 10 }: UseAutoScr
     const container = containerRef.current;
     if (!container) return;
 
-    // Check if user is at bottom (with small threshold)
-    const isAtBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight < bottomThreshold;
+    // Check if user is at bottom (with very sensitive threshold for touchpad)
+    // Make it much easier to disable auto-scroll with small scroll movements
+    const scrollBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    const isAtBottom = scrollBottom < bottomThreshold + 10; // Much more sensitive
     isAutoScrollEnabledRef.current = isAtBottom;
   }, [bottomThreshold]);
 
@@ -55,8 +59,9 @@ export function useAutoScroll({ dependencies, bottomThreshold = 10 }: UseAutoScr
     scrollToBottom();
   }, []);
 
-  // Auto-scroll when dependencies change if enabled
+  // Auto-scroll when dependencies change - respect user intent during streaming
   useEffect(() => {
+    // Only auto-scroll if the user is already at the bottom or if this is a new message
     if (isAutoScrollEnabledRef.current) {
       scrollToBottom();
     }
