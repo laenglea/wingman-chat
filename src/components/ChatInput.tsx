@@ -293,7 +293,7 @@ export function ChatInput() {
     <form onSubmit={handleSubmit}>
       <div 
         ref={containerRef}
-        className="chat-input-container border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 drop-shadow-2xl"
+        className="chat-input-container border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80"
       >
         <input
           type="file"
@@ -304,19 +304,19 @@ export function ChatInput() {
           onChange={handleFileChange}
         />
 
-        {/* Attachments display at the top of the input */}
+        {/* Attachments display */}
         {(attachments.length > 0 || loadingAttachments.size > 0) && (
           <div className="flex flex-wrap gap-3 p-3">
             {/* Loading attachments */}
             {Array.from(loadingAttachments).map((fileId, index) => (
               <div
                 key={fileId}
-                className="relative w-14 h-14 bg-neutral-100 dark:bg-neutral-700 rounded-xl border-2 border-dashed border-neutral-400 dark:border-neutral-500 flex items-center justify-center animate-pulse"
+                className="relative size-14 bg-neutral-100 dark:bg-neutral-700 rounded-xl border-2 border-dashed border-neutral-400 dark:border-neutral-500 flex items-center justify-center animate-pulse"
                 title="Processing file..."
               >
                 <Loader2 size={18} className="animate-spin text-neutral-500 dark:text-neutral-400" />
                 {loadingAttachments.size > 1 && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
+                  <div className="absolute -bottom-1 -right-1 size-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
                     {index + 1}
                   </div>
                 )}
@@ -327,14 +327,14 @@ export function ChatInput() {
             {attachments.map((attachment, index) => (
               <div
                 key={index}
-                className="relative w-14 h-14 bg-white dark:bg-neutral-600 rounded-xl border border-neutral-300 dark:border-neutral-500 shadow-sm flex items-center justify-center group hover:shadow-md hover:border-neutral-400 dark:hover:border-neutral-400 transition-all duration-200"
+                className="relative size-14 bg-white dark:bg-neutral-600 rounded-xl border border-neutral-300 dark:border-neutral-500 shadow-sm flex items-center justify-center group hover:shadow-md hover:border-neutral-400 dark:hover:border-neutral-400 transition-all"
                 title={attachment.name}
               >
                 {attachment.type === AttachmentType.Image ? (
                   <img 
                     src={attachment.data} 
                     alt={attachment.name}
-                    className="w-full h-full object-cover rounded-xl"
+                    className="size-full object-cover rounded-xl"
                   />
                 ) : (
                   <div className="text-neutral-600 dark:text-neutral-300">
@@ -343,7 +343,7 @@ export function ChatInput() {
                 )}
                 <button
                   type="button"
-                  className="absolute top-0.5 right-0.5 w-5 h-5 bg-neutral-800/80 hover:bg-neutral-900 dark:bg-neutral-200/80 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 backdrop-blur-sm shadow-sm cursor-pointer"
+                  className="absolute top-0.5 right-0.5 size-5 bg-neutral-800/80 hover:bg-neutral-900 dark:bg-neutral-200/80 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm shadow-sm"
                   onClick={() => handleRemoveAttachment(index)}
                 >
                   <X size={10} />
@@ -353,9 +353,9 @@ export function ChatInput() {
           </div>
         )}
 
-        {/* Prompt suggestions display */}
+        {/* Prompt suggestions */}
         {showPromptSuggestions && (
-          <div className="px-3 pt-3 pb-3">
+          <div className="p-3">
             {loadingPrompts ? (
               <div className="flex items-center justify-center py-4">
                 <Loader2 size={16} className="animate-spin text-neutral-500 dark:text-neutral-400" />
@@ -370,7 +370,7 @@ export function ChatInput() {
                     key={index}
                     type="button"
                     onClick={() => handlePromptSelect(suggestion)}
-                    className="w-full text-left p-3 text-sm bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-150 dark:hover:bg-neutral-600 rounded-lg border border-neutral-200 dark:border-neutral-600 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer"
+                    className="w-full text-left p-3 text-sm bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-150 dark:hover:bg-neutral-600 rounded-lg border border-neutral-200 dark:border-neutral-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer"
                   >
                     {suggestion}
                   </button>
@@ -384,13 +384,14 @@ export function ChatInput() {
           </div>
         )}
 
+        {/* Input area */}
         <div
           ref={contentEditableRef}
-          className="pt-2 px-2 pb-2 md:pt-4 md:px-4 md:pb-2 pr-0 bg-transparent dark:text-neutral-200 focus:outline-none flex-1 max-h-[40vh] overflow-y-auto min-h-[2.5rem] whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:dark:text-neutral-400"
+          className="p-3 md:p-4 flex-1 max-h-[40vh] overflow-y-auto min-h-[2.5rem] whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:dark:text-neutral-400 focus:outline-none dark:text-neutral-200"
           style={{ 
             scrollbarWidth: "thin",
-            minHeight: "2.5rem", // Explicit fallback for min-height
-            height: "auto" // Ensure height is calculated properly
+            minHeight: "2.5rem",
+            height: "auto"
           }}
           role="textbox"
           contentEditable
@@ -403,11 +404,12 @@ export function ChatInput() {
           onKeyDown={handleKeyDown}
         />
 
-        <div className="flex items-center justify-between gap-1 px-2 pb-2 md:px-4 md:pb-2 pt-0">
+        {/* Controls */}
+        <div className="flex items-center justify-between p-3 pt-0">
           <div className="flex items-center gap-2">
             <Button
               type="button"
-              className="pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+              className="text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
               onClick={handlePromptSuggestionsClick}
               title="Show prompt suggestions"
             >
@@ -415,7 +417,7 @@ export function ChatInput() {
             </Button>
             
             <Menu>
-              <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none focus:ring-0 focus:border-none text-sm">
+              <MenuButton className="flex items-center gap-1 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none text-sm cursor-pointer">
                 <Brain size={14} />
                 <span>
                   {model?.name ?? model?.id ?? "Select Model"}
@@ -431,7 +433,7 @@ export function ChatInput() {
                     <Button
                       onClick={() => onModelChange(model)}
                       title={model.description}
-                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer focus:outline-none focus:ring-0"
+                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] focus:outline-none cursor-pointer"
                     >
                       {model.name ?? model.id}
                     </Button>
@@ -442,13 +444,13 @@ export function ChatInput() {
             
             {bridge.isConnected() && (
               <div 
-                className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 dark:text-neutral-400 text-sm relative group"
+                className="flex items-center gap-1 pr-1.5 py-1.5 text-neutral-600 dark:text-neutral-400 text-sm relative group"
                 title={bridgeTools.length > 0 ? `Available tools: ${bridgeTools.map(t => t.name).join(', ')}` : "Bridge connected"}
               >
                 <Link size={14} />
                 <span>Bridge</span>
                 {bridgeTools.length > 0 && (
-                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-neutral-800 dark:bg-neutral-700 text-white text-xs rounded-md p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-neutral-800 dark:bg-neutral-700 text-white text-xs rounded-md p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                     <div className="font-semibold mb-1">Available Tools ({bridgeTools.length}):</div>
                     <div className="space-y-1">
                       {bridgeTools.map((tool, index) => (
@@ -468,11 +470,11 @@ export function ChatInput() {
             )}
           </div>
 
-          <div className="flex items-center gap-1 relative">
+          <div className="flex items-center gap-1">
             {supportsScreenshot() && (
               <Button
                 type="button"
-                className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+                className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
                 onClick={handleScreenshotClick}
               >
                 <ScreenShare size={16} />
@@ -481,14 +483,14 @@ export function ChatInput() {
 
             <Button
               type="button"
-              className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+              className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
               onClick={handleAttachmentClick}
             >
               <Paperclip size={16} />
             </Button>
 
             <Button
-              className="pl-1.5 pr-0 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none"
+              className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
               type="submit"
             >
               <Send size={16} />
