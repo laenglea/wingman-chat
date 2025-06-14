@@ -4,7 +4,7 @@ import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useNavigation } from "../contexts/NavigationContext";
-import { useResponsiveness } from "../hooks/useResponsiveness";
+import { useResponsive } from "../hooks/useResponsive";
 import { useChat } from "../hooks/useChat";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
@@ -17,7 +17,7 @@ export function ChatPage() {
     createChat
   } = useChat();
   
-  const { isResponsive, toggleResponsiveness } = useResponsiveness();
+  const { isResponsive, toggleResponsive } = useResponsive();
   
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent } = useSidebar();
@@ -60,7 +60,7 @@ export function ChatPage() {
       {/* Toggle button - positioned at page level */}
       <div className="hidden md:block absolute top-4 right-4 z-20">
         <Button
-          onClick={toggleResponsiveness}
+          onClick={toggleResponsive}
           className="menu-button !p-1.5"
           title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
         >
