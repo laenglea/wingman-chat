@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 
-const STORAGE_KEY = 'app_responsiveness';
+const STORAGE_KEY = 'app_responsive';
 
-export function useResponsiveness() {
+export function useResponsive() {
   const [isResponsive, setIsResponsive] = useState<boolean>(() => {
     // Initialize from localStorage or default to true
     try {
@@ -13,7 +13,7 @@ export function useResponsiveness() {
     }
   });
 
-  const toggleResponsiveness = useCallback(() => {
+  const toggleResponsive = useCallback(() => {
     setIsResponsive(prev => {
       const newValue = !prev;
       // Persist to localStorage
@@ -37,6 +37,6 @@ export function useResponsiveness() {
 
   return {
     isResponsive,
-    toggleResponsiveness,
+    toggleResponsive,
   };
 }
