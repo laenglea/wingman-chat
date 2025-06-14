@@ -2,13 +2,13 @@ import { useEffect } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, Maximize2, Minimize2 } from "lucide-react";
 import { useNavigation } from "../contexts/NavigationContext";
-import { useResponsiveness } from "../hooks/useResponsiveness";
+import { useResponsive } from "../hooks/useResponsive";
 import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
 
 export function TranslatePage() {
   const { setRightActions } = useNavigation();
-  const { isResponsive, toggleResponsiveness } = useResponsiveness();
+  const { isResponsive, toggleResponsive } = useResponsive();
   
   // Use translate context
   const {
@@ -50,7 +50,7 @@ export function TranslatePage() {
       {/* Toggle button - positioned at page level */}
       <div className="hidden md:block absolute top-4 right-4 z-20">
         <Button
-          onClick={toggleResponsiveness}
+          onClick={toggleResponsive}
           className="menu-button !p-1.5"
           title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
         >

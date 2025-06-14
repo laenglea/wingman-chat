@@ -18,6 +18,7 @@ import {
 } from "../lib/utils";
 import { getConfig } from "../config";
 import { useChat } from "../hooks/useChat";
+import { useTextPaste } from "../hooks/useTextPaste";
 
 export function ChatInput() {
   const config = getConfig();
@@ -40,6 +41,9 @@ export function ChatInput() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contentEditableRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Custom hook for plain text paste handling
+  const handlePaste = useTextPaste(contentEditableRef, setContent);
 
   // Handle prompt suggestions click
   const handlePromptSuggestionsClick = async () => {
@@ -402,6 +406,7 @@ export function ChatInput() {
             setContent(target.textContent || "");
           }}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
         />
 
         {/* Controls */}
