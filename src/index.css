@@ -181,11 +181,11 @@ button:focus-visible,
 }
 
 .sidebar-item {
-  @apply p-1.5 sm:p-2 hover:bg-neutral-400 dark:hover:text-gray-300 dark:hover:bg-neutral-800 rounded cursor-pointer focus:outline-none;
+  @apply p-1.5 sm:p-2 hover:text-neutral-600 dark:hover:text-neutral-300 rounded cursor-pointer focus:outline-none transition-all duration-200;
 }
 
 .sidebar-item-selected {
-  @apply p-1.5 sm:p-2 bg-neutral-300 dark:bg-neutral-800 focus:outline-none;
+  @apply p-1.5 sm:p-2 text-neutral-900 dark:text-neutral-100 focus:outline-none;
 }
 
 .menu-button {
