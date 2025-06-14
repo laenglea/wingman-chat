@@ -14,7 +14,6 @@ export interface TranslateContextType {
   targetLang: string;
   isLoading: boolean;
   selectedFile: File | null;
-  isFileTranslating: boolean;
   translatedFileUrl: string | null;
   translatedFileName: string | null;
   
@@ -28,7 +27,6 @@ export interface TranslateContextType {
   performTranslate: (langCode?: string, textToTranslate?: string) => Promise<void>;
   handleReset: () => void;
   selectFile: (file: File) => void;
-  translateFile: () => Promise<void>;
   clearFile: () => void;
 }
 
@@ -57,7 +55,6 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
   const [targetLang, setTargetLang] = useState("en");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isFileTranslating, setIsFileTranslating] = useState(false);
   const [translatedFileUrl, setTranslatedFileUrl] = useState<string | null>(null);
   const [translatedFileName, setTranslatedFileName] = useState<string | null>(null);
 
@@ -80,6 +77,46 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
   // Actions with stable references
   const performTranslate = useCallback(async (langCode?: string, textToTranslate?: string) => {
     const langToUse = langCode ?? targetLangRef.current;
+    
+    // Handle file translation if a file is selected
+    if (selectedFile) {
+      setIsLoading(true);
+      try {
+        const translatedBlob = await client.translate(langToUse, selectedFile);
+        
+        if (translatedBlob instanceof Blob) {
+          // Create download URL
+          const url = URL.createObjectURL(translatedBlob);
+          
+          // Generate filename with language suffix
+          const originalName = selectedFile.name;
+          const lastDotIndex = originalName.lastIndexOf('.');
+          const nameWithoutExt = lastDotIndex !== -1 ? originalName.substring(0, lastDotIndex) : originalName;
+          const extension = lastDotIndex !== -1 ? originalName.substring(lastDotIndex) : '';
+          const translatedFileName = `${nameWithoutExt}_${langToUse}${extension}`;
+          
+          // Set download URL and filename for display
+          setTranslatedFileUrl(url);
+          setTranslatedFileName(translatedFileName);
+          
+          // Auto-download the file
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = translatedFileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } catch (err) {
+        console.error('File translation failed:', err);
+        // Could add error state here if needed
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+    
+    // Handle text translation
     const textToUse = textToTranslate ?? sourceTextRef.current;
 
     if (!textToUse.trim()) {
@@ -92,13 +129,15 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
 
     try {
       const result = await client.translate(langToUse, textToUse);
-      setTranslatedText(result);
+      if (typeof result === 'string') {
+        setTranslatedText(result);
+      }
     } catch (err) {
       setTranslatedText(err instanceof Error ? err.message : "An unknown error occurred during translation.");
     } finally {
       setIsLoading(false);
     }
-  }, [client]);
+  }, [client, selectedFile]);
 
   const handleReset = useCallback(() => {
     setSourceText("");
@@ -149,42 +188,6 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     setTranslatedFileName(null);
   }, []);
 
-  const translateFileAction = useCallback(async () => {
-    if (!selectedFile) return;
-
-    setIsFileTranslating(true);
-    try {
-      const translatedBlob = await client.translateFile(selectedFile, targetLang);
-      
-      // Create download URL
-      const url = URL.createObjectURL(translatedBlob);
-      
-      // Generate filename with language suffix
-      const originalName = selectedFile.name;
-      const lastDotIndex = originalName.lastIndexOf('.');
-      const nameWithoutExt = lastDotIndex !== -1 ? originalName.substring(0, lastDotIndex) : originalName;
-      const extension = lastDotIndex !== -1 ? originalName.substring(lastDotIndex) : '';
-      const translatedFileName = `${nameWithoutExt}_${targetLang}${extension}`;
-      
-      // Set download URL and filename for display
-      setTranslatedFileUrl(url);
-      setTranslatedFileName(translatedFileName);
-      
-      // Auto-download the file
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = translatedFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err) {
-      console.error('File translation failed:', err);
-      // Could add error state here if needed
-    } finally {
-      setIsFileTranslating(false);
-    }
-  }, [client, selectedFile, targetLang]);
-
   const contextValue: TranslateContextType = {
     // State
     sourceText,
@@ -192,7 +195,6 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     targetLang,
     isLoading,
     selectedFile,
-    isFileTranslating,
     translatedFileUrl,
     translatedFileName,
     
@@ -206,7 +208,6 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     performTranslate,
     handleReset,
     selectFile,
-    translateFile: translateFileAction,
     clearFile,
   };
 

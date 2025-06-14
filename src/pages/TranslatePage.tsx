@@ -19,7 +19,6 @@ export function TranslatePage() {
     languages,
     selectedLanguage,
     selectedFile,
-    isFileTranslating,
     translatedFileUrl,
     translatedFileName,
     setSourceText,
@@ -27,16 +26,11 @@ export function TranslatePage() {
     performTranslate,
     handleReset,
     selectFile,
-    translateFile,
     clearFile
   } = useTranslate();
 
   const handleTranslateButtonClick = () => {
-    if (selectedFile) {
-      translateFile();
-    } else {
-      performTranslate();
-    }
+    performTranslate();
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,11 +186,11 @@ export function TranslatePage() {
                 className="menu-button !bg-neutral-400 dark:!bg-neutral-900 z-10 relative"
                 title={selectedFile ? `Translate file to ${selectedLanguage?.name || 'Selected Language'}` : `Translate to ${selectedLanguage?.name || 'Selected Language'}`}
                 disabled={
-                  (isLoading || isFileTranslating) || 
+                  isLoading || 
                   (selectedFile ? !selectedLanguage : !sourceText.trim())
                 }
               >
-                {(isLoading || isFileTranslating) ? (
+                {isLoading ? (
                   <Loader2 className="animate-spin" />
                 ) : (
                   <PilcrowRightIcon />
@@ -261,7 +255,7 @@ export function TranslatePage() {
               )}
 
               {/* Show loading state for file translation */}
-              {selectedFile && isFileTranslating && (
+              {selectedFile && isLoading && (
                 <div className="absolute inset-2 flex items-center justify-center">
                   <div className="bg-neutral-300 dark:bg-neutral-700 p-4 rounded-lg shadow-lg flex flex-col items-center gap-3">
                     <Loader2 size={48} className="animate-spin text-neutral-600 dark:text-neutral-400" />
@@ -273,7 +267,7 @@ export function TranslatePage() {
               )}
 
               {/* Show candidate file when selected but not translated */}
-              {selectedFile && !isFileTranslating && !translatedFileUrl && (
+              {selectedFile && !isLoading && !translatedFileUrl && (
                 <div className="absolute inset-2 flex items-center justify-center">
                   <div 
                     className="bg-neutral-100 dark:bg-neutral-900 border-2 border-dashed border-neutral-400 dark:border-neutral-600 p-4 rounded-lg flex flex-col items-center gap-3 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"

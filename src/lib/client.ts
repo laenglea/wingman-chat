@@ -230,18 +230,22 @@ Return only the prompts themselves, without numbering or bullet points.`,
     return resp.text();
   }
 
-  async translateFile(blob: Blob, lang: string): Promise<Blob> {
-    await new Promise((resolve) => setTimeout(resolve, 8000));
-    return new Blob();
-  }
-
-  async translate(lang: string, text: string): Promise<string> {
+  async translate(lang: string, input: string | Blob): Promise<string | Blob> {
     const data = new FormData();
     data.append("lang", lang);
-    data.append("text", text);
+    
+    const headers: HeadersInit = {};
+    
+    if (input instanceof Blob) {
+      data.append("file", input);
+      headers["Accept"] = input.type || "application/octet-stream";
+    } else {
+      data.append("text", input);
+    }
 
     const resp = await fetch(new URL("/api/v1/translate", window.location.origin), {
       method: "POST",
+      headers,
       body: data,
     });
 
@@ -249,7 +253,12 @@ Return only the prompts themselves, without numbering or bullet points.`,
       throw new Error(`Translate request failed with status ${resp.status}`);
     }
 
-    return resp.text();
+    // Return blob if input was blob, text if input was text
+    if (input instanceof Blob) {
+      return resp.blob();
+    } else {
+      return resp.text();
+    }
   }
 
   private toTools(tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {
