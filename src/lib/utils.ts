@@ -173,3 +173,31 @@ export const documentTypes = [
 ];
 
 export const supportedTypes = [...textTypes, ...imageTypes, ...documentTypes];
+
+export function isAudioUrl(url: string): boolean {
+  const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
+  
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname.toLowerCase();
+    
+    // Check file extensions
+    return audioExtensions.some(ext => pathname.endsWith(ext));
+  } catch {
+    return false;
+  }
+}
+
+export function isVideoUrl(url: string): boolean {
+  const videoExtensions = ['.mp4', '.webm', '.avi', '.mov', '.wmv', '.flv', '.mkv'];
+  
+  try {
+    const urlObj = new URL(url);
+    const pathname = urlObj.pathname.toLowerCase();
+    
+    // Check file extensions
+    return videoExtensions.some(ext => pathname.endsWith(ext));
+  } catch {
+    return false;
+  }
+}

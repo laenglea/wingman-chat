@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Plus as PlusIcon, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
@@ -23,7 +23,7 @@ export function ChatPage() {
   const { setSidebarContent } = useSidebar();
   const { setRightActions } = useNavigation();
 
-  const { containerRef, bottomRef, handleScroll } = useAutoScroll({
+  const { containerRef, bottomRef, handleScroll, enableAutoScroll } = useAutoScroll({
     dependencies: [chat, messages],
   });
 
@@ -55,21 +55,32 @@ export function ChatPage() {
     return () => setSidebarContent(null);
   }, [sidebarContent, setSidebarContent]);
 
+  // Force scroll to bottom only for new user messages, not streaming updates
+  const prevMessagesLengthRef = useRef(messages.length);
+  useEffect(() => {
+    // Only force scroll if a completely new message was added (not just updated)
+    if (messages.length > prevMessagesLengthRef.current) {
+      // This indicates a new message was added (user or assistant), not just streaming content
+      enableAutoScroll();
+    }
+    prevMessagesLengthRef.current = messages.length;
+  }, [messages.length, enableAutoScroll]);
+
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
-      {/* Toggle button - positioned at page level */}
-      <div className="hidden md:block absolute top-4 right-4 z-20">
-        <Button
-          onClick={toggleResponsive}
-          className="menu-button !p-1.5"
-          title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
-        >
-          {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </Button>
-      </div>
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Toggle button - positioned within content area */}
+        <div className="hidden md:block absolute top-20 right-6 z-20">
+          <Button
+            onClick={toggleResponsive}
+            className="menu-button !p-1.5"
+            title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
+          >
+            {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </Button>
+        </div>
         {messages.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center pt-16">
             <div className="flex flex-col items-center text-center">
               <img src="/logo.svg" className="w-32 h-32 dark:opacity-80" alt="Wingman Chat" />
             </div>
@@ -80,7 +91,7 @@ export function ChatPage() {
             ref={containerRef}
             onScroll={handleScroll}
           >
-            <div className={`px-2 pt-4 ${
+            <div className={`px-2 pt-20 pb-28 ${
               isResponsive 
                 ? 'max-w-full md:max-w-[80vw] mx-auto' 
                 : 'max-content-width'
@@ -96,8 +107,10 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className="bg-neutral-50 dark:bg-neutral-950 md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right">
-        <div className={isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'}>
+      <footer className="absolute bottom-0 left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none">
+        {/* Gradient overlay for enhanced glass effect */}
+        <div className="absolute inset-0 bg-gradient-to-t from-neutral-50/90 via-neutral-50/40 to-transparent dark:from-neutral-950/90 dark:via-neutral-950/40 dark:to-transparent pointer-events-none" />
+        <div className={`relative pointer-events-auto ${isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'}`}>
           <ChatInput />
         </div>
       </footer>

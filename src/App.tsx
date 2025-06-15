@@ -16,7 +16,6 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
-  const [isClosing, setIsClosing] = useState(false);
 
   // Handle responsive sidebar behavior
   useEffect(() => {
@@ -31,20 +30,6 @@ function AppContent() {
     return () => window.removeEventListener('resize', handleResize);
   }, [showSidebar, setShowSidebar]);
 
-  // Handle mobile sidebar close animation
-  const handleMobileSidebarClose = () => {
-    if (window.innerWidth < 768) {
-      setIsClosing(true);
-      // Wait for animation to complete before actually closing
-      setTimeout(() => {
-        setShowSidebar(false);
-        setIsClosing(false);
-      }, 300); // Match the animation duration
-    } else {
-      setShowSidebar(false);
-    }
-  };
-
   const pages: { key: Page; label: string; icon: React.ReactNode }[] = [
     { key: "chat", label: "Chat", icon: <MessageCircle size={20} /> },
     { key: "translate", label: "Translate", icon: <Languages size={20} /> },
@@ -52,19 +37,9 @@ function AppContent() {
 
   return (
     <div className="h-dvh w-dvw flex overflow-hidden relative">
-      {/* Mobile backdrop overlay */}
-      {sidebarContent && (showSidebar || isClosing) && (
-        <div 
-          className={`fixed inset-0 bg-black/50 z-40 md:hidden ${
-            isClosing ? 'mobile-backdrop-exit' : 'mobile-backdrop-enter'
-          }`}
-          onClick={handleMobileSidebarClose}
-        />
-      )}
-
       {/* Fixed hamburger button for mobile - only visible when sidebar is closed */}
       {sidebarContent && !showSidebar && (
-        <div className="fixed top-0 left-0 z-30 md:hidden pt-safe-top pl-safe-left p-3">
+        <div className="fixed top-0 left-0 z-40 md:hidden pt-safe-top pl-safe-left p-3">
           <Button
             className="menu-button"
             onClick={() => {
@@ -81,18 +56,22 @@ function AppContent() {
         </div>
       )}
 
-      {/* Generic sidebar that can be controlled by any page */}
+      {/* Backdrop overlay for sidebar */}
+      {sidebarContent && showSidebar && (
+        <div
+          className={`fixed inset-0 bg-black/5 z-40 transition-opacity duration-300 opacity-100`}
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
+      {/* Generic sidebar that slides over content with glass effect */}
       {sidebarContent && (
         <aside
           className={`
-            h-full bg-white dark:bg-neutral-900 border-r border-neutral-200 dark:border-neutral-700
-            ${showSidebar ? "w-64" : "w-0"} 
-            md:flex-shrink-0 md:relative
-            fixed left-0 top-0 z-50 md:z-auto
-            ${(showSidebar || isClosing) ? "block" : "hidden md:block"}
-            ${showSidebar && !isClosing ? "mobile-sidebar-enter" : ""}
-            ${isClosing ? "mobile-sidebar-exit" : ""}
-            md:transition-all md:duration-300 md:ease-in-out overflow-hidden
+            h-full bg-white/20 dark:bg-black/15 backdrop-blur-lg border-r border-neutral-300/60 dark:border-white/20
+            fixed left-0 top-0 z-50 w-64
+            transform transition-transform duration-300 ease-in-out
+            ${showSidebar ? 'translate-x-0' : '-translate-x-full'}
           `}
         >
           {sidebarContent}
@@ -100,8 +79,9 @@ function AppContent() {
       )}
 
       {/* Main app content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <nav className="px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200/60 dark:border-neutral-700/60 flex-shrink-0 nav-header">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Fixed navigation bar with glass effect */}
+        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-white/20 dark:bg-black/15 backdrop-blur-lg border-b border-white/30 dark:border-white/20 nav-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 w-1/3">
               {sidebarContent && (
@@ -140,6 +120,7 @@ function AppContent() {
           </div>
         </nav>
         
+        {/* Content area - no padding so it can scroll under the nav */}
         <div className="flex-1 overflow-hidden">
           {currentPage === "chat" && <ChatPage />}
           {currentPage === "translate" && <TranslatePage />}

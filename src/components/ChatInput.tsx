@@ -297,7 +297,7 @@ export function ChatInput() {
     <form onSubmit={handleSubmit}>
       <div 
         ref={containerRef}
-        className="chat-input-container border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80"
+        className="chat-input-container border border-white/20 dark:border-white/15 bg-white/20 dark:bg-black/15 backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80"
       >
         <input
           type="file"
@@ -315,7 +315,7 @@ export function ChatInput() {
             {Array.from(loadingAttachments).map((fileId, index) => (
               <div
                 key={fileId}
-                className="relative size-14 bg-neutral-100 dark:bg-neutral-700 rounded-xl border-2 border-dashed border-neutral-400 dark:border-neutral-500 flex items-center justify-center animate-pulse"
+                className="relative size-14 bg-white/30 dark:bg-black/20 backdrop-blur-lg rounded-xl border-2 border-dashed border-white/50 dark:border-white/30 flex items-center justify-center animate-pulse"
                 title="Processing file..."
               >
                 <Loader2 size={18} className="animate-spin text-neutral-500 dark:text-neutral-400" />
@@ -331,7 +331,7 @@ export function ChatInput() {
             {attachments.map((attachment, index) => (
               <div
                 key={index}
-                className="relative size-14 bg-white dark:bg-neutral-600 rounded-xl border border-neutral-300 dark:border-neutral-500 shadow-sm flex items-center justify-center group hover:shadow-md hover:border-neutral-400 dark:hover:border-neutral-400 transition-all"
+                className="relative size-14 bg-white/40 dark:bg-black/25 backdrop-blur-lg rounded-xl border border-white/40 dark:border-white/25 shadow-sm flex items-center justify-center group hover:shadow-md hover:border-white/60 dark:hover:border-white/40 transition-all"
                 title={attachment.name}
               >
                 {attachment.type === AttachmentType.Image ? (
@@ -374,7 +374,7 @@ export function ChatInput() {
                     key={index}
                     type="button"
                     onClick={() => handlePromptSelect(suggestion)}
-                    className="w-full text-left p-3 text-sm bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-150 dark:hover:bg-neutral-600 rounded-lg border border-neutral-200 dark:border-neutral-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer"
+                    className="w-full text-left p-3 text-sm bg-white/25 dark:bg-black/15 backdrop-blur-lg hover:bg-white/40 dark:hover:bg-black/25 rounded-lg border border-white/30 dark:border-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 cursor-pointer"
                   >
                     {suggestion}
                   </button>
@@ -391,7 +391,7 @@ export function ChatInput() {
         {/* Input area */}
         <div
           ref={contentEditableRef}
-          className="p-3 md:p-4 flex-1 max-h-[40vh] overflow-y-auto min-h-[2.5rem] whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:dark:text-neutral-400 focus:outline-none dark:text-neutral-200"
+          className="p-3 md:p-4 flex-1 max-h-[40vh] overflow-y-auto min-h-[2.5rem] whitespace-pre-wrap break-words empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:dark:text-neutral-400 focus:outline-none text-neutral-800 dark:text-neutral-200"
           style={{ 
             scrollbarWidth: "thin",
             minHeight: "2.5rem",
@@ -403,7 +403,13 @@ export function ChatInput() {
           data-placeholder="Ask anything"
           onInput={(e) => {
             const target = e.target as HTMLDivElement;
-            setContent(target.textContent || "");
+            const newContent = target.textContent || "";
+            setContent(newContent);
+            
+            // Hide prompt suggestions when user starts typing
+            if (newContent.trim() && showPromptSuggestions) {
+              setShowPromptSuggestions(false);
+            }
           }}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
@@ -431,14 +437,14 @@ export function ChatInput() {
               <MenuItems
                 transition
                 anchor="bottom start"
-                className="sidebar-scroll !max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg z-50"
+                className="sidebar-scroll !max-h-[50vh] mt-2 rounded border bg-white/30 dark:bg-black/25 backdrop-blur-2xl border-white/30 dark:border-white/20 overflow-y-auto shadow-lg z-50"
               >
                 {models.map((model) => (
                   <MenuItem key={model.id}>
                     <Button
                       onClick={() => onModelChange(model)}
                       title={model.description}
-                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] focus:outline-none cursor-pointer"
+                      className="group flex w-full items-center px-4 py-2 data-[focus]:bg-white/40 dark:data-[focus]:bg-black/30 text-neutral-800 dark:text-neutral-200 focus:outline-none cursor-pointer"
                     >
                       {model.name ?? model.id}
                     </Button>
