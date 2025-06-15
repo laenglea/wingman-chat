@@ -253,12 +253,13 @@ Return only the prompts themselves, without numbering or bullet points.`,
       throw new Error(`Translate request failed with status ${resp.status}`);
     }
 
-    // Return blob if input was blob, text if input was text
-    if (input instanceof Blob) {
-      return resp.blob();
-    } else {
+    const contentType = resp.headers.get("content-type")?.toLowerCase() || "";
+    
+    if (contentType.includes("text/plain") || contentType.includes("text/markdown")) {
       return resp.text();
     }
+    
+    return resp.blob();
   }
 
   private toTools(tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {

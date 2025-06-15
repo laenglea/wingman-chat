@@ -82,11 +82,19 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     if (selectedFile) {
       setIsLoading(true);
       try {
-        const translatedBlob = await client.translate(langToUse, selectedFile);
+        const result = await client.translate(langToUse, selectedFile);
         
-        if (translatedBlob instanceof Blob) {
+        // Check the return type and handle accordingly
+        if (typeof result === 'string') {
+          // If string, render the output directly in the translated content
+          setTranslatedText(result);
+          // Clear any previous file download state
+          setTranslatedFileUrl(null);
+          setTranslatedFileName(null);
+        } else if (result instanceof Blob) {
+          // If blob, allow to download like currently
           // Create download URL
-          const url = URL.createObjectURL(translatedBlob);
+          const url = URL.createObjectURL(result);
           
           // Generate filename with language suffix
           const originalName = selectedFile.name;
@@ -98,6 +106,8 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
           // Set download URL and filename for display
           setTranslatedFileUrl(url);
           setTranslatedFileName(translatedFileName);
+          // Clear any previous text translation
+          setTranslatedText("");
           
           // Auto-download the file
           const link = document.createElement('a');
@@ -154,6 +164,7 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     if (selectedFile) {
       setTranslatedFileUrl(null);
       setTranslatedFileName(null);
+      setTranslatedText("");  // Also clear text translation for files
     }
     
     // Automatically translate with new language if there's source text (but not if file is selected)
@@ -186,6 +197,7 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     setSelectedFile(null);
     setTranslatedFileUrl(null);
     setTranslatedFileName(null);
+    setTranslatedText("");  // Clear translated text when clearing file
   }, []);
 
   const contextValue: TranslateContextType = {
