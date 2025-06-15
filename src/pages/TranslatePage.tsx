@@ -253,7 +253,7 @@ export function TranslatePage() {
                   )}
 
                   {/* Show candidate file when selected but not translated */}
-                  {selectedFile && !isLoading && !translatedFileUrl && (
+                  {selectedFile && !isLoading && !translatedFileUrl && !translatedText && (
                     <div className="absolute inset-2 flex items-center justify-center">
                       <div 
                         className="bg-white/20 dark:bg-black/10 backdrop-blur-lg border-2 border-dashed border-white/50 dark:border-white/30 p-6 rounded-xl flex flex-col items-center gap-4 cursor-pointer hover:bg-white/30 dark:hover:bg-black/20 transition-all"
@@ -274,8 +274,8 @@ export function TranslatePage() {
                     </div>
                   )}
                   
-                  {/* Show copy button for text translations */}
-                  {translatedText && !selectedFile && (
+                  {/* Show copy button for text translations and file translations that return text */}
+                  {translatedText && (
                     <div className="absolute top-2 right-2">
                       <CopyButton text={translatedText} />
                     </div>
