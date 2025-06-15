@@ -39,7 +39,7 @@ function AppContent() {
     <div className="h-dvh w-dvw flex overflow-hidden relative">
       {/* Fixed hamburger button for mobile - only visible when sidebar is closed */}
       {sidebarContent && !showSidebar && (
-        <div className="fixed top-0 left-0 z-30 md:hidden pt-safe-top pl-safe-left p-3">
+        <div className="fixed top-0 left-0 z-40 md:hidden pt-safe-top pl-safe-left p-3">
           <Button
             className="menu-button"
             onClick={() => {
@@ -79,8 +79,9 @@ function AppContent() {
       )}
 
       {/* Main app content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <nav className="px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-neutral-100 dark:bg-neutral-900 border-b border-neutral-200/60 dark:border-neutral-700/60 flex-shrink-0 nav-header">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Fixed navigation bar with glass effect */}
+        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-white/20 dark:bg-black/15 backdrop-blur-lg border-b border-white/30 dark:border-white/20 nav-header">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 w-1/3">
               {sidebarContent && (
@@ -119,6 +120,7 @@ function AppContent() {
           </div>
         </nav>
         
+        {/* Content area - no padding so it can scroll under the nav */}
         <div className="flex-1 overflow-hidden">
           {currentPage === "chat" && <ChatPage />}
           {currentPage === "translate" && <TranslatePage />}

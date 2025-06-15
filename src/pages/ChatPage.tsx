@@ -68,19 +68,19 @@ export function ChatPage() {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
-      {/* Toggle button - positioned at page level */}
-      <div className="hidden md:block absolute top-4 right-4 z-20">
-        <Button
-          onClick={toggleResponsive}
-          className="menu-button !p-1.5"
-          title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
-        >
-          {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-        </Button>
-      </div>
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Toggle button - positioned within content area */}
+        <div className="hidden md:block absolute top-20 right-6 z-20">
+          <Button
+            onClick={toggleResponsive}
+            className="menu-button !p-1.5"
+            title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
+          >
+            {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          </Button>
+        </div>
         {messages.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center pt-16">
             <div className="flex flex-col items-center text-center">
               <img src="/logo.svg" className="w-32 h-32 dark:opacity-80" alt="Wingman Chat" />
             </div>
@@ -91,7 +91,7 @@ export function ChatPage() {
             ref={containerRef}
             onScroll={handleScroll}
           >
-            <div className={`px-2 pt-4 pb-28 ${
+            <div className={`px-2 pt-20 pb-28 ${
               isResponsive 
                 ? 'max-w-full md:max-w-[80vw] mx-auto' 
                 : 'max-content-width'
