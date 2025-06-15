@@ -1,14 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
-import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, Maximize2, Minimize2, FileIcon, UploadIcon, XIcon, DownloadIcon } from "lucide-react";
+import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, XIcon, DownloadIcon } from "lucide-react";
 import { useNavigation } from "../contexts/NavigationContext";
-import { useResponsive } from "../hooks/useResponsive";
 import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
 
 export function TranslatePage() {
   const { setRightActions } = useNavigation();
-  const { isResponsive, toggleResponsive } = useResponsive();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Use translate context
@@ -104,28 +102,11 @@ export function TranslatePage() {
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Toggle button - positioned within content area */}
-        <div className="hidden md:block absolute top-20 right-6 z-20">
-          <Button
-            onClick={toggleResponsive}
-            className="menu-button !p-1.5"
-            title={isResponsive ? "Switch to compact mode" : "Switch to adaptive mode"}
-          >
-            {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </Button>
-        </div>
         
         {/* Text Translation Section */}
-        <div className={`w-full flex-grow overflow-hidden flex items-center justify-center ${
-          // Only add padding on larger screens, keep full width for medium screens to preserve side-by-side
-          'p-0 xl:p-4 pt-16 xl:pt-20'
-        }`}>
-          <div className={`w-full h-full ${
-            isResponsive 
-              ? 'lg:max-w-[85vw] lg:max-h-[85vh]' 
-              : 'lg:max-w-[1200px] lg:max-h-[800px]'
-          }`}>
-            <div className="relative h-full w-full border-0 lg:border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800 rounded-none lg:rounded-lg overflow-hidden shadow-none lg:shadow-md">
+        <div className="w-full flex-grow overflow-hidden flex items-center justify-center p-0 pt-16 xl:p-6 xl:pt-20">
+          <div className="w-full h-full xl:max-w-[1200px] xl:max-h-[800px]">
+            <div className="relative h-full w-full overflow-hidden border-0 bg-transparent xl:border xl:border-white/20 xl:dark:border-white/15 xl:bg-white/20 xl:dark:bg-black/15 xl:backdrop-blur-2xl xl:rounded-2xl xl:shadow-2xl xl:shadow-black/60 xl:dark:shadow-black/80">
               {/* Responsive layout: vertical stack on mobile/narrow screens, horizontal on wide screens */}
               <div className="h-full flex flex-col md:flex-row min-h-0">
                 {/* Source section */}
@@ -135,7 +116,7 @@ export function TranslatePage() {
                     {!selectedFile && (
                       <Button
                         onClick={handleFileUploadClick}
-                        className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none text-sm"
+                        className="inline-flex items-center gap-1 pl-2 pr-3 py-2 bg-white/25 dark:bg-black/15 backdrop-blur-lg border border-white/30 dark:border-white/20 hover:bg-white/40 dark:hover:bg-black/25 text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100 cursor-pointer focus:outline-none text-sm rounded-lg transition-all shadow-sm"
                         title="Select a file to translate (.docx, .pptx, .xlsx)"
                       >
                         <UploadIcon size={14} />
@@ -154,18 +135,18 @@ export function TranslatePage() {
                   {/* Show selected file in center */}
                   {selectedFile ? (
                     <div className="absolute inset-2 flex items-center justify-center">
-                      <div className="bg-neutral-300 dark:bg-neutral-700 p-4 rounded-lg shadow-lg flex flex-col items-center gap-3 relative">
+                      <div className="bg-white/30 dark:bg-black/20 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-white/40 dark:border-white/25 flex flex-col items-center gap-4 relative">
                         {/* Subtle delete button in top-right */}
                         <Button
                           onClick={handleFileClear}
-                          className="absolute -top-2 -right-2 !p-1 !bg-neutral-400 dark:!bg-neutral-600 hover:!bg-neutral-500 dark:hover:!bg-neutral-500 rounded-full opacity-70 hover:opacity-100 transition-opacity"
+                          className="absolute -top-2 -right-2 !p-1.5 !bg-white/40 dark:!bg-black/30 backdrop-blur-lg hover:!bg-white/60 dark:hover:!bg-black/40 rounded-full opacity-70 hover:opacity-100 transition-all border border-white/50 dark:border-white/30 shadow-sm"
                           title="Remove file"
                         >
                           <XIcon size={12} />
                         </Button>
                         
-                        <FileIcon size={48} className="text-neutral-600 dark:text-neutral-400" />
-                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 text-center max-w-[200px] truncate">
+                        <FileIcon size={48} className="text-neutral-700 dark:text-neutral-300" />
+                        <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 text-center max-w-[200px] truncate">
                           {selectedFile.name}
                         </span>
                       </div>
@@ -175,7 +156,7 @@ export function TranslatePage() {
                       value={sourceText}
                       onChange={(e) => setSourceText(e.target.value)}
                       placeholder="Enter text to translate..."
-                      className="absolute inset-0 w-full h-full p-2 pt-12 bg-transparent border-none resize-none focus:outline-none overflow-y-auto"
+                      className="absolute inset-0 w-full h-full p-2 pt-12 bg-transparent border-none resize-none focus:outline-none overflow-y-auto text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
                     />
                   )}
                 </div>
@@ -183,11 +164,11 @@ export function TranslatePage() {
                 {/* Translate button */}
                 <div className="relative flex items-center justify-center py-2 md:py-0 md:w-12 flex-shrink-0">
                   {/* Responsive divider: horizontal on mobile, vertical on desktop */}
-                  <div className="absolute md:inset-y-0 md:w-px md:left-1/2 md:-translate-x-px inset-x-0 h-px md:h-auto bg-neutral-300 dark:bg-neutral-600"></div>
+                  <div className="absolute md:inset-y-0 md:w-px md:left-1/2 md:-translate-x-px inset-x-0 h-px md:h-auto bg-white/30 dark:bg-white/20"></div>
                   
                   <Button
                     onClick={handleTranslateButtonClick}
-                    className="menu-button !bg-neutral-400 dark:!bg-neutral-900 z-10 relative"
+                    className="!bg-white/30 dark:!bg-black/20 backdrop-blur-lg border border-white/40 dark:border-white/25 hover:!bg-white/50 dark:hover:!bg-black/30 !text-neutral-700 dark:!text-neutral-300 hover:!text-neutral-900 dark:hover:!text-neutral-100 z-10 relative !p-2.5 rounded-lg shadow-lg transition-all"
                     title={selectedFile ? `Translate file to ${selectedLanguage?.name || 'Selected Language'}` : `Translate to ${selectedLanguage?.name || 'Selected Language'}`}
                     disabled={
                       isLoading || 
@@ -206,7 +187,7 @@ export function TranslatePage() {
                 <div className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">
                   <div className="absolute top-2 left-2 z-10">
                     <Menu>
-                      <MenuButton className="inline-flex items-center gap-1 pl-0 pr-1.5 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 cursor-pointer focus:outline-none text-sm">
+                      <MenuButton className="inline-flex items-center gap-1 pl-2 pr-3 py-2 bg-white/25 dark:bg-black/15 backdrop-blur-lg border border-white/30 dark:border-white/20 hover:bg-white/40 dark:hover:bg-black/25 text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100 cursor-pointer focus:outline-none text-sm rounded-lg transition-all shadow-sm">
                         <GlobeIcon size={14} />
                         <span>
                           {selectedLanguage?.name || 'Select Language'}
@@ -215,13 +196,13 @@ export function TranslatePage() {
                       <MenuItems
                         transition
                         anchor="bottom start"
-                        className="!max-h-[50vh] mt-2 rounded border bg-neutral-200 dark:bg-neutral-900 border-neutral-700 overflow-y-auto shadow-lg z-50"
+                        className="!max-h-[50vh] mt-2 rounded-lg bg-white/20 dark:bg-black/15 backdrop-blur-2xl border border-white/30 dark:border-white/20 overflow-y-auto shadow-2xl shadow-black/60 dark:shadow-black/80 z-50"
                       >
                         {languages.map((lang) => (
                           <MenuItem key={lang.code}>
                             <Button
                               onClick={() => setTargetLang(lang.code)}
-                              className="group flex w-full items-center px-4 py-2 data-[focus]:bg-neutral-300 dark:text-neutral-200 dark:data-[focus]:bg-[#2c2c2e] cursor-pointer"
+                              className="group flex w-full items-center px-4 py-2 data-[focus]:bg-white/30 dark:data-[focus]:bg-black/25 text-neutral-800 dark:text-neutral-200 cursor-pointer transition-all"
                             >
                               {lang.name}
                             </Button>
@@ -234,25 +215,25 @@ export function TranslatePage() {
                     value={translatedText}
                     readOnly
                     placeholder={selectedFile ? "" : "Translation will appear here..."}
-                    className="absolute inset-0 w-full h-full p-2 pt-12 bg-transparent border-none resize-none focus:outline-none overflow-y-auto"
+                    className="absolute inset-0 w-full h-full p-2 pt-12 bg-transparent border-none resize-none focus:outline-none overflow-y-auto text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
                   />
                   
                   {/* Show download link for translated files */}
                   {translatedFileUrl && translatedFileName && (
                     <div className="absolute inset-2 flex items-center justify-center">
                       <div 
-                        className="bg-neutral-300 dark:bg-neutral-700 p-4 rounded-lg shadow-lg flex flex-col items-center gap-3 cursor-pointer hover:bg-neutral-400 dark:hover:bg-neutral-600 transition-colors"
+                        className="bg-white/30 dark:bg-black/20 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-white/40 dark:border-white/25 flex flex-col items-center gap-4 cursor-pointer hover:bg-white/40 dark:hover:bg-black/30 transition-all"
                         onClick={handleDownload} 
                         title="Download translated file"
                       >
                         <div className="relative">
-                          <FileIcon size={48} className="text-neutral-600 dark:text-neutral-400" />
+                          <FileIcon size={48} className="text-neutral-700 dark:text-neutral-300" />
                           {/* Simple download icon in center */}
                           <div className="absolute inset-0 flex items-center justify-center">
                             <DownloadIcon size={16} className="text-neutral-800 dark:text-neutral-200" />
                           </div>
                         </div>
-                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 text-center max-w-[200px] truncate">
+                        <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 text-center max-w-[200px] truncate">
                           {translatedFileName}
                         </span>
                       </div>
@@ -262,9 +243,9 @@ export function TranslatePage() {
                   {/* Show loading state for file translation */}
                   {selectedFile && isLoading && (
                     <div className="absolute inset-2 flex items-center justify-center">
-                      <div className="bg-neutral-300 dark:bg-neutral-700 p-4 rounded-lg shadow-lg flex flex-col items-center gap-3">
-                        <Loader2 size={48} className="animate-spin text-neutral-600 dark:text-neutral-400" />
-                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 text-center">
+                      <div className="bg-white/30 dark:bg-black/20 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-white/40 dark:border-white/25 flex flex-col items-center gap-4">
+                        <Loader2 size={48} className="animate-spin text-neutral-700 dark:text-neutral-300" />
+                        <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 text-center">
                           Translating...
                         </span>
                       </div>
@@ -275,18 +256,18 @@ export function TranslatePage() {
                   {selectedFile && !isLoading && !translatedFileUrl && (
                     <div className="absolute inset-2 flex items-center justify-center">
                       <div 
-                        className="bg-neutral-100 dark:bg-neutral-900 border-2 border-dashed border-neutral-400 dark:border-neutral-600 p-4 rounded-lg flex flex-col items-center gap-3 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+                        className="bg-white/20 dark:bg-black/10 backdrop-blur-lg border-2 border-dashed border-white/50 dark:border-white/30 p-6 rounded-xl flex flex-col items-center gap-4 cursor-pointer hover:bg-white/30 dark:hover:bg-black/20 transition-all"
                         onClick={handleTranslateButtonClick} 
                         title="Click to translate file"
                       >
                         <div className="relative">
-                          <FileIcon size={48} className="text-neutral-500 dark:text-neutral-500" />
+                          <FileIcon size={48} className="text-neutral-600 dark:text-neutral-400" />
                           {/* Simple translate icon in center */}
                           <div className="absolute inset-0 flex items-center justify-center">
                             <PilcrowRightIcon size={16} className="text-neutral-700 dark:text-neutral-300" />
                           </div>
                         </div>
-                        <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400 text-center max-w-[200px] truncate">
+                        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300 text-center max-w-[200px] truncate">
                           {getCandidateFileName()}
                         </span>
                       </div>
