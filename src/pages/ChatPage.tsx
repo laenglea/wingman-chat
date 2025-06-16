@@ -70,7 +70,7 @@ export function ChatPage() {
     <div className="h-full w-full flex flex-col overflow-hidden relative">
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Toggle button - positioned within content area */}
-        <div className="hidden md:block absolute top-20 right-6 z-20">
+        <div className="hidden md:block absolute top-18 right-4 z-20">
           <Button
             onClick={toggleResponsive}
             className="menu-button !p-1.5"
