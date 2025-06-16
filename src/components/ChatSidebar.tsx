@@ -1,14 +1,28 @@
-import { Trash, Menu as MenuIcon, MoreHorizontal, GitBranch } from "lucide-react";
+import { Trash, Menu as MenuIcon, MoreVertical, GitBranch } from "lucide-react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { getConfig } from "../config";
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { useChat } from "../hooks/useChat";
 import { useSidebar } from "../contexts/SidebarContext";
 
 export function ChatSidebar() {
   const config = getConfig();
   const { chats, chat, selectChat, deleteChat, createChat, updateChat } = useChat();
-  const { setShowSidebar } = useSidebar();
+  const { setShowSidebar, showSidebar } = useSidebar();
+  const [shouldAnimateItems, setShouldAnimateItems] = useState(false);
+  
+  // Trigger item animations when sidebar opens
+  useEffect(() => {
+    if (showSidebar) {
+      // Small delay to ensure sidebar slide animation starts first
+      const timer = setTimeout(() => {
+        setShouldAnimateItems(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    } else {
+      setShouldAnimateItems(false);
+    }
+  }, [showSidebar]);
   
   // sort once per chats change
   const sortedChats = useMemo(
@@ -38,7 +52,10 @@ export function ChatSidebar() {
   }, [createChat, updateChat, setShowSidebar]);
 
   return (
-    <div className="flex flex-col h-full w-full bg-transparent">
+    <div 
+      className="flex flex-col h-full w-full bg-neutral-100/50 dark:bg-neutral-950/80"
+      onMouseLeave={() => setShowSidebar(false)}
+    >
       {/* Static header with title and hamburger menu */}
       <div 
         className="flex items-center justify-between px-2 py-2.5 pt-safe-top pl-safe-left pr-safe-right flex-shrink-0 min-h-14"
@@ -56,7 +73,7 @@ export function ChatSidebar() {
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto sidebar-scroll">
         <ul className="flex flex-col gap-2 py-2 px-2 pl-safe-left">
-        {sortedChats.map((chatItem) => (
+        {sortedChats.map((chatItem, index) => (
           <li
             key={chatItem.id}
             onClick={() => {
@@ -66,22 +83,23 @@ export function ChatSidebar() {
                 setShowSidebar(false);
               }
             }}
-            className={`flex items-center justify-between sidebar-item cursor-pointer relative flex-shrink-0 group ${
+            style={{ '--item-index': index } as React.CSSProperties}
+            className={`flex items-center justify-between sidebar-item-base cursor-pointer relative flex-shrink-0 group ${
               chatItem.id === chat?.id ? "sidebar-item-selected" : ""
-            }`}
+            } ${shouldAnimateItems ? "sidebar-item-animate" : "sidebar-item-hidden"}`}
           >
             <div
-              className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap pr-2 text-neutral-800 dark:text-neutral-200"
+              className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-neutral-800 dark:text-neutral-200"
               title={chatItem.title ?? "Untitled"}
             >
               {chatItem.title ?? "Untitled"}
             </div>
             <Menu>
               <MenuButton
-                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 cursor-pointer shrink-0 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 p-1 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 cursor-pointer shrink-0 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 p-0 rounded hover:bg-white/30 dark:hover:bg-black/20"
                 onClick={(e) => e.stopPropagation()}
               >
-                <MoreHorizontal size={16} />
+                <MoreVertical size={16} />
               </MenuButton>
               <MenuItems
                 transition
