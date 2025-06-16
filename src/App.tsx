@@ -81,39 +81,48 @@ function AppContent() {
       {/* Main app content */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Fixed navigation bar with glass effect */}
-        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-white/20 dark:bg-black/15 backdrop-blur-lg border-b border-white/30 dark:border-white/20 nav-header">
+        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-white/20 dark:bg-black/15 backdrop-blur-lg nav-header">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 w-1/3">
-              {sidebarContent && (
-                <Button
-                  className={`menu-button hidden md:flex ${showSidebar ? 'sidebar-open' : ''}`}
-                  onClick={toggleSidebar}
-                  aria-label={showSidebar ? 'Close sidebar' : 'Open sidebar'}
-                >
-                  <MenuIcon size={20} />
-                </Button>
-              )}
+            <div className="flex items-center">
+              {/* Fixed space for hamburger menu - always reserve the space */}
+              <div className="w-12 flex justify-start">
+                {sidebarContent && (
+                  <Button
+                    className={`menu-button hidden md:flex ${showSidebar ? 'sidebar-open' : ''}`}
+                    onClick={toggleSidebar}
+                    aria-label={showSidebar ? 'Close sidebar' : 'Open sidebar'}
+                  >
+                    <MenuIcon size={20} />
+                  </Button>
+                )}
+              </div>
+              
+              {/* Tab buttons at fixed position */}
+              <div className="flex items-center">
+                {pages.map(({ key, label, icon }) => (
+                  <Button
+                    key={key}
+                    onClick={() => setCurrentPage(key)}
+                    className={`px-3 py-2 font-medium transition-colors flex items-center gap-2 cursor-pointer relative ${
+                      currentPage === key
+                        ? "text-neutral-900 dark:text-neutral-100"
+                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    {icon}
+                    <span className="hidden sm:inline">{label}</span>
+                    {/* Underline for active tab */}
+                    {currentPage === key && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-neutral-100"></div>
+                    )}
+                  </Button>
+                ))}
+              </div>
+              
               {leftActions}
             </div>
             
-            <div className="flex space-x-1 sm:space-x-2">
-              {pages.map(({ key, label, icon }) => (
-                <Button
-                  key={key}
-                  onClick={() => setCurrentPage(key)}
-                  className={`px-2 py-2 sm:px-4 font-medium rounded transition-colors flex items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
-                    currentPage === key
-                      ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-200"
-                      : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-800"
-                  }`}
-                >
-                  {icon}
-                  <span className="hidden sm:inline">{label}</span>
-                </Button>
-              ))}
-            </div>
-            
-            <div className="flex items-center gap-2 w-1/3 justify-end">
+            <div className="flex items-center gap-4 justify-end">
               <ThemeToggle />
               {rightActions}
             </div>
