@@ -1,13 +1,13 @@
-import { Trash, Menu as MenuIcon, MoreHorizontal } from "lucide-react";
+import { Trash, Menu as MenuIcon, MoreHorizontal, GitBranch } from "lucide-react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { getConfig } from "../config";
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { useChat } from "../hooks/useChat";
 import { useSidebar } from "../contexts/SidebarContext";
 
 export function ChatSidebar() {
   const config = getConfig();
-  const { chats, chat, selectChat, deleteChat } = useChat();
+  const { chats, chat, selectChat, deleteChat, createChat, updateChat } = useChat();
   const { setShowSidebar } = useSidebar();
   
   // sort once per chats change
@@ -15,6 +15,27 @@ export function ChatSidebar() {
     () => [...chats].sort((a, b) => new Date(b.updated || b.created || 0).getTime() - new Date(a.updated || a.created || 0).getTime()),
     [chats]
   );
+
+  // Function to fork a chat (create a new chat with copied messages)
+  const forkChat = useCallback((chatToFork: typeof chats[0]) => {
+    const newChat = createChat();
+    
+    // Copy all the properties from the original chat
+    updateChat(newChat.id, {
+      title: chatToFork.title ? `${chatToFork.title} (Fork)` : "Forked Chat",
+      model: chatToFork.model,
+      messages: [...chatToFork.messages], // Create a copy of the messages array
+    });
+    
+    // The chat is already selected by createChat, but we need to ensure it's visible
+    // Use a small delay to ensure state updates have propagated
+    requestAnimationFrame(() => {
+      // Close sidebar on mobile after forking
+      if (window.innerWidth < 768) {
+        setShowSidebar(false);
+      }
+    });
+  }, [createChat, updateChat, setShowSidebar]);
 
   return (
     <div className="flex flex-col h-full w-full overflow-y-auto sidebar-scroll bg-transparent">
@@ -64,6 +85,15 @@ export function ChatSidebar() {
                 anchor="bottom end"
                 className="w-32 origin-top-right rounded-md border border-white/20 dark:border-white/15 bg-white/90 dark:bg-black/90 backdrop-blur-lg shadow-lg transition duration-100 ease-out [--anchor-gap:var(--spacing-1)] focus:outline-none data-[closed]:scale-95 data-[closed]:opacity-0 z-50"
               >
+                <MenuItem>
+                  <Button
+                    onClick={() => forkChat(chatItem)}
+                    className="group flex w-full items-center gap-2 rounded-md py-2 px-3 data-[focus]:bg-neutral-500/10 dark:data-[focus]:bg-neutral-500/20 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
+                  >
+                    <GitBranch size={14} />
+                    Fork
+                  </Button>
+                </MenuItem>
                 <MenuItem>
                   <Button
                     onClick={() => deleteChat(chatItem.id)}
