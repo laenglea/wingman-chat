@@ -1,5 +1,5 @@
-import { Trash, Menu as MenuIcon } from "lucide-react";
-import { Button } from "@headlessui/react";
+import { Trash, Menu as MenuIcon, MoreHorizontal } from "lucide-react";
+import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { getConfig } from "../config";
 import { useMemo } from "react";
 import { useChat } from "../hooks/useChat";
@@ -42,7 +42,7 @@ export function ChatSidebar() {
                 setShowSidebar(false);
               }
             }}
-            className={`flex items-center justify-between sidebar-item cursor-pointer relative flex-shrink-0 ${
+            className={`flex items-center justify-between sidebar-item cursor-pointer relative flex-shrink-0 group ${
               chatItem.id === chat?.id ? "sidebar-item-selected" : ""
             }`}
           >
@@ -52,15 +52,29 @@ export function ChatSidebar() {
             >
               {chatItem.title ?? "Untitled"}
             </div>
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteChat(chatItem.id);
-              }}
-              className="opacity-0 hover:opacity-100 transition-opacity duration-200 cursor-pointer shrink-0 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-            >
-              <Trash size={16} />
-            </Button>
+            <Menu>
+              <MenuButton
+                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200 cursor-pointer shrink-0 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 p-1 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal size={16} />
+              </MenuButton>
+              <MenuItems
+                transition
+                anchor="bottom end"
+                className="w-32 origin-top-right rounded-md border border-white/20 dark:border-white/15 bg-white/90 dark:bg-black/90 backdrop-blur-lg shadow-lg transition duration-100 ease-out [--anchor-gap:var(--spacing-1)] focus:outline-none data-[closed]:scale-95 data-[closed]:opacity-0 z-50"
+              >
+                <MenuItem>
+                  <Button
+                    onClick={() => deleteChat(chatItem.id)}
+                    className="group flex w-full items-center gap-2 rounded-md py-2 px-3 data-[focus]:bg-red-500/10 dark:data-[focus]:bg-red-500/20 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 focus:outline-none cursor-pointer"
+                  >
+                    <Trash size={14} />
+                    Delete
+                  </Button>
+                </MenuItem>
+              </MenuItems>
+            </Menu>
           </li>
         ))}
       </ul>
