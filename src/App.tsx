@@ -41,7 +41,7 @@ function AppContent() {
       {sidebarContent && !showSidebar && (
         <div className="fixed top-0 left-0 z-40 md:hidden pt-safe-top pl-safe-left p-3">
           <Button
-            className="menu-button"
+            className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
             onClick={() => {
               // Provide haptic feedback on supported devices
               if ('vibrate' in navigator) {
@@ -68,9 +68,9 @@ function AppContent() {
       {sidebarContent && (
         <aside
           className={`
-            h-full bg-white/20 dark:bg-black/15 backdrop-blur-lg border-r border-neutral-300/60 dark:border-white/20
-            fixed left-0 top-0 z-50 w-64
-            transform transition-transform duration-300 ease-in-out
+            h-full bg-white/20 dark:bg-black/15 backdrop-blur-lg shadow-2xl
+            fixed left-0 top-0 z-50 w-80
+            transform transition-transform duration-500 ease-in-out
             ${showSidebar ? 'translate-x-0' : '-translate-x-full'}
           `}
         >
@@ -81,14 +81,15 @@ function AppContent() {
       {/* Main app content */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {/* Fixed navigation bar with glass effect */}
-        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-white/20 dark:bg-black/15 backdrop-blur-lg nav-header">
+        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-neutral-50/60 dark:bg-neutral-950/80 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-900 nav-header">
           <div className="flex items-center justify-between">
-            <div className="flex items-center">
+            {/* Left section */}
+            <div className="flex items-center flex-1">
               {/* Fixed space for hamburger menu - always reserve the space */}
               <div className="w-12 flex justify-start">
                 {sidebarContent && (
                   <Button
-                    className={`menu-button hidden md:flex ${showSidebar ? 'sidebar-open' : ''}`}
+                    className={`p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer hidden md:flex ${showSidebar ? 'sidebar-open' : ''}`}
                     onClick={toggleSidebar}
                     aria-label={showSidebar ? 'Close sidebar' : 'Open sidebar'}
                   >
@@ -96,33 +97,33 @@ function AppContent() {
                   </Button>
                 )}
               </div>
-              
-              {/* Tab buttons at fixed position */}
-              <div className="flex items-center">
-                {pages.map(({ key, label, icon }) => (
-                  <Button
-                    key={key}
-                    onClick={() => setCurrentPage(key)}
-                    className={`px-3 py-2 font-medium transition-colors flex items-center gap-2 cursor-pointer relative ${
-                      currentPage === key
-                        ? "text-neutral-900 dark:text-neutral-100"
-                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-                    }`}
-                  >
-                    {icon}
-                    <span className="hidden sm:inline">{label}</span>
-                    {/* Underline for active tab */}
-                    {currentPage === key && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-neutral-100"></div>
-                    )}
-                  </Button>
-                ))}
-              </div>
-              
               {leftActions}
             </div>
             
-            <div className="flex items-center gap-4 justify-end">
+            {/* Center section - Tab buttons */}
+            <div className="flex items-center justify-center">
+              {pages.map(({ key, label, icon }) => (
+                <Button
+                  key={key}
+                  onClick={() => setCurrentPage(key)}
+                  className={`px-3 py-2 font-medium transition-colors flex items-center gap-2 cursor-pointer relative ${
+                    currentPage === key
+                      ? "text-neutral-900 dark:text-neutral-100"
+                      : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+                  }`}
+                >
+                  {icon}
+                  <span className="hidden sm:inline">{label}</span>
+                  {/* Underline for active tab */}
+                  {currentPage === key && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-neutral-100"></div>
+                  )}
+                </Button>
+              ))}
+            </div>
+            
+            {/* Right section */}
+            <div className="flex items-center gap-2 justify-end flex-1">
               <ThemeToggle />
               {rightActions}
             </div>

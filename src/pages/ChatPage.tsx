@@ -31,7 +31,7 @@ export function ChatPage() {
   useEffect(() => {
     setRightActions(
       <Button
-        className="menu-button"
+        className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
         onClick={createChat}
       >
         <PlusIcon size={20} />
@@ -73,7 +73,7 @@ export function ChatPage() {
         <div className="hidden md:block absolute top-18 right-4 z-20">
           <Button
             onClick={toggleResponsive}
-            className="menu-button !p-1.5"
+            className="p-1.5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
             title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
           >
             {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
