@@ -38,9 +38,10 @@ export function ChatSidebar() {
   }, [createChat, updateChat, setShowSidebar]);
 
   return (
-    <div className="flex flex-col h-full w-full overflow-y-auto sidebar-scroll bg-transparent">
+    <div className="flex flex-col h-full w-full bg-transparent">
+      {/* Static header with title and hamburger menu */}
       <div 
-        className="flex items-center justify-between px-2 py-2 pt-safe-top pl-safe-left pr-safe-right flex-shrink-0 min-h-12"
+        className="flex items-center justify-between px-2 py-2.5 pt-safe-top pl-safe-left pr-safe-right flex-shrink-0 min-h-14"
       >
         <h2 className="text-xl font-semibold px-2 whitespace-nowrap overflow-hidden text-ellipsis text-neutral-800 dark:text-neutral-200">{config.title}</h2>
         <Button
@@ -52,7 +53,9 @@ export function ChatSidebar() {
         </Button>
       </div>
       
-      <ul className="flex flex-col gap-2 py-2 px-2 pl-safe-left">
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto sidebar-scroll">
+        <ul className="flex flex-col gap-2 py-2 px-2 pl-safe-left">
         {sortedChats.map((chatItem) => (
           <li
             key={chatItem.id}
@@ -108,6 +111,7 @@ export function ChatSidebar() {
           </li>
         ))}
       </ul>
+      </div>
     </div>
   );
 }
