@@ -9,6 +9,7 @@ import { useChat } from "../hooks/useChat";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
+import { useBackground } from "../hooks/useBackground";
 
 export function ChatPage() {
   const {
@@ -29,7 +30,6 @@ export function ChatPage() {
 
   // Animation state for chat input
   const [isAnimating, setIsAnimating] = useState(false);
-  const [showShadow, setShowShadow] = useState(false);
   const prevMessagesCountRef = useRef(0);
 
   // Set up navigation actions (only once on mount)
@@ -80,36 +80,23 @@ export function ChatPage() {
         setIsAnimating(false);
       }, 600); // Match the CSS transition duration
       
-      // Show shadow after animation completes + longer delay to ensure visual movement is done
-      const shadowTimer = setTimeout(() => {
-        setShowShadow(true);
-      }, 850); // 250ms after animation completes to ensure no rolling effect
-      
       return () => {
         clearTimeout(animationTimer);
-        clearTimeout(shadowTimer);
       };
-    }
-    // Reset shadow when going back to no messages
-    if (messages.length === 0) {
-      setShowShadow(false);
     }
     prevMessagesCountRef.current = messages.length;
   }, [messages.length]);
 
-  // Handle shadow state when switching to chats that already have messages
-  useEffect(() => {
-    if (messages.length > 0 && prevMessagesCountRef.current > 0) {
-      // If switching to a chat that already has messages, show shadow immediately
-      setShowShadow(true);
-    }
-  }, [chat?.id, messages.length]);
-
-  // Show shadow based on whether chat has messages (for immediate visibility on existing chats)
-  const hasMessages = messages.length > 0;
+  // Background styles and className from useBackground hook
+  const { backgroundStyles, backgroundClassName } = useBackground();
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
+      {/* Background image - only show when no messages, logic handled here */}
+      {messages.length === 0 && (
+        <div className={backgroundClassName} style={backgroundStyles} />
+      )}
+      
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Toggle button - positioned within content area */}
         <div className="hidden md:block absolute top-18 right-4 z-20">
@@ -152,10 +139,6 @@ export function ChatPage() {
       <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out ${
         messages.length === 0 ? 'bottom-1/2 transform translate-y-1/2' : 'bottom-0'
       } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
-        {/* Gradient overlay for enhanced glass effect - show immediately for existing chats, with delay for new messages */}
-        {(hasMessages && !isAnimating) || showShadow ? (
-          <div className="absolute inset-0 bg-gradient-to-t from-neutral-50/90 via-neutral-50/40 to-transparent dark:from-neutral-950/90 dark:via-neutral-950/40 dark:to-transparent pointer-events-none transition-opacity duration-300 ease-out" />
-        ) : null}
         <div className={`relative pointer-events-auto ${
           isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
         } ${messages.length === 0 ? 'max-w-4xl' : ''}`}>

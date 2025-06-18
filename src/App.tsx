@@ -9,7 +9,6 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ChatProvider } from "./contexts/ChatContext";
 import { TranslateProvider } from "./contexts/TranslateContext";
 import { ThemeToggle } from "./components/ThemeToggle";
-import { useChat } from "./hooks/useChat";
 
 type Page = "chat" | "translate";
 
@@ -17,25 +16,20 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
-  const { messages } = useChat();
-  
-  // Background opacity based on message count: intense when no messages, subtle when messages exist
-  const hasMessages = messages.length > 0;
-
-  // Random background image for the app
-  const [randomBackgroundImage] = useState(() => {
-    const imageNumber = Math.floor(Math.random() * 19) + 1;
-    return `/backgrounds/image_${imageNumber.toString().padStart(2, '0')}.png`;
-  });
 
   // Handle responsive sidebar behavior
   useEffect(() => {
     const handleResize = () => {
+      const isSmall = window.innerWidth < 768;
+      
       // Auto-close sidebar on mobile screens
-      if (window.innerWidth < 768 && showSidebar) {
+      if (isSmall && showSidebar) {
         setShowSidebar(false);
       }
     };
+
+    // Set initial screen size
+    handleResize();
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -48,22 +42,6 @@ function AppContent() {
 
   return (
     <div className="h-dvh w-dvw flex overflow-hidden relative">
-      {/* Global background image - strong when no messages, subtle when messages exist */}
-      <div 
-        className={`absolute inset-0 bg-cover bg-center bg-no-repeat z-0 transition-opacity duration-700 ease-out ${
-          hasMessages ? 'opacity-40' : 'opacity-70'
-        }`}
-        style={{ 
-          backgroundImage: `url(${randomBackgroundImage})`
-        }}
-      />
-      {/* Dynamic overlay for readability - stronger when no messages */}
-      <div className={`absolute inset-0 z-0 transition-opacity duration-700 ease-out ${
-        hasMessages 
-          ? 'bg-black/20 dark:bg-black/70' 
-          : 'bg-white/0 dark:bg-black/30'
-      }`} />
-      
       {/* Fixed hamburger button for mobile - only visible when sidebar is closed */}
       {sidebarContent && !showSidebar && (
         <div className="fixed top-0 left-0 z-40 md:hidden pt-safe-top pl-safe-left p-3">
