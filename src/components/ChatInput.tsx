@@ -297,7 +297,7 @@ export function ChatInput() {
     <form onSubmit={handleSubmit}>
       <div 
         ref={containerRef}
-        className="chat-input-container border border-neutral-200 dark:border-neutral-900 bg-white/20 dark:bg-black/15 backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80"
+        className="chat-input-container border border-neutral-200 dark:border-neutral-900 bg-white/30 dark:bg-black/20 backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80"
       >
         <input
           type="file"
