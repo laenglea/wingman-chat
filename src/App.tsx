@@ -9,6 +9,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ChatProvider } from "./contexts/ChatContext";
 import { TranslateProvider } from "./contexts/TranslateContext";
 import { ThemeToggle } from "./components/ThemeToggle";
+import { useChat } from "./hooks/useChat";
 
 type Page = "chat" | "translate";
 
@@ -16,6 +17,16 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
+  const { messages } = useChat();
+  
+  // Background opacity based on message count: intense when no messages, subtle when messages exist
+  const hasMessages = messages.length > 0;
+
+  // Random background image for the app
+  const [randomBackgroundImage] = useState(() => {
+    const imageNumber = Math.floor(Math.random() * 19) + 1;
+    return `/backgrounds/image_${imageNumber.toString().padStart(2, '0')}.png`;
+  });
 
   // Handle responsive sidebar behavior
   useEffect(() => {
@@ -37,6 +48,22 @@ function AppContent() {
 
   return (
     <div className="h-dvh w-dvw flex overflow-hidden relative">
+      {/* Global background image - strong when no messages, subtle when messages exist */}
+      <div 
+        className={`absolute inset-0 bg-cover bg-center bg-no-repeat z-0 transition-opacity duration-700 ease-out ${
+          hasMessages ? 'opacity-40' : 'opacity-70'
+        }`}
+        style={{ 
+          backgroundImage: `url(${randomBackgroundImage})`
+        }}
+      />
+      {/* Dynamic overlay for readability - stronger when no messages */}
+      <div className={`absolute inset-0 z-0 transition-opacity duration-700 ease-out ${
+        hasMessages 
+          ? 'bg-black/20 dark:bg-black/70' 
+          : 'bg-white/0 dark:bg-black/30'
+      }`} />
+      
       {/* Fixed hamburger button for mobile - only visible when sidebar is closed */}
       {sidebarContent && !showSidebar && (
         <div className="fixed top-0 left-0 z-40 md:hidden pt-safe-top pl-safe-left p-3">
@@ -79,7 +106,7 @@ function AppContent() {
       )}
 
       {/* Main app content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative z-10">
         {/* Fixed navigation bar with glass effect */}
         <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-neutral-50/60 dark:bg-neutral-950/80 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-900 nav-header">
           <div className="flex items-center justify-between">
@@ -96,6 +123,14 @@ function AppContent() {
                     <MenuIcon size={20} />
                   </Button>
                 )}
+              </div>
+              {/* Logo */}
+              <div className="flex items-center ml-2">
+                <img 
+                  src="/logo.svg" 
+                  alt="Wingman Chat" 
+                  className="h-8 w-8 text-neutral-600 dark:text-neutral-400"
+                />
               </div>
               {leftActions}
             </div>

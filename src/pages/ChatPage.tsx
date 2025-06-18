@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus as PlusIcon, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
@@ -26,6 +26,11 @@ export function ChatPage() {
   const { containerRef, bottomRef, handleScroll, enableAutoScroll } = useAutoScroll({
     dependencies: [chat, messages],
   });
+
+  // Animation state for chat input
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [showShadow, setShowShadow] = useState(false);
+  const prevMessagesCountRef = useRef(0);
 
   // Set up navigation actions (only once on mount)
   useEffect(() => {
@@ -66,6 +71,43 @@ export function ChatPage() {
     prevMessagesLengthRef.current = messages.length;
   }, [messages.length, enableAutoScroll]);
 
+  // Handle animation when first message is added
+  useEffect(() => {
+    if (prevMessagesCountRef.current === 0 && messages.length > 0) {
+      setIsAnimating(true);
+      // Reset animation state after animation completes
+      const animationTimer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 600); // Match the CSS transition duration
+      
+      // Show shadow after animation completes + longer delay to ensure visual movement is done
+      const shadowTimer = setTimeout(() => {
+        setShowShadow(true);
+      }, 850); // 250ms after animation completes to ensure no rolling effect
+      
+      return () => {
+        clearTimeout(animationTimer);
+        clearTimeout(shadowTimer);
+      };
+    }
+    // Reset shadow when going back to no messages
+    if (messages.length === 0) {
+      setShowShadow(false);
+    }
+    prevMessagesCountRef.current = messages.length;
+  }, [messages.length]);
+
+  // Handle shadow state when switching to chats that already have messages
+  useEffect(() => {
+    if (messages.length > 0 && prevMessagesCountRef.current > 0) {
+      // If switching to a chat that already has messages, show shadow immediately
+      setShowShadow(true);
+    }
+  }, [chat?.id, messages.length]);
+
+  // Show shadow based on whether chat has messages (for immediate visibility on existing chats)
+  const hasMessages = messages.length > 0;
+
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -80,9 +122,9 @@ export function ChatPage() {
           </Button>
         </div>
         {messages.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center pt-16">
-            <div className="flex flex-col items-center text-center">
-              <img src="/logo.svg" className="w-32 h-32 dark:opacity-80" alt="Wingman Chat" />
+          <div className="flex-1 flex items-center justify-center pt-16 relative">
+            <div className="flex flex-col items-center text-center relative z-10 w-full max-w-4xl px-4">
+              {/* Content will be centered here when needed */}
             </div>
           </div>
         ) : (
@@ -107,10 +149,16 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className="absolute bottom-0 left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none">
-        {/* Gradient overlay for enhanced glass effect */}
-        <div className="absolute inset-0 bg-gradient-to-t from-neutral-50/90 via-neutral-50/40 to-transparent dark:from-neutral-950/90 dark:via-neutral-950/40 dark:to-transparent pointer-events-none" />
-        <div className={`relative pointer-events-auto ${isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'}`}>
+      <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out ${
+        messages.length === 0 ? 'bottom-1/2 transform translate-y-1/2' : 'bottom-0'
+      } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
+        {/* Gradient overlay for enhanced glass effect - show immediately for existing chats, with delay for new messages */}
+        {(hasMessages && !isAnimating) || showShadow ? (
+          <div className="absolute inset-0 bg-gradient-to-t from-neutral-50/90 via-neutral-50/40 to-transparent dark:from-neutral-950/90 dark:via-neutral-950/40 dark:to-transparent pointer-events-none transition-opacity duration-300 ease-out" />
+        ) : null}
+        <div className={`relative pointer-events-auto ${
+          isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
+        } ${messages.length === 0 ? 'max-w-4xl' : ''}`}>
           <ChatInput />
         </div>
       </footer>
