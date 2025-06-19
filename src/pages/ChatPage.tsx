@@ -129,7 +129,7 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out ${
+      <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out z-20 ${
         messages.length === 0 ? 'bottom-1/3 transform translate-y-1/2' : 'bottom-0'
       } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
         <div className={`relative pointer-events-auto ${
