@@ -13,6 +13,9 @@ export default {
         'safe-left': 'env(safe-area-inset-left, 0px)',
         'safe-right': 'env(safe-area-inset-right, 0px)',
       },
+      transitionDuration: {
+        '600': '600ms',
+      },
     },
   },
   plugins: [],

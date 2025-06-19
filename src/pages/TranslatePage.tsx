@@ -85,7 +85,7 @@ export function TranslatePage() {
   useEffect(() => {
     setRightActions(
       <Button
-        className="menu-button"
+        className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
         onClick={handleReset}
         title="Clear translation"
       >
@@ -106,7 +106,7 @@ export function TranslatePage() {
         {/* Text Translation Section */}
         <div className="w-full flex-grow overflow-hidden flex items-center justify-center p-0 pt-16 xl:p-6 xl:pt-20">
           <div className="w-full h-full xl:max-w-[1200px] xl:max-h-[800px]">
-            <div className="relative h-full w-full overflow-hidden border-0 bg-transparent xl:border xl:border-white/20 xl:dark:border-white/15 xl:bg-white/20 xl:dark:bg-black/15 xl:backdrop-blur-2xl xl:rounded-2xl xl:shadow-2xl xl:shadow-black/60 xl:dark:shadow-black/80">
+            <div className="relative h-full w-full overflow-hidden border-0 bg-transparent xl:border xl:border-neutral-200 xl:dark:border-neutral-900 xl:bg-white/20 xl:dark:bg-black/15 xl:backdrop-blur-2xl xl:rounded-2xl xl:shadow-2xl xl:shadow-black/60 xl:dark:shadow-black/80">
               {/* Responsive layout: vertical stack on mobile/narrow screens, horizontal on wide screens */}
               <div className="h-full flex flex-col md:flex-row min-h-0">
                 {/* Source section */}
