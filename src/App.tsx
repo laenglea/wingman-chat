@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { MessageCircle, Languages, Menu as MenuIcon } from "lucide-react";
+import { MessageCircle, Languages, PanelLeftOpen, PanelRightOpen } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { ChatPage } from "./pages/ChatPage";
 import { TranslatePage } from "./pages/TranslatePage";
 import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { NavigationProvider, useNavigation } from "./contexts/NavigationContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { LayoutProvider } from "./contexts/LayoutContext";
 import { ChatProvider } from "./contexts/ChatContext";
 import { TranslateProvider } from "./contexts/TranslateContext";
-import { ThemeToggle } from "./components/ThemeToggle";
+import { SettingsButton } from "./components/SettingsButton";
 
 type Page = "chat" | "translate";
 
@@ -17,23 +18,19 @@ function AppContent() {
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
 
-  // Handle responsive sidebar behavior
+  // Auto-close sidebar on mobile screens on mount and resize
   useEffect(() => {
     const handleResize = () => {
-      const isSmall = window.innerWidth < 768;
-      
-      // Auto-close sidebar on mobile screens
-      if (isSmall && showSidebar) {
+      if (window.innerWidth < 768) {
         setShowSidebar(false);
       }
     };
 
-    // Set initial screen size
     handleResize();
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [showSidebar, setShowSidebar]);
+  }, [setShowSidebar]);
 
   const pages: { key: Page; label: string; icon: React.ReactNode }[] = [
     { key: "chat", label: "Chat", icon: <MessageCircle size={20} /> },
@@ -56,7 +53,7 @@ function AppContent() {
             }}
             aria-label="Open sidebar"
           >
-            <MenuIcon size={20} />
+            <PanelLeftOpen size={20} />
           </Button>
         </div>
       )}
@@ -98,7 +95,7 @@ function AppContent() {
                     onClick={toggleSidebar}
                     aria-label={showSidebar ? 'Close sidebar' : 'Open sidebar'}
                   >
-                    <MenuIcon size={20} />
+                    {showSidebar ? <PanelRightOpen size={20} /> : <PanelLeftOpen size={20} />}
                   </Button>
                 )}
               </div>
@@ -129,7 +126,7 @@ function AppContent() {
             
             {/* Right section */}
             <div className="flex items-center gap-2 justify-end flex-1">
-              <ThemeToggle />
+              <SettingsButton />
               {rightActions}
             </div>
           </div>
@@ -148,15 +145,17 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <SidebarProvider>
-        <NavigationProvider>
-          <ChatProvider>
-            <TranslateProvider>
-              <AppContent />
-            </TranslateProvider>
-          </ChatProvider>
-        </NavigationProvider>
-      </SidebarProvider>
+      <LayoutProvider>
+        <SidebarProvider>
+          <NavigationProvider>
+            <ChatProvider>
+              <TranslateProvider>
+                <AppContent />
+              </TranslateProvider>
+            </ChatProvider>
+          </NavigationProvider>
+        </SidebarProvider>
+      </LayoutProvider>
     </ThemeProvider>
   );
 }
