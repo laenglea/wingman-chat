@@ -179,7 +179,7 @@ export class Client {
     }).strict();
 
     if (!prompt) {
-      prompt = "No conversation history provided. Please generate common prompts based on general topics.";
+      prompt = "No conversation history provided. Please suggest interesting prompts to start a new conversation.";
     }
 
     try {
@@ -189,10 +189,12 @@ export class Client {
           {
             role: "system",
             content: `Based on the conversation history provided, generate 3-5 related follow-up prompts that would help the user explore the topic more deeply. The prompts should be:
+
+- From the user's point of view 
 - Specific and actionable
 - Build upon the current conversation context
 - Encourage deeper exploration or different perspectives
-- Be concise but clear (10-50 words each)
+- Be concise but clear (maximal 15 words each)
 - Vary in type (clarifying questions, requests for examples, deeper analysis, practical applications, etc.)
 
 Return only the prompts themselves, without numbering or bullet points.`,
