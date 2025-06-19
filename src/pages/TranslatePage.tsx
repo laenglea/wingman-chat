@@ -2,11 +2,13 @@ import { useEffect, useRef } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, XIcon, DownloadIcon } from "lucide-react";
 import { useNavigation } from "../contexts/NavigationContext";
+import { useLayout } from "../hooks/useLayout";
 import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
 
 export function TranslatePage() {
   const { setRightActions } = useNavigation();
+  const { layoutMode } = useLayout();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Use translate context
@@ -105,7 +107,11 @@ export function TranslatePage() {
         
         {/* Text Translation Section */}
         <div className="w-full flex-grow overflow-hidden flex items-center justify-center p-0 pt-16 xl:p-6 xl:pt-20">
-          <div className="w-full h-full xl:max-w-[1200px] xl:max-h-[800px]">
+          <div className={`w-full h-full xl:max-h-[800px] ${
+            layoutMode === 'wide' 
+              ? 'max-w-full md:max-w-[80vw] mx-auto' 
+              : 'xl:max-w-[1200px] mx-auto'
+          }`}>
             <div className="relative h-full w-full overflow-hidden border-0 bg-transparent xl:border xl:border-neutral-200 xl:dark:border-neutral-900 xl:bg-white/20 xl:dark:bg-black/15 xl:backdrop-blur-2xl xl:rounded-2xl xl:shadow-2xl xl:shadow-black/60 xl:dark:shadow-black/80">
               {/* Responsive layout: vertical stack on mobile/narrow screens, horizontal on wide screens */}
               <div className="h-full flex flex-col md:flex-row min-h-0">

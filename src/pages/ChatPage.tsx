@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus as PlusIcon, Maximize2, Minimize2 } from "lucide-react";
+import { Plus as PlusIcon } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useNavigation } from "../contexts/NavigationContext";
-import { useResponsive } from "../hooks/useResponsive";
+import { useLayout } from "../hooks/useLayout";
 import { useChat } from "../hooks/useChat";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
@@ -14,10 +14,11 @@ export function ChatPage() {
   const {
     chat,
     messages,
-    createChat
+    createChat,
+    chats
   } = useChat();
   
-  const { isResponsive, toggleResponsive } = useResponsive();
+  const { layoutMode } = useLayout();
   
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent } = useSidebar();
@@ -49,9 +50,13 @@ export function ChatPage() {
   }, [setRightActions, createChat]);
 
   // Create sidebar content with useMemo to avoid infinite re-renders
-  const sidebarContent = useMemo(() => (
-    <ChatSidebar />
-  ), []);
+  const sidebarContent = useMemo(() => {
+    // Only show sidebar if there are chats
+    if (chats.length === 0) {
+      return null;
+    }
+    return <ChatSidebar />;
+  }, [chats.length]);
 
   // Set up sidebar content when it changes
   useEffect(() => {
@@ -89,16 +94,6 @@ export function ChatPage() {
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
       <main className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Toggle button - positioned within content area */}
-        <div className="hidden md:block absolute top-18 right-4 z-20">
-          <Button
-            onClick={toggleResponsive}
-            className="p-1.5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
-            title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
-          >
-            {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </Button>
-        </div>
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center pt-16 relative">
             <div className="flex flex-col items-center text-center relative z-10 w-full max-w-4xl px-4 mb-32">
@@ -107,7 +102,7 @@ export function ChatPage() {
                 <img 
                   src="/logo.svg" 
                   alt="Wingman Chat" 
-                  className="h-24 w-24 text-neutral-600 dark:text-neutral-400"
+                  className="h-24 w-24 opacity-80 dark:opacity-60"
                 />
               </div>
             </div>
@@ -119,7 +114,7 @@ export function ChatPage() {
             onScroll={handleScroll}
           >
             <div className={`px-2 pt-20 pb-28 ${
-              isResponsive 
+              layoutMode === 'wide'
                 ? 'max-w-full md:max-w-[80vw] mx-auto' 
                 : 'max-content-width'
             }`}>
@@ -138,7 +133,7 @@ export function ChatPage() {
         messages.length === 0 ? 'bottom-1/3 transform translate-y-1/2' : 'bottom-0'
       } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
         <div className={`relative pointer-events-auto ${
-          isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
+          layoutMode === 'wide' ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
         } ${messages.length === 0 ? 'max-w-4xl' : ''}`}>
           <ChatInput />
         </div>

@@ -1,4 +1,4 @@
-import { Trash, Menu as MenuIcon, MoreVertical, GitBranch } from "lucide-react";
+import { Trash, PanelRightOpen, MoreVertical, GitBranch } from "lucide-react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { getConfig } from "../config";
 import { useMemo, useCallback, useState, useEffect } from "react";
@@ -52,9 +52,8 @@ export function ChatSidebar() {
   }, [createChat, updateChat, setShowSidebar]);
 
   return (
-    <div 
+    <div
       className="flex flex-col h-full w-full bg-neutral-100/50 dark:bg-neutral-950/80"
-      onMouseLeave={() => setShowSidebar(false)}
     >
       {/* Static header with title and hamburger menu */}
       <div 
@@ -66,7 +65,7 @@ export function ChatSidebar() {
           className="p-1.5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-white/30 dark:hover:bg-black/20 rounded transition-all duration-200 cursor-pointer"
           aria-label="Close sidebar"
         >
-          <MenuIcon size={20} />
+          <PanelRightOpen size={20} />
         </Button>
       </div>
       
