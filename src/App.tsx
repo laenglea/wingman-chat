@@ -102,14 +102,6 @@ function AppContent() {
                   </Button>
                 )}
               </div>
-              {/* Logo */}
-              <div className="flex items-center ml-2">
-                <img 
-                  src="/logo.svg" 
-                  alt="Wingman Chat" 
-                  className="h-8 w-8 text-neutral-600 dark:text-neutral-400"
-                />
-              </div>
               {leftActions}
             </div>
             

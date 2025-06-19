@@ -9,7 +9,6 @@ import { useChat } from "../hooks/useChat";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
-import { useBackground } from "../hooks/useBackground";
 
 export function ChatPage() {
   const {
@@ -87,16 +86,8 @@ export function ChatPage() {
     prevMessagesCountRef.current = messages.length;
   }, [messages.length]);
 
-  // Background styles and className from useBackground hook
-  const { backgroundStyles, backgroundClassName } = useBackground();
-
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
-      {/* Background image - only show when no messages, logic handled here */}
-      {messages.length === 0 && (
-        <div className={backgroundClassName} style={backgroundStyles} />
-      )}
-      
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Toggle button - positioned within content area */}
         <div className="hidden md:block absolute top-18 right-4 z-20">
@@ -110,8 +101,15 @@ export function ChatPage() {
         </div>
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center pt-16 relative">
-            <div className="flex flex-col items-center text-center relative z-10 w-full max-w-4xl px-4">
-              {/* Content will be centered here when needed */}
+            <div className="flex flex-col items-center text-center relative z-10 w-full max-w-4xl px-4 mb-32">
+              {/* Logo */}
+              <div className="mb-8">
+                <img 
+                  src="/logo.svg" 
+                  alt="Wingman Chat" 
+                  className="h-24 w-24 text-neutral-600 dark:text-neutral-400"
+                />
+              </div>
             </div>
           </div>
         ) : (
@@ -137,7 +135,7 @@ export function ChatPage() {
       </main>
 
       <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out ${
-        messages.length === 0 ? 'bottom-1/2 transform translate-y-1/2' : 'bottom-0'
+        messages.length === 0 ? 'bottom-1/3 transform translate-y-1/2' : 'bottom-0'
       } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
         <div className={`relative pointer-events-auto ${
           isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
