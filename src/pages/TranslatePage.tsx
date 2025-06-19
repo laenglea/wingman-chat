@@ -4,7 +4,6 @@ import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, X
 import { useNavigation } from "../contexts/NavigationContext";
 import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
-import { BackgroundImage } from "../components/BackgroundImage";
 
 export function TranslatePage() {
   const { setRightActions } = useNavigation();
@@ -102,10 +101,6 @@ export function TranslatePage() {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
-      {/* Background image - classes applied directly here for xl and up */}
-      <div className="hidden xl:block absolute inset-0 w-full h-full z-0">
-        <BackgroundImage />
-      </div>
       <main className="flex-1 flex flex-col overflow-hidden relative">
         
         {/* Text Translation Section */}
