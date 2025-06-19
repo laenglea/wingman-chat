@@ -20,11 +20,16 @@ function AppContent() {
   // Handle responsive sidebar behavior
   useEffect(() => {
     const handleResize = () => {
+      const isSmall = window.innerWidth < 768;
+      
       // Auto-close sidebar on mobile screens
-      if (window.innerWidth < 768 && showSidebar) {
+      if (isSmall && showSidebar) {
         setShowSidebar(false);
       }
     };
+
+    // Set initial screen size
+    handleResize();
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -41,7 +46,7 @@ function AppContent() {
       {sidebarContent && !showSidebar && (
         <div className="fixed top-0 left-0 z-40 md:hidden pt-safe-top pl-safe-left p-3">
           <Button
-            className="menu-button"
+            className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
             onClick={() => {
               // Provide haptic feedback on supported devices
               if ('vibrate' in navigator) {
@@ -68,9 +73,9 @@ function AppContent() {
       {sidebarContent && (
         <aside
           className={`
-            h-full bg-white/20 dark:bg-black/15 backdrop-blur-lg border-r border-neutral-300/60 dark:border-white/20
-            fixed left-0 top-0 z-50 w-64
-            transform transition-transform duration-300 ease-in-out
+            h-full bg-white/20 dark:bg-black/15 backdrop-blur-lg shadow-2xl
+            fixed left-0 top-0 z-50 w-80
+            transform transition-transform duration-500 ease-in-out
             ${showSidebar ? 'translate-x-0' : '-translate-x-full'}
           `}
         >
@@ -79,41 +84,51 @@ function AppContent() {
       )}
 
       {/* Main app content */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative z-10">
         {/* Fixed navigation bar with glass effect */}
-        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-white/20 dark:bg-black/15 backdrop-blur-lg border-b border-white/30 dark:border-white/20 nav-header">
+        <nav className="fixed top-0 left-0 right-0 z-30 px-3 py-2 pl-safe-left pr-safe-right pt-safe-top bg-neutral-50/60 dark:bg-neutral-950/80 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-900 nav-header">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 w-1/3">
-              {sidebarContent && (
-                <Button
-                  className={`menu-button hidden md:flex ${showSidebar ? 'sidebar-open' : ''}`}
-                  onClick={toggleSidebar}
-                  aria-label={showSidebar ? 'Close sidebar' : 'Open sidebar'}
-                >
-                  <MenuIcon size={20} />
-                </Button>
-              )}
+            {/* Left section */}
+            <div className="flex items-center flex-1">
+              {/* Fixed space for hamburger menu - always reserve the space */}
+              <div className="w-12 flex justify-start">
+                {sidebarContent && (
+                  <Button
+                    className={`p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer hidden md:flex ${showSidebar ? 'sidebar-open' : ''}`}
+                    onClick={toggleSidebar}
+                    aria-label={showSidebar ? 'Close sidebar' : 'Open sidebar'}
+                  >
+                    <MenuIcon size={20} />
+                  </Button>
+                )}
+              </div>
               {leftActions}
             </div>
             
-            <div className="flex space-x-1 sm:space-x-2">
+            {/* Center section - Tab buttons */}
+            <div className="flex items-center justify-center">
               {pages.map(({ key, label, icon }) => (
                 <Button
                   key={key}
                   onClick={() => setCurrentPage(key)}
-                  className={`px-2 py-2 sm:px-4 font-medium rounded transition-colors flex items-center justify-center gap-1 sm:gap-2 cursor-pointer ${
+                  className={`px-3 py-2 font-medium transition-colors flex items-center gap-2 cursor-pointer relative ${
                     currentPage === key
-                      ? "bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-200"
-                      : "bg-neutral-100 dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-800"
+                      ? "text-neutral-900 dark:text-neutral-100"
+                      : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
                   }`}
                 >
                   {icon}
                   <span className="hidden sm:inline">{label}</span>
+                  {/* Underline for active tab */}
+                  {currentPage === key && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900 dark:bg-neutral-100"></div>
+                  )}
                 </Button>
               ))}
             </div>
             
-            <div className="flex items-center gap-2 w-1/3 justify-end">
+            {/* Right section */}
+            <div className="flex items-center gap-2 justify-end flex-1">
               <ThemeToggle />
               {rightActions}
             </div>

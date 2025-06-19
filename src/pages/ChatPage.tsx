@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus as PlusIcon, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
@@ -27,11 +27,15 @@ export function ChatPage() {
     dependencies: [chat, messages],
   });
 
+  // Animation state for chat input
+  const [isAnimating, setIsAnimating] = useState(false);
+  const prevMessagesCountRef = useRef(0);
+
   // Set up navigation actions (only once on mount)
   useEffect(() => {
     setRightActions(
       <Button
-        className="menu-button"
+        className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
         onClick={createChat}
       >
         <PlusIcon size={20} />
@@ -66,6 +70,22 @@ export function ChatPage() {
     prevMessagesLengthRef.current = messages.length;
   }, [messages.length, enableAutoScroll]);
 
+  // Handle animation when first message is added
+  useEffect(() => {
+    if (prevMessagesCountRef.current === 0 && messages.length > 0) {
+      setIsAnimating(true);
+      // Reset animation state after animation completes
+      const animationTimer = setTimeout(() => {
+        setIsAnimating(false);
+      }, 600); // Match the CSS transition duration
+      
+      return () => {
+        clearTimeout(animationTimer);
+      };
+    }
+    prevMessagesCountRef.current = messages.length;
+  }, [messages.length]);
+
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
       <main className="flex-1 flex flex-col overflow-hidden relative">
@@ -73,16 +93,23 @@ export function ChatPage() {
         <div className="hidden md:block absolute top-18 right-4 z-20">
           <Button
             onClick={toggleResponsive}
-            className="menu-button !p-1.5"
+            className="p-1.5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
             title={isResponsive ? "Switch to fixed width (900px)" : "Switch to responsive mode (80%/80%)"}
           >
             {isResponsive ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </Button>
         </div>
         {messages.length === 0 ? (
-          <div className="flex-1 flex items-center justify-center pt-16">
-            <div className="flex flex-col items-center text-center">
-              <img src="/logo.svg" className="w-32 h-32 dark:opacity-80" alt="Wingman Chat" />
+          <div className="flex-1 flex items-center justify-center pt-16 relative">
+            <div className="flex flex-col items-center text-center relative z-10 w-full max-w-4xl px-4 mb-32">
+              {/* Logo */}
+              <div className="mb-8">
+                <img 
+                  src="/logo.svg" 
+                  alt="Wingman Chat" 
+                  className="h-24 w-24 text-neutral-600 dark:text-neutral-400"
+                />
+              </div>
             </div>
           </div>
         ) : (
@@ -107,10 +134,12 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className="absolute bottom-0 left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none">
-        {/* Gradient overlay for enhanced glass effect */}
-        <div className="absolute inset-0 bg-gradient-to-t from-neutral-50/90 via-neutral-50/40 to-transparent dark:from-neutral-950/90 dark:via-neutral-950/40 dark:to-transparent pointer-events-none" />
-        <div className={`relative pointer-events-auto ${isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'}`}>
+      <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out ${
+        messages.length === 0 ? 'bottom-1/3 transform translate-y-1/2' : 'bottom-0'
+      } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
+        <div className={`relative pointer-events-auto ${
+          isResponsive ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
+        } ${messages.length === 0 ? 'max-w-4xl' : ''}`}>
           <ChatInput />
         </div>
       </footer>

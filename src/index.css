@@ -100,21 +100,6 @@
   .mobile-backdrop-exit {
     animation: backdropFadeOut 0.25s ease-in forwards;
   }
-  
-  /* Enhanced touch feedback for mobile buttons - preserve existing styles */
-  .menu-button {
-    -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
-    transition: all 0.15s ease-out;
-  }
-  
-  .menu-button:active {
-    transform: scale(0.95);
-    background-color: rgba(0, 0, 0, 0.1);
-  }
-  
-  .dark .menu-button:active {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
 }
 
 html, body {
@@ -180,16 +165,38 @@ button:focus-visible,
   @apply bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-200;
 }
 
-.sidebar-item {
+.sidebar-item-base {
   @apply p-1.5 sm:p-2 hover:text-neutral-600 dark:hover:text-neutral-300 rounded cursor-pointer focus:outline-none transition-all duration-200;
+}
+
+.sidebar-item-hidden {
+  opacity: 0;
+  transform: translateX(-50px);
+}
+
+/* Chat sidebar item animations - only when sidebar-item-animate class is applied */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.sidebar-item-animate {
+  animation: slideInFromLeft 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+/* Staggered animation delays for all items using dynamic calculation */
+.sidebar-item-animate {
+  animation-delay: calc(0.1s + (var(--item-index, 0) * 0.05s));
 }
 
 .sidebar-item-selected {
   @apply p-1.5 sm:p-2 text-neutral-900 dark:text-neutral-100 focus:outline-none;
-}
-
-.menu-button {
-  @apply p-1.5 sm:p-2 dark:text-neutral-200 hover:text-neutral-600 hover:bg-neutral-300 dark:bg-neutral-900 dark:hover:text-neutral-400 dark:hover:bg-neutral-800 rounded cursor-pointer focus:outline-none;  
 }
 
 
