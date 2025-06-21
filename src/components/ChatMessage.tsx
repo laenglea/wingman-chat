@@ -1,5 +1,6 @@
 import { Markdown } from './Markdown';
 import { CopyButton } from './CopyButton';
+import { PlayButton } from './PlayButton';
 import { Bot, User, File, Brain } from "lucide-react";
 
 import { AttachmentType, Message, Role } from "../models/chat";
@@ -73,7 +74,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
         
         {!isUser && (
           <div className="flex justify-between items-center mt-2">
-             <CopyButton text={message.content} subtle={true} />
+            <div className="flex items-center gap-2">
+              <CopyButton text={message.content} />
+              <PlayButton text={message.content} />
+            </div>
           </div>
         )}
       </div>
