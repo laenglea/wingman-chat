@@ -12,6 +12,9 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
   const isActiveRef = useRef(false);
 
   const start = async () => {
+    const realtimeModel = "gpt-4o-realtime-preview";
+    const transcribeModel = "gpt-4o-transcribe";
+
     try {
       // Don't start if already active
       if (isActiveRef.current) return;
@@ -46,7 +49,7 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
       dc.addEventListener('open', () => {
         console.log('Data channel is open');
         // Set initial transcription model when data channel opens
-        setTranscriptionModel("gpt-4o-transcribe")
+        setTranscriptionModel(transcribeModel)
           .then(() => console.log('Default transcription model set'))
           .catch(error => console.warn('Failed to set default transcription model:', error));
       });
@@ -74,13 +77,14 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const baseUrl = "https://api.openai.com/v1/realtime";
-      const model = "gpt-4o-realtime-preview-2025-06-03";
-      const sdpResponse = await fetch(`${baseUrl}?model=${model}`, {
+      // Use relative path for WebSocket connection
+      const baseUrl = `${window.location.protocol}//${window.location.host}/api/v1/realtime`;
+
+      const sdpResponse = await fetch(`${baseUrl}?model=${realtimeModel}`, {
         method: "POST",
         body: offer.sdp,
         headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          //Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/sdp"
         },
       });

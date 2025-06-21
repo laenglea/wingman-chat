@@ -12,8 +12,12 @@ export function useVoiceWebSockets(
   const wavPlayerRef = useRef<WavStreamPlayer | null>(null);
   const wavRecorderRef = useRef<WavRecorder | null>(null);
   const isActiveRef = useRef(false);
+  const isListeningRef = useRef(false);
 
   const start = async () => {
+    const realtimeModel = "gpt-4o-realtime-preview";
+    const transcribeModel = "gpt-4o-transcribe";
+
     if (isActiveRef.current) return;
 
     isActiveRef.current = true;
@@ -31,17 +35,16 @@ export function useVoiceWebSockets(
       await recorder.begin();
       wavRecorderRef.current = recorder;
 
-      const realtimeModel = "gpt-4o-realtime-preview-2025-06-03";
-      const transcribeModel = "gpt-4o-transcribe"
+      // Use relative path for WebSocket connection
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const baseUrl = `${protocol}//${window.location.host}/api/v1/realtime?model=${realtimeModel}`;
 
-      const ws = new WebSocket(
-        `wss://api.openai.com/v1/realtime?model=${realtimeModel}`,
-        [
-          "realtime",
-          "openai-insecure-api-key." + OPENAI_API_KEY,
-          "openai-beta.realtime-v1"
-        ]
-      );
+      const ws = new WebSocket(baseUrl, [
+        "realtime",
+        //"openai-insecure-api-key." + OPENAI_API_KEY,
+        "openai-beta.realtime-v1"
+      ]);
+
       wsRef.current = ws;
 
       ws.addEventListener('open', () => {
@@ -65,12 +68,19 @@ export function useVoiceWebSockets(
         // Start recording immediately after WebSocket connects
         console.log('Starting audio recording after WebSocket connection...');
         recorder.record((data) => {
+          // Check if session is still active first
+          if (!isActiveRef.current) {
+            return;
+          }
+
           const { mono } = data;
 
           // Handle ArrayBuffer data properly
           const monoArray = mono ? new Int16Array(mono) : null;
 
-          if (ws.readyState === WebSocket.OPEN && monoArray) {
+          // Use wsRef.current to get the current WebSocket state
+          const currentWs = wsRef.current;
+          if (currentWs && currentWs.readyState === WebSocket.OPEN && monoArray && isActiveRef.current) {
             try {
               // Convert Int16Array audio data to base64 PCM16
               const float32Array = new Float32Array(monoArray.length);
@@ -80,8 +90,8 @@ export function useVoiceWebSockets(
               }
               const audio = base64EncodeAudio(float32Array);
 
-              if (audio) {
-                ws.send(JSON.stringify({
+              if (audio && isActiveRef.current) {
+                currentWs.send(JSON.stringify({
                   type: 'input_audio_buffer.append',
                   audio: audio
                 }));
@@ -89,9 +99,8 @@ export function useVoiceWebSockets(
             } catch (error) {
               console.error('Error processing audio data:', error);
             }
-          } else {
-            console.warn('Cannot send audio: WebSocket not ready or no audio data');
           }
+          // Remove the warning log to reduce noise when session is properly stopped
         }).catch(error => {
           console.error('Failed to start recording:', error);
           isListeningRef.current = false;
@@ -139,7 +148,8 @@ export function useVoiceWebSockets(
       console.log('Voice session initialized, waiting for session ready...');
     } catch (error) {
       console.error('Failed to start voice session:', error);
-      isListeningRef.current = false;
+      // Clean up on error
+      stop();
       throw error;
     }
   };
@@ -147,33 +157,43 @@ export function useVoiceWebSockets(
   const stop = () => {
     console.log('Stopping voice session...');
 
-    // Stop recorder and reset listening state
+    // First, set the active flag to false to prevent any new audio processing
+    isActiveRef.current = false;
+    isListeningRef.current = false;
+
+    // Stop recorder
     if (wavRecorderRef.current) {
       try {
-        if (isListeningRef.current) {
-          wavRecorderRef.current.pause();
-          isListeningRef.current = false;
-        }
+        console.log('Stopping audio recorder...');
+        wavRecorderRef.current.pause();
+        // Give a small delay to ensure all pending audio callbacks are processed
+        setTimeout(() => {
+          wavRecorderRef.current = null;
+        }, 100);
       } catch (error) {
         console.error('Error pausing recorder:', error);
+        wavRecorderRef.current = null;
       }
-      wavRecorderRef.current = null;
     }
 
     // Close WebSocket
     const ws = wsRef.current;
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws) {
       try {
-        ws.close(1000, 'User stopped session');
+        if (ws.readyState === WebSocket.OPEN) {
+          console.log('Closing WebSocket connection...');
+          ws.close(1000, 'User stopped session');
+        }
       } catch (error) {
         console.error('Error closing WebSocket:', error);
       }
+      wsRef.current = null;
     }
-    wsRef.current = null;
 
     // Stop audio player
     if (wavPlayerRef.current) {
       try {
+        console.log('Stopping audio player...');
         wavPlayerRef.current.interrupt();
       } catch (error) {
         console.error('Error interrupting player:', error);
@@ -210,7 +230,7 @@ export function useVoiceWebSockets(
     }
   };
 
-    // Convert Float32Array of audio data to base64-encoded PCM16
+  // Convert Float32Array of audio data to base64-encoded PCM16
   const floatTo16BitPCM = (float32Array: Float32Array) => {
     const buffer = new ArrayBuffer(float32Array.length * 2);
     const view = new DataView(buffer);
