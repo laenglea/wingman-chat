@@ -146,9 +146,6 @@ export class Client {
 
       content: message.content ?? "",
       refusal: message.refusal ?? "",
-
-      inputTokens: completion.usage?.prompt_tokens ?? 0,
-      outputTokens: completion.usage?.completion_tokens ?? 0,
     };
   }
 
