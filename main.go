@@ -18,30 +18,15 @@ func main() {
 		title = "Wingman AI"
 	}
 
-	token := os.Getenv("OPENAI_API_KEY")
-	target, _ := url.Parse(os.Getenv("OPENAI_BASE_URL"))
+	token := platformToken()
 
-	if target.Host == "" {
-		target, _ = url.Parse("https://api.openai.com/v1")
-	}
+	platformURL := platformURL()
+	realtimeURL := realtimeURL()
 
-	if target != nil {
-		target.Path = strings.TrimRight(target.Path, "/")
-		target.Path = strings.TrimRight(target.Path, "/v1")
-	}
+	bridgeURL := os.Getenv("BRIDGE_URL")
 
-	realtime, _ := url.Parse(os.Getenv("OPENAI_REALTIME_PROXY"))
-
-	if realtime == nil || realtime.Host == "" {
-		realtime = nil
-	}
-
-	if realtime != nil {
-		realtime.Path = strings.TrimRight(realtime.Path, "/")
-		realtime.Path = strings.TrimRight(realtime.Path, "/v1")
-	}
-
-	bridgeURL := os.Getenv("BRIDGE_BASE_URL")
+	tts := os.Getenv("TTS_ENABLED") == "true"
+	voice := os.Getenv("VOICE_ENABLED") == "true"
 
 	mux := http.NewServeMux()
 	dist := os.DirFS("dist")
@@ -60,6 +45,10 @@ func main() {
 			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 		}
 
+		type ttsType struct {
+			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+		}
+
 		type bridgeType struct {
 			URL string `json:"url,omitempty" yaml:"url,omitempty"`
 		}
@@ -69,7 +58,9 @@ func main() {
 
 			Models []modelType `json:"models,omitempty" yaml:"models,omitempty"`
 
-			Voice  *voiceType  `json:"voice,omitempty" yaml:"voice,omitempty"`
+			TTS   *ttsType   `json:"tts,omitempty" yaml:"tts,omitempty"`
+			Voice *voiceType `json:"voice,omitempty" yaml:"voice,omitempty"`
+
 			Bridge *bridgeType `json:"bridge,omitempty" yaml:"bridge,omitempty"`
 		}
 
@@ -81,7 +72,13 @@ func main() {
 			yaml.Unmarshal(data, &config.Models)
 		}
 
-		if realtime != nil {
+		if tts {
+			config.TTS = &ttsType{
+				Enabled: true,
+			}
+		}
+
+		if voice {
 			config.Voice = &voiceType{
 				Enabled: true,
 			}
@@ -125,10 +122,10 @@ func main() {
 		json.NewEncoder(w).Encode(manifest)
 	})
 
-	if realtime != nil {
+	if realtimeURL != nil {
 		mux.Handle("/api/v1/realtime", http.StripPrefix("/api", &httputil.ReverseProxy{
 			Rewrite: func(r *httputil.ProxyRequest) {
-				r.SetURL(realtime)
+				r.SetURL(realtimeURL)
 
 				if token != "" {
 					r.Out.Header.Set("Authorization", "Bearer "+token)
@@ -139,7 +136,7 @@ func main() {
 
 	mux.Handle("/api/", http.StripPrefix("/api", &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
-			r.SetURL(target)
+			r.SetURL(platformURL)
 
 			if token != "" {
 				r.Out.Header.Set("Authorization", "Bearer "+token)
@@ -148,4 +145,57 @@ func main() {
 	}))
 
 	http.ListenAndServe(":8000", mux)
+}
+
+func platformToken() string {
+	if val := os.Getenv("WINGMAN_TOKEN"); val != "" {
+		return val
+	}
+
+	if val := os.Getenv("OPENAI_API_KEY"); val != "" {
+		return val
+	}
+
+	return ""
+}
+
+func platformURL() *url.URL {
+	if val, ok := os.LookupEnv("WINGMAN_URL"); ok {
+		u, _ := url.Parse(val)
+
+		if u != nil && u.Host != "" {
+			u.Path = strings.TrimRight(u.Path, "/")
+			u.Path = strings.TrimRight(u.Path, "/v1")
+
+			return u
+		}
+	}
+
+	if val, ok := os.LookupEnv("OPENAI_BASE_URL"); ok {
+		u, _ := url.Parse(val)
+
+		if u != nil && u.Host != "" {
+			u.Path = strings.TrimRight(u.Path, "/")
+			u.Path = strings.TrimRight(u.Path, "/v1")
+
+			return u
+		}
+	}
+
+	panic("WINGMAN_URL is not set or invalid")
+}
+
+func realtimeURL() *url.URL {
+	if val, ok := os.LookupEnv("REALTIME_PROXY"); ok {
+		u, _ := url.Parse(val)
+
+		if u != nil && u.Host != "" {
+			u.Path = strings.TrimRight(u.Path, "/")
+			u.Path = strings.TrimRight(u.Path, "/v1")
+
+			return u
+		}
+	}
+
+	return nil
 }
