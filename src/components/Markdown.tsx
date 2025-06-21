@@ -5,6 +5,8 @@ import { MermaidRenderer } from './MermaidRenderer';
 import { AdaptiveCardRenderer } from './AdaptiveCardRenderer';
 import { CodeRenderer } from './CodeRenderer';
 import { HtmlRenderer } from './HtmlRenderer';
+import { MediaPlayer } from './MediaPlayer';
+import { isAudioUrl, isVideoUrl } from '../lib/utils';
 
 const components: Partial<Components> = {
     pre: ({ children }) => {
@@ -45,6 +47,16 @@ const components: Partial<Components> = {
 
         if (url && !url.startsWith('http') && !url.startsWith('#')) {
             url = `https://${url}`;
+        }
+
+        // Check if this is an audio link
+        if (isAudioUrl(url)) {
+            return <MediaPlayer url={url} type="audio">{children}</MediaPlayer>;
+        }
+
+        // Check if this is a video link
+        if (isVideoUrl(url)) {
+            return <MediaPlayer url={url} type="video">{children}</MediaPlayer>;
         }
         
         return (

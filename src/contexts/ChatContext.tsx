@@ -16,9 +16,10 @@ export interface ChatContextType {
   messages: Message[];
 
   // Chat actions
-  createChat: () => void;
+  createChat: () => Chat;
   selectChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
+  updateChat: (chatId: string, updates: Partial<Chat>) => void;
 
   addMessage: (message: Message) => void;
   sendMessage: (message: Message) => Promise<void>;
@@ -62,8 +63,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   // Handler functions with stable references
   const createChat = useCallback(() => {
-    setChatId(null);
-  }, []);
+    const newChat = createChatHook();
+    setChatId(newChat.id);
+    return newChat;
+  }, [createChatHook]);
 
   const selectChat = useCallback((chatId: string) => {
     setChatId(chatId);
@@ -168,7 +171,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
     createChat,
     selectChat,
     deleteChat,
+    updateChat,
 
+    // Message actions
     addMessage,
     sendMessage,
 

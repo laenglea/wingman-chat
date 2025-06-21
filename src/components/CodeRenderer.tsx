@@ -16,36 +16,24 @@ interface StylesType {
   oneLight: any;
 }
 
-// Only map essential language aliases that need normalization
+// Language aliases and normalization mappings (only for actual transformations)
 const languageMap: Record<string, string> = {
-  'js': 'javascript',
-  'ts': 'typescript',
-  'py': 'python',
-  'sh': 'shell',
   'bash': 'shell',
-  'yml': 'yaml',
+  'c++': 'cpp',
+  'cs': 'csharp',
+  'html': 'markup',
+  'js': 'javascript',
+  'jsx': 'javascript',
+  'md': 'markdown',
+  'plaintext': 'text',
+  'py': 'python',
   'rb': 'ruby',
   'rs': 'rust',
-  'jsx': 'javascript',
+  'sh': 'shell',
+  'ts': 'typescript',
   'tsx': 'typescript',
-  'json': 'json',
-  'md': 'markdown',
-  'html': 'markup',
   'xml': 'markup',
-  'css': 'css',
-  'scss': 'scss',
-  'sass': 'sass',
-  'go': 'go',
-  'java': 'java',
-  'c': 'c',
-  'cpp': 'cpp',
-  'csharp': 'csharp',
-  'php': 'php',
-  'sql': 'sql',
-  'r': 'r',
-  'swift': 'swift',
-  'kotlin': 'kotlin',
-  'dart': 'dart'
+  'yml': 'yaml'
 };
 
 const NonMemoizedCodeRenderer = ({ code, language }: CodeRendererProps) => {

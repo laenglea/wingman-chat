@@ -179,7 +179,7 @@ export class Client {
     }).strict();
 
     if (!prompt) {
-      prompt = "No conversation history provided. Please generate common prompts based on general topics.";
+      prompt = "No conversation history provided. Please suggest interesting prompts to start a new conversation.";
     }
 
     try {
@@ -189,10 +189,12 @@ export class Client {
           {
             role: "system",
             content: `Based on the conversation history provided, generate 3-5 related follow-up prompts that would help the user explore the topic more deeply. The prompts should be:
+
+- From the user's point of view 
 - Specific and actionable
 - Build upon the current conversation context
 - Encourage deeper exploration or different perspectives
-- Be concise but clear (10-50 words each)
+- Be concise but clear (maximal 15 words each)
 - Vary in type (clarifying questions, requests for examples, deeper analysis, practical applications, etc.)
 
 Return only the prompts themselves, without numbering or bullet points.`,
@@ -230,13 +232,22 @@ Return only the prompts themselves, without numbering or bullet points.`,
     return resp.text();
   }
 
-  async translate(lang: string, text: string): Promise<string> {
+  async translate(lang: string, input: string | Blob): Promise<string | Blob> {
     const data = new FormData();
     data.append("lang", lang);
-    data.append("text", text);
+    
+    const headers: HeadersInit = {};
+    
+    if (input instanceof Blob) {
+      data.append("file", input);
+      headers["Accept"] = input.type || "application/octet-stream";
+    } else {
+      data.append("text", input);
+    }
 
     const resp = await fetch(new URL("/api/v1/translate", window.location.origin), {
       method: "POST",
+      headers,
       body: data,
     });
 
@@ -244,7 +255,13 @@ Return only the prompts themselves, without numbering or bullet points.`,
       throw new Error(`Translate request failed with status ${resp.status}`);
     }
 
-    return resp.text();
+    const contentType = resp.headers.get("content-type")?.toLowerCase() || "";
+    
+    if (contentType.includes("text/plain") || contentType.includes("text/markdown")) {
+      return resp.text();
+    }
+    
+    return resp.blob();
   }
 
   private toTools(tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {
