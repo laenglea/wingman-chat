@@ -4,23 +4,25 @@ import { useRef } from 'react';
  * Hook to manage OpenAI Realtime voice streaming via WebRTC.
  * @param onTranscript called with interim transcript of user speech
  */
-export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (text: string) => void) {
+export function useVoiceWebRTC(
+  onUser: (text: string) => void,
+  onAssistant: (text: string) => void
+) {
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
   const isActiveRef = useRef(false);
 
   const start = async () => {
     const realtimeModel = "gpt-4o-realtime-preview";
     const transcribeModel = "gpt-4o-transcribe";
 
+    if (isActiveRef.current) return;
+    isActiveRef.current = true;
+
     try {
-      // Don't start if already active
-      if (isActiveRef.current) return;
-
-      // THATS FINE. DO NOT REFACTOR THIS KEY. IT IS FINE.
-
       // Create a peer connection
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
@@ -29,6 +31,7 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
       const audioEl = document.createElement("audio");
       audioEl.autoplay = true;
       audioRef.current = audioEl;
+
       pc.ontrack = e => {
         if (audioEl) {
           audioEl.srcObject = e.streams[0];
@@ -39,6 +42,7 @@ export function useVoiceWebRTC(onUser: (text: string) => void, onAssistant: (tex
       const ms = await navigator.mediaDevices.getUserMedia({
         audio: true
       });
+      
       streamRef.current = ms;
       pc.addTrack(ms.getTracks()[0]);
 
