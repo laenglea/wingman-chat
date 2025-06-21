@@ -149,12 +149,12 @@ export function useVoiceWebSockets(
     } catch (error) {
       console.error('Failed to start voice session:', error);
       // Clean up on error
-      stop();
+      await stop();
       throw error;
     }
   };
 
-  const stop = () => {
+  const stop = async () => {
     console.log('Stopping voice session...');
 
     // First, set the active flag to false to prevent any new audio processing
@@ -165,13 +165,25 @@ export function useVoiceWebSockets(
     if (wavRecorderRef.current) {
       try {
         console.log('Stopping audio recorder...');
-        wavRecorderRef.current.pause();
-        // Give a small delay to ensure all pending audio callbacks are processed
-        setTimeout(() => {
-          wavRecorderRef.current = null;
-        }, 100);
+        
+        // First pause recording if it's active
+        if (isListeningRef.current) {
+          await wavRecorderRef.current.pause();
+        }
+        
+        // Then properly end the recording session
+        await wavRecorderRef.current.end();
+        wavRecorderRef.current = null;
       } catch (error) {
-        console.error('Error pausing recorder:', error);
+        console.error('Error stopping recorder:', error);
+        // Force cleanup even if end() fails
+        try {
+          if (wavRecorderRef.current) {
+            await wavRecorderRef.current.pause();
+          }
+        } catch (pauseError) {
+          console.error('Error pausing recorder during cleanup:', pauseError);
+        }
         wavRecorderRef.current = null;
       }
     }

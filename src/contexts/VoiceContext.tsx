@@ -8,7 +8,7 @@ export interface VoiceContextType {
   isListening: boolean;
   isConnecting: boolean;
   toggleVoiceMode: () => void;
-  stopVoiceMode: () => void;
+  stopVoiceMode: () => Promise<void>;
 }
 
 const VoiceContext = createContext<VoiceContextType | undefined>(undefined);
@@ -89,8 +89,8 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const { start, stop } = useVoiceWebSockets(onUserTranscript, onAssistantTranscript);
 
-  const stopVoiceMode = useCallback(() => {
-    stop();
+  const stopVoiceMode = useCallback(async () => {
+    await stop();
     setIsVoiceMode(false);
     setIsListening(false);
     setIsConnecting(false);
@@ -98,7 +98,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const toggleVoiceMode = useCallback(async () => {
     if (isVoiceMode) {
-      stopVoiceMode();
+      await stopVoiceMode();
     } else {
       try {
         setIsConnecting(true);
