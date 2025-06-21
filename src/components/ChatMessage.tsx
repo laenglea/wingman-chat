@@ -71,14 +71,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         )}
         
-        {!isUser && (message.inputTokens !== undefined && message.outputTokens !== undefined) && (
+        {!isUser && (
           <div className="flex justify-between items-center mt-2">
-            <div className="text-[9px] text-neutral-500 dark:text-neutral-400">
-              Usage: {message.inputTokens} / {message.outputTokens} tokens
-            </div>
-            <div className="ml-2">
-              <CopyButton text={message.content} subtle={true} />
-            </div>
+             <CopyButton text={message.content} subtle={true} />
           </div>
         )}
       </div>
