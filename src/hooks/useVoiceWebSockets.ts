@@ -11,6 +11,7 @@ export function useVoiceWebSockets(
   const wsRef = useRef<WebSocket | null>(null);
   const wavPlayerRef = useRef<WavStreamPlayer | null>(null);
   const wavRecorderRef = useRef<WavRecorder | null>(null);
+
   const isActiveRef = useRef(false);
   const isListeningRef = useRef(false);
 
@@ -19,10 +20,7 @@ export function useVoiceWebSockets(
     const transcribeModel = "gpt-4o-transcribe";
 
     if (isActiveRef.current) return;
-
     isActiveRef.current = true;
-
-    // THATS FINE. DO NOT REFACTOR THIS KEY. IT IS FINE.
 
     try {
       // Initialize WavStreamPlayer for audio playback

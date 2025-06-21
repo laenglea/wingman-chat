@@ -25,8 +25,21 @@ func main() {
 		target, _ = url.Parse("https://api.openai.com/v1")
 	}
 
-	target.Path = strings.TrimRight(target.Path, "/")
-	target.Path = strings.TrimRight(target.Path, "/v1")
+	if target != nil {
+		target.Path = strings.TrimRight(target.Path, "/")
+		target.Path = strings.TrimRight(target.Path, "/v1")
+	}
+
+	realtime, _ := url.Parse(os.Getenv("OPENAI_REALTIME_PROXY"))
+
+	if realtime == nil || realtime.Host == "" {
+		realtime = nil
+	}
+
+	if realtime != nil {
+		realtime.Path = strings.TrimRight(realtime.Path, "/")
+		realtime.Path = strings.TrimRight(realtime.Path, "/v1")
+	}
 
 	bridgeURL := os.Getenv("BRIDGE_BASE_URL")
 
@@ -99,6 +112,18 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(manifest)
 	})
+
+	if realtime != nil {
+		mux.Handle("/api/v1/realtime", http.StripPrefix("/api", &httputil.ReverseProxy{
+			Rewrite: func(r *httputil.ProxyRequest) {
+				r.SetURL(realtime)
+
+				if token != "" {
+					r.Out.Header.Set("Authorization", "Bearer "+token)
+				}
+			},
+		}))
+	}
 
 	mux.Handle("/api/", http.StripPrefix("/api", &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
