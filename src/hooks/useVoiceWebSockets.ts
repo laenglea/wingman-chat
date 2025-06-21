@@ -13,7 +13,6 @@ export function useVoiceWebSockets(
   const wavRecorderRef = useRef<WavRecorder | null>(null);
 
   const isActiveRef = useRef(false);
-  const isListeningRef = useRef(false);
 
   const start = async () => {
     const realtimeModel = "gpt-4o-realtime-preview";
@@ -101,7 +100,6 @@ export function useVoiceWebSockets(
           // Remove the warning log to reduce noise when session is properly stopped
         }).catch(error => {
           console.error('Failed to start recording:', error);
-          isListeningRef.current = false;
         });
       });
 
@@ -157,19 +155,13 @@ export function useVoiceWebSockets(
 
     // First, set the active flag to false to prevent any new audio processing
     isActiveRef.current = false;
-    isListeningRef.current = false;
 
     // Stop recorder
     if (wavRecorderRef.current) {
       try {
         console.log('Stopping audio recorder...');
         
-        // First pause recording if it's active
-        if (isListeningRef.current) {
-          await wavRecorderRef.current.pause();
-        }
-        
-        // Then properly end the recording session
+        // End the recording session
         await wavRecorderRef.current.end();
         wavRecorderRef.current = null;
       } catch (error) {
