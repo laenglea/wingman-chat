@@ -10,7 +10,7 @@ import { useVoice } from "../hooks/useVoice";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
-import { VoiceOverlay } from "../components/VoiceOverlay";
+import { VoiceWaves } from "../components/VoiceWaves";
 
 export function ChatPage() {
   const {
@@ -21,7 +21,7 @@ export function ChatPage() {
   } = useChat();
   
   const { layoutMode } = useLayout();
-  const { isVoiceMode, isListening, isConnecting, toggleVoiceMode, stopVoiceMode } = useVoice();
+  const { isVoiceMode, isListening, isConnecting, toggleVoiceMode } = useVoice();
   
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent } = useSidebar();
@@ -160,13 +160,15 @@ export function ChatPage() {
         </footer>
       )}
 
-      {/* Voice Overlay */}
-      <VoiceOverlay 
-        isVisible={isVoiceMode}
-        isConnecting={isConnecting}
-        isListening={isListening}
-        onClose={stopVoiceMode}
-      />
+      {/* Full-width waves during voice mode */}
+      {isVoiceMode && (
+        <div className="fixed bottom-0 left-0 right-0 h-32 z-20 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent dark:from-neutral-900 dark:via-neutral-900/80 dark:to-transparent">
+          <VoiceWaves 
+            isConnecting={isConnecting}
+            isListening={isListening}
+          />
+        </div>
+      )}
     </div>
   );
 }
