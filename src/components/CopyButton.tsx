@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Copy as CopyIcon, CopyCheck as CopyCheckIcon } from "lucide-react";
 import { Button } from "@headlessui/react";
 
-export const CopyButton = ({ text, subtle = false }: { text: string, subtle?: boolean }) => {
+export const CopyButton = ({ text }: { text: string }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {
@@ -15,11 +15,9 @@ export const CopyButton = ({ text, subtle = false }: { text: string, subtle?: bo
         }
     };
 
-    const buttonClasses = subtle 
-        ? "text-neutral-400 hover:text-neutral-300 dark:text-neutral-500 dark:hover:text-neutral-400 transition-colors opacity-60 hover:opacity-100"
-        : "text-neutral-300 hover:text-white transition-colors";
+    const buttonClasses = "text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors opacity-60 hover:opacity-100";
 
-    const iconSize = subtle ? "h-3 w-3" : "h-4";
+    const iconSize = "h-3 w-3";
 
     return (
         <Button
