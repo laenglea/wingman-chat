@@ -6,6 +6,13 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   server: {
     proxy: {
+      '/api/v1/realtime': {
+        target: 'http://localhost:8081',
+        ws: true,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
+      },
+
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,

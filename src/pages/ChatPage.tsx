@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus as PlusIcon } from "lucide-react";
+import { Plus as PlusIcon, Mic, MicOff } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useSidebar } from "../contexts/SidebarContext";
 import { useNavigation } from "../contexts/NavigationContext";
 import { useLayout } from "../hooks/useLayout";
 import { useChat } from "../hooks/useChat";
+import { useVoice } from "../hooks/useVoice";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
+import { VoiceOverlay } from "../components/VoiceOverlay";
 
 export function ChatPage() {
   const {
@@ -19,6 +21,7 @@ export function ChatPage() {
   } = useChat();
   
   const { layoutMode } = useLayout();
+  const { isVoiceMode, isListening, isConnecting, toggleVoiceMode, stopVoiceMode } = useVoice();
   
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent } = useSidebar();
@@ -35,19 +38,32 @@ export function ChatPage() {
   // Set up navigation actions (only once on mount)
   useEffect(() => {
     setRightActions(
-      <Button
-        className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
-        onClick={createChat}
-      >
-        <PlusIcon size={20} />
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button
+          className={`p-2 rounded transition-all duration-150 ease-out cursor-pointer ${
+            isVoiceMode 
+              ? 'bg-red-500 hover:bg-red-600 text-white' 
+              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
+          }`}
+          onClick={toggleVoiceMode}
+          title={isVoiceMode ? 'Stop voice mode' : 'Start voice mode'}
+        >
+          {isVoiceMode ? <MicOff size={20} /> : <Mic size={20} />}
+        </Button>
+        <Button
+          className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
+          onClick={createChat}
+        >
+          <PlusIcon size={20} />
+        </Button>
+      </div>
     );
 
     // Cleanup when component unmounts
     return () => {
       setRightActions(null);
     };
-  }, [setRightActions, createChat]);
+  }, [setRightActions, createChat, isVoiceMode, toggleVoiceMode]);
 
   // Create sidebar content with useMemo to avoid infinite re-renders
   const sidebarContent = useMemo(() => {
@@ -109,7 +125,9 @@ export function ChatPage() {
           </div>
         ) : (
           <div
-            className="flex-1 overflow-auto ios-scroll sidebar-scroll"
+            className={`flex-1 overflow-auto ios-scroll sidebar-scroll transition-opacity duration-300 ${
+              isVoiceMode ? 'opacity-90' : 'opacity-100'
+            }`}
             ref={containerRef}
             onScroll={handleScroll}
           >
@@ -129,15 +147,26 @@ export function ChatPage() {
         )}
       </main>
 
-      <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out z-20 ${
-        messages.length === 0 ? 'bottom-1/3 transform translate-y-1/2' : 'bottom-0'
-      } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
-        <div className={`relative pointer-events-auto ${
-          layoutMode === 'wide' ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
-        } ${messages.length === 0 ? 'max-w-4xl' : ''}`}>
-          <ChatInput />
-        </div>
-      </footer>
+      {/* Chat Input - hidden during voice mode */}
+      {!isVoiceMode && (
+        <footer className={`absolute left-0 right-0 bg-transparent md:pb-4 pb-safe-bottom px-3 pl-safe-left pr-safe-right pointer-events-none transition-all duration-600 ease-out z-20 ${
+          messages.length === 0 ? 'bottom-1/3 transform translate-y-1/2' : 'bottom-0'
+        } ${isAnimating ? 'transition-all duration-600 ease-out' : ''}`}>
+          <div className={`relative pointer-events-auto ${
+            layoutMode === 'wide' ? 'max-w-full md:max-w-[80vw] mx-auto' : 'max-content-width'
+          } ${messages.length === 0 ? 'max-w-4xl' : ''}`}>
+            <ChatInput />
+          </div>
+        </footer>
+      )}
+
+      {/* Voice Overlay */}
+      <VoiceOverlay 
+        isVisible={isVoiceMode}
+        isConnecting={isConnecting}
+        isListening={isListening}
+        onClose={stopVoiceMode}
+      />
     </div>
   );
 }
