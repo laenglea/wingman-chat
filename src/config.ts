@@ -39,6 +39,7 @@ interface Config {
 
   tts: boolean;
   voice: boolean;
+  
   bridge: Bridge;
 
   models: Model[]; 
