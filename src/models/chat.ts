@@ -11,9 +11,6 @@ export type Message = {
     content: string;
     refusal?: string;
 
-    inputTokens?: number
-    outputTokens?: number
-
     attachments?: Attachment[];
 };
 
