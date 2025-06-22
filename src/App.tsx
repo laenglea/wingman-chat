@@ -9,6 +9,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { LayoutProvider } from "./contexts/LayoutContext";
 import { ChatProvider } from "./contexts/ChatContext";
 import { TranslateProvider } from "./contexts/TranslateContext";
+import { VoiceProvider } from "./contexts/VoiceContext";
 import { SettingsButton } from "./components/SettingsButton";
 
 type Page = "chat" | "translate";
@@ -149,9 +150,11 @@ function App() {
         <SidebarProvider>
           <NavigationProvider>
             <ChatProvider>
-              <TranslateProvider>
-                <AppContent />
-              </TranslateProvider>
+              <VoiceProvider>
+                <TranslateProvider>
+                  <AppContent />
+                </TranslateProvider>
+              </VoiceProvider>
             </ChatProvider>
           </NavigationProvider>
         </SidebarProvider>

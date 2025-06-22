@@ -261,6 +261,48 @@ Return only the prompts themselves, without numbering or bullet points.`,
     return resp.blob();
   }
 
+  async speakText(model: string, input: string, voice?: string): Promise<void> {
+    if (!input.trim()) {
+      return;
+    }
+
+    try {
+      const response = await this.oai.audio.speech.create({
+        model: model,
+        input: input,
+
+        instructions: "Speak in a clear and natural tone.",
+
+        voice: voice ?? "",
+        response_format: "wav",
+      });
+
+      const audioBuffer = await response.arrayBuffer();      
+      const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      
+      return new Promise((resolve, reject) => {
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          resolve();
+        };
+        
+        audio.onerror = (error) => {
+          URL.revokeObjectURL(audioUrl);
+          reject(new Error(`Audio playback failed: ${error}`));
+        };
+        
+        audio.play().catch(reject);
+      });
+
+    } catch (error) {
+      console.error("Text-to-speech failed:", error);
+      throw new Error(`Text-to-speech failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   private toTools(tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {
     if (!tools || tools.length === 0) {
       return undefined;

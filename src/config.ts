@@ -6,6 +6,10 @@ interface config {
   title: string;
 
   models: modelConfig[];
+  
+  tts?: ttsConfig;
+  voice?: voiceConfig;
+  
   bridge?: bridgeConfig;
 }
 
@@ -16,6 +20,14 @@ interface modelConfig {
   description?: string;
 }
 
+interface ttsConfig {
+  enabled: boolean;
+}
+
+interface voiceConfig {
+  enabled: boolean;
+}
+
 interface bridgeConfig {
   url: string;
 }
@@ -24,9 +36,13 @@ interface Config {
   title: string;
 
   client: Client;
+
+  tts: boolean;
+  voice: boolean;
+  
   bridge: Bridge;
 
-  models: Model[];
+  models: Model[]; 
 }
 
 let config: Config;
@@ -50,6 +66,10 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       title : cfg.title,
       
       client: client,
+
+      tts: cfg.tts?.enabled ?? false,
+      voice: cfg.voice?.enabled ?? false,
+      
       bridge: bridge,
 
       models: cfg.models?.map((model) => {
