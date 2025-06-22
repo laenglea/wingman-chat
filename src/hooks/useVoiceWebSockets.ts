@@ -11,6 +11,8 @@ export function useVoiceWebSockets(
   const wsRef = useRef<WebSocket | null>(null);
   const wavPlayerRef = useRef<WavStreamPlayer | null>(null);
   const wavRecorderRef = useRef<WavRecorder | null>(null);
+  // current track ID for audio playback; bump after interrupt to allow restart
+  const trackIdRef = useRef<string>(crypto.randomUUID());
 
   const isActiveRef = useRef(false);
 
@@ -110,10 +112,13 @@ export function useVoiceWebSockets(
         switch (msg.type) {
           case 'input_audio_buffer.speech_started':
             console.log('User started speaking, audio playback will be interrupted');
+            wavPlayerRef.current?.interrupt();
             break;
           
           case 'input_audio_buffer.speech_stopped':
             console.log('User stopped speaking, audio playback can resume');
+            // reset track ID so that subsequent add16BitPCM restarts playback
+            trackIdRef.current = crypto.randomUUID();
             break;
 
           case 'conversation.item.input_audio_transcription.delta':
@@ -294,7 +299,8 @@ export function useVoiceWebSockets(
     try {
       const buf = base64ToArrayBuffer(base64);
       const samples = new Int16Array(buf);
-      player.add16BitPCM(samples, 'assistant');
+      // use a fresh trackId after interrupts to allow restarting playback
+      player.add16BitPCM(samples, trackIdRef.current);
     } catch (err) {
       console.error('Audio playback error:', err);
     }
