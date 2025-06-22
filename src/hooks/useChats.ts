@@ -1,13 +1,84 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 import { Chat } from '../models/chat';
+import { setValue, getValue } from '../lib/db';
 
-const STORAGE_KEY = 'app_chats';
 const SAVE_DELAY = 2000;
 
+const CHATS_KEY = 'chats';
+const STORAGE_KEY = 'app_chats';
+
+// Chat-specific database operations
+async function storeChats(chats: Chat[]): Promise<void> {
+  try {
+    await setValue(CHATS_KEY, chats);
+    //console.log('chats saved to IndexedDB');
+  } catch (error) {
+    console.error('error saving chats to IndexedDB', error);
+    throw error;
+  }
+}
+
+async function loadChats(): Promise<Chat[]> {
+  try {
+    const chats = await getValue<Chat[]>(CHATS_KEY);
+    
+    if (!chats || !Array.isArray(chats)) {
+      return [];
+    }
+    
+    return chats;
+  } catch (error) {
+    console.error('error loading chats from IndexedDB', error);
+    return [];
+  }
+}
+
+// Migration function
+async function migrateChats(): Promise<Chat[]> {
+  try {
+    // Check for legacy data in localStorage
+    const data = localStorage.getItem(STORAGE_KEY);
+
+    if (data) {
+      const legacyChats = JSON.parse(data);
+
+      if (Array.isArray(legacyChats) && legacyChats.length > 0) {
+        console.log(`Migrating ${legacyChats.length} chats from localStorage to IndexedDB`);
+        
+        // Save legacy chats to IndexedDB (overwrite any existing data)
+        await storeChats(legacyChats);
+        
+        // Clear legacy data from localStorage after successful migration
+        localStorage.removeItem(STORAGE_KEY);
+        
+        console.log('Migration completed successfully');
+        return legacyChats;
+      }
+    }
+
+    // No legacy data, load from IndexedDB
+    return await loadChats();
+  } catch (error) {
+    console.error('error during migration', error);
+    // If migration fails, try to load from IndexedDB anyway
+    return await loadChats();
+  }
+}
+
 export function useChats() {
-  const [chats, setChats] = useState<Chat[]>(() => loadLocalChats());
+  const [chats, setChats] = useState<Chat[]>([]);
   const saveTimeoutRef = useRef<number | null>(null);
+
+  // Load chats on mount
+  useEffect(() => {
+    async function load() {
+      const items = await migrateChats();
+      setChats(items);
+    }
+
+    load();
+  }, []);
 
   function createChat() {
     const chat: Chat = {
@@ -21,6 +92,7 @@ export function useChats() {
     setChats((prev) => {
       const items = [chat, ...prev];
       debounceSaveChats(items);
+
       return items;
     });
     
@@ -34,6 +106,7 @@ export function useChats() {
           ? { ...chat, ...updates, updated: new Date() }
           : chat
       );
+
       debounceSaveChats(items);
       return items;
     });
@@ -43,6 +116,7 @@ export function useChats() {
     setChats((prev) => {
       const items = prev.filter((chat) => chat.id !== chatId);
       debounceSaveChats(items);
+      
       return items;
     });
   }
@@ -52,50 +126,12 @@ export function useChats() {
       window.clearTimeout(saveTimeoutRef.current);
     }
 
-    saveTimeoutRef.current = window.setTimeout(() => {
+    saveTimeoutRef.current = window.setTimeout(async () => {
       const itemsToSave = chatItems || chats;
-      const savedChats = loadLocalChats();
-
-      if (JSON.stringify(itemsToSave) !== JSON.stringify(savedChats)) {
-        saveLocalChats(itemsToSave);
-      }
-      
+      await storeChats(itemsToSave);
       saveTimeoutRef.current = null;
     }, SAVE_DELAY);
   }, [chats]);
-
-  function saveLocalChats(chats: Chat[]) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(chats));
-      //console.log('chats saved');
-    }
-    catch (error) {
-      console.error('error saving chats', error);
-    }
-  }
-
-  function loadLocalChats() {
-    try {
-      const data = localStorage.getItem(STORAGE_KEY);
-
-      if (!data) {
-        return [];
-      }
-
-      const charts = JSON.parse(data);
-
-      if (!Array.isArray(charts)) {
-        return [];
-      }
-
-      //console.log('chats loaded');
-      return charts;
-    }
-    catch (error) {
-      console.error('error loading charts', error);
-      return [];
-    }
-  }
 
   return { chats, createChat, updateChat, deleteChat };
 }
