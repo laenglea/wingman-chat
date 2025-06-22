@@ -18,11 +18,16 @@ export function VoiceWaves() {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setWaveOffset(prev => (prev + 5) % 360); // Animate wave movement
-    }, 50);
-
-    return () => clearInterval(interval);
+    let animationId: number;
+    
+    const animate = () => {
+      setWaveOffset(prev => (prev + 2) % 360); // Animate wave movement (reduced increment for smoother animation)
+      animationId = requestAnimationFrame(animate);
+    };
+    
+    animationId = requestAnimationFrame(animate);
+    
+    return () => cancelAnimationFrame(animationId);
   }, []);
 
   // Generate wave path
