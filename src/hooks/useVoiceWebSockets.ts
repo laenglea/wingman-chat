@@ -108,25 +108,40 @@ export function useVoiceWebSockets(
         console.log('Received message:', msg.type);
 
         switch (msg.type) {
-          case 'response.audio.delta':
-            if (msg.delta) {
-              playAudioChunk(msg.delta);
-            }
+          case 'input_audio_buffer.speech_started':
+            console.log('User started speaking, audio playback will be interrupted');
+            break;
+          
+          case 'input_audio_buffer.speech_stopped':
+            console.log('User stopped speaking, audio playback can resume');
+            break;
+
+          case 'conversation.item.input_audio_transcription.delta':
             break;
 
           case 'conversation.item.input_audio_transcription.completed':
             console.log('Transcription completed:', msg.transcript);
+
             if (msg.transcript?.trim()) {
               onUser(msg.transcript);
             }
             break;
+          
+          case 'response.audio.delta':
+            if (msg.delta) {
+              playAudioChunk(msg.delta);
+            }
+            
+            break;
 
           case 'response.done':
             console.log('Response complete:', msg.response);
+
             if (msg.response?.output?.[0]?.content?.[0]?.transcript) {
               onAssistant(msg.response.output[0].content[0].transcript);
             }
             break;
+
           case 'error':
             console.error('OpenAI Error:', msg.error);
             break;

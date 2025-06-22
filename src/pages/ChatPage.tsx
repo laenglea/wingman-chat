@@ -57,7 +57,7 @@ export function ChatPage() {
           <Button
             className={`p-2 rounded transition-all duration-150 ease-out cursor-pointer ${
               isVoiceMode 
-                ? 'bg-red-500 hover:bg-red-600 text-white' 
+                ? 'text-red-600 dark:text-red-400 hover:text-neutral-800 dark:hover:text-neutral-200' 
                 : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
             }`}
             onClick={toggleVoiceMode}
