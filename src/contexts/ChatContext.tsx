@@ -20,6 +20,8 @@ export interface ChatContextType {
   selectChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
   updateChat: (chatId: string, updates: Partial<Chat>) => void;
+
+  addMessage: (message: Message) => void;
   sendMessage: (message: Message) => Promise<void>;
 
   // Refs for stable references
@@ -49,12 +51,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // Use refs to maintain stable references for frequently changing values
   const chatsRef = useRef(chats);
   const chatIdRef = useRef(chatId);
-  
+
   // Update refs when values change
   useEffect(() => {
     chatsRef.current = chats;
   }, [chats]);
-  
+
   useEffect(() => {
     chatIdRef.current = chatId;
   }, [chatId]);
@@ -88,52 +90,71 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [chat, updateChat, setSelectedModel]);
 
-  const sendMessage = useCallback(async (message: Message) => {
-    let currentChat = chat;
-
-    if (!model) throw new Error("no model selected");
-
-    if (!currentChat) {
-      currentChat = createChatHook();
-      currentChat.model = model;
-      setChatId(currentChat.id);
-      // Update the chat with the model
-      updateChat(currentChat.id, { model });
+  // Helper to get or create a chat and its id
+  const getOrCreateChat = useCallback(() => {
+    if (!model) {
+      throw new Error('no model selected');
     }
 
-    const base = [...currentChat.messages, message];
-    const updateMessages = (msgs: typeof base) => updateChat(currentChat.id, { messages: msgs });
-    updateMessages([...base, { role: Role.Assistant, content: "" }]);
+    let id = chatIdRef.current;
+    let chat = id ? chatsRef.current.find(c => c.id === id) || null : null;
+
+    if (!chat) {
+      chat = createChatHook();
+      chat.model = model;
+
+      setChatId(chat.id);
+      updateChat(chat.id, { model });
+
+      id = chat.id;
+    }
+
+    return { id: id!, chat: chat! };
+  }, [model, createChatHook, updateChat, setChatId, chatsRef, chatIdRef]);
+
+  const addMessage = useCallback((message: Message) => {
+    if (!message.content.trim()) return;
+
+    const { id } = getOrCreateChat();
+    const existingMessages = chatsRef.current.find(c => c.id === id)?.messages || [];
+    updateChat(id, { messages: [...existingMessages, message] });
+  }, [getOrCreateChat, updateChat, chatsRef]);
+
+  const sendMessage = useCallback(async (message: Message) => {
+    const { id, chat: chatObj } = getOrCreateChat();
+
+    const existingMessages = chatsRef.current.find(c => c.id === id)?.messages || [];
+    const conversation = [...existingMessages, message];
+    const updateMessages = (msgs: Message[]) => updateChat(id, { messages: msgs });
+
+    updateMessages([...conversation, { role: Role.Assistant, content: '' }]);
 
     try {
       const tools = await bridge.listTools();
 
       const completion = await client.complete(
-        model.id,
+        model!.id,
         tools,
-        base,
-        (_, snapshot) => updateMessages([...base, { role: Role.Assistant, content: snapshot }])
+        conversation,
+        (_, snapshot) => updateMessages([...conversation, { role: Role.Assistant, content: snapshot }])
       );
 
-      updateMessages([...base, completion]);
+      updateMessages([...conversation, completion]);
 
-      if (!currentChat.title || base.length % 3 === 0) {
+      if (!chatObj.title || conversation.length % 3 === 0) {
         client
-          .summarize(model.id, base)
-          .then((title) => updateChat(currentChat.id, { title }));
+          .summarize(model!.id, conversation)
+          .then(title => updateChat(id, { title }));
       }
     } catch (error) {
       console.error(error);
 
-      if (error?.toString().includes("missing finish_reason")) return;
+      if (error?.toString().includes('missing finish_reason')) return;
 
-      const errorMessage = {
-        role: Role.Assistant,
-        content: `An error occurred:\n${error}`,
-      };
-      updateMessages([...base, errorMessage]);
+      const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
+      updateMessages([...conversation, errorMessage]);
     }
-  }, [chat, model, createChatHook, updateChat, bridge, client]);
+  }, [getOrCreateChat, updateChat, bridge, client, model, chatsRef]);
 
   const value: ChatContextType = {
     // Models
@@ -151,6 +172,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
     selectChat,
     deleteChat,
     updateChat,
+
+    // Message actions
+    addMessage,
     sendMessage,
 
     // Refs

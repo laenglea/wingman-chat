@@ -1,8 +1,10 @@
 import { Markdown } from './Markdown';
 import { CopyButton } from './CopyButton';
+import { PlayButton } from './PlayButton';
 import { Bot, User, File, Brain } from "lucide-react";
 
 import { AttachmentType, Message, Role } from "../models/chat";
+import { getConfig } from "../config";
 
 type ChatMessageProps = {
   message: Message;
@@ -10,6 +12,9 @@ type ChatMessageProps = {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === Role.User;
+  
+  const config = getConfig();
+  const enableTTS = config.tts;
 
   if (!isUser && !message.content) {
     return (
@@ -73,7 +78,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
         
         {!isUser && (
           <div className="flex justify-between items-center mt-2">
-             <CopyButton text={message.content} subtle={true} />
+            <div className="flex items-center gap-2">
+              <CopyButton text={message.content} />
+              {enableTTS && <PlayButton text={message.content} />}
+            </div>
           </div>
         )}
       </div>
