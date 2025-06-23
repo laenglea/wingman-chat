@@ -38,11 +38,7 @@ export function useVoiceWebSockets(
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const baseUrl = `${protocol}//${window.location.host}/api/v1/realtime?model=${realtimeModel}`;
 
-      const ws = new WebSocket(baseUrl, [
-        "realtime",
-        //"openai-insecure-api-key." + OPENAI_API_KEY,
-        "openai-beta.realtime-v1"
-      ]);
+      const ws = new WebSocket(baseUrl);
 
       wsRef.current = ws;
 
