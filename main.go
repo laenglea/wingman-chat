@@ -26,6 +26,7 @@ func main() {
 	bridgeURL := os.Getenv("BRIDGE_URL")
 
 	tts := os.Getenv("TTS_ENABLED") == "true"
+	stt := os.Getenv("STT_ENABLED") == "true"
 	voice := os.Getenv("VOICE_ENABLED") == "true"
 
 	mux := http.NewServeMux()
@@ -41,11 +42,15 @@ func main() {
 			Description string `json:"description,omitempty" yaml:"description,omitempty"`
 		}
 
-		type voiceType struct {
+		type ttsType struct {
 			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 		}
 
-		type ttsType struct {
+		type sttType struct {
+			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+		}
+
+		type voiceType struct {
 			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 		}
 
@@ -59,6 +64,7 @@ func main() {
 			Models []modelType `json:"models,omitempty" yaml:"models,omitempty"`
 
 			TTS   *ttsType   `json:"tts,omitempty" yaml:"tts,omitempty"`
+			STT   *sttType   `json:"stt,omitempty" yaml:"stt,omitempty"`
 			Voice *voiceType `json:"voice,omitempty" yaml:"voice,omitempty"`
 
 			Bridge *bridgeType `json:"bridge,omitempty" yaml:"bridge,omitempty"`
@@ -74,6 +80,12 @@ func main() {
 
 		if tts {
 			config.TTS = &ttsType{
+				Enabled: true,
+			}
+		}
+
+		if stt {
+			config.STT = &sttType{
 				Enabled: true,
 			}
 		}

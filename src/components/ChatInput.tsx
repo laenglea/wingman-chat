@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, Link, File, Loader2, FileText, Lightbulb } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, Link, File, Loader2, FileText, Lightbulb, Mic, Square } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role, Tool } from "../models/chat";
 import {
@@ -19,6 +19,7 @@ import {
 import { getConfig } from "../config";
 import { useChat } from "../hooks/useChat";
 import { useTextPaste } from "../hooks/useTextPaste";
+import { useTranscription } from "../hooks/useTranscription";
 
 export function ChatInput() {
   const config = getConfig();
@@ -44,6 +45,9 @@ export function ChatInput() {
 
   // Custom hook for plain text paste handling
   const handlePaste = useTextPaste(contentEditableRef, setContent);
+
+  // Transcription hook
+  const { canTranscribe, isTranscribing, startTranscription, stopTranscription } = useTranscription();
 
   // Handle prompt suggestions click
   const handlePromptSuggestionsClick = async () => {
@@ -293,6 +297,30 @@ export function ChatInput() {
     }
   };
 
+  // Handle transcription button click
+  const handleTranscriptionClick = async () => {
+    if (isTranscribing) {
+      try {
+        const text = await stopTranscription();
+        if (text.trim()) {
+          setContent(text);
+          
+          if (contentEditableRef.current) {
+            contentEditableRef.current.textContent = text;
+          }
+        }
+      } catch (error) {
+        console.error('Transcription failed:', error);
+      }
+    } else {
+      try {
+        await startTranscription();
+      } catch (error) {
+        console.error('Failed to start transcription:', error);
+      }
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit}>
       <div 
@@ -500,12 +528,35 @@ export function ChatInput() {
               <Paperclip size={16} />
             </Button>
 
-            <Button
-              className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
-              type="submit"
-            >
-              <Send size={16} />
-            </Button>
+            {/* Dynamic Send/Mic Button */}
+            {content.trim() ? (
+              <Button
+                className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
+                type="submit"
+              >
+                <Send size={16} />
+              </Button>
+            ) : canTranscribe ? (
+              <Button
+                type="button"
+                className={`p-1.5 focus:outline-none cursor-pointer transition-colors ${
+                  isTranscribing 
+                    ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200' 
+                    : 'text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
+                }`}
+                onClick={handleTranscriptionClick}
+                title={isTranscribing ? 'Stop recording' : 'Start recording'}
+              >
+                {isTranscribing ? <Square size={16} /> : <Mic size={16} />}
+              </Button>
+            ) : (
+              <Button
+                className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
+                type="submit"
+              >
+                <Send size={16} />
+              </Button>
+            )}
           </div>
         </div>
       </div>
