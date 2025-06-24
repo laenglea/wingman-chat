@@ -8,6 +8,7 @@ interface config {
   models: modelConfig[];
   
   tts?: ttsConfig;
+  stt?: sttConfig;
   voice?: voiceConfig;
   
   bridge?: bridgeConfig;
@@ -24,6 +25,10 @@ interface ttsConfig {
   enabled: boolean;
 }
 
+interface sttConfig {
+   enabled: boolean;
+}
+
 interface voiceConfig {
   enabled: boolean;
 }
@@ -38,6 +43,7 @@ interface Config {
   client: Client;
 
   tts: boolean;
+  stt: boolean;
   voice: boolean;
   
   bridge: Bridge;
@@ -68,6 +74,7 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       client: client,
 
       tts: cfg.tts?.enabled ?? false,
+      stt: cfg.stt?.enabled ?? false,
       voice: cfg.voice?.enabled ?? false,
       
       bridge: bridge,

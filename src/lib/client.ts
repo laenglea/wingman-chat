@@ -266,41 +266,56 @@ Return only the prompts themselves, without numbering or bullet points.`,
       return;
     }
 
-    try {
-      const response = await this.oai.audio.speech.create({
-        model: model,
-        input: input,
+    const response = await this.oai.audio.speech.create({
+      model: model,
+      input: input,
 
-        instructions: "Speak in a clear and natural tone.",
+      instructions: "Speak in a clear and natural tone.",
 
-        voice: voice ?? "",
-        response_format: "wav",
-      });
+      voice: voice ?? "",
+      response_format: "wav",
+    });
 
-      const audioBuffer = await response.arrayBuffer();      
-      const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
-      const audioUrl = URL.createObjectURL(audioBlob);
+    const audioBuffer = await response.arrayBuffer();      
+    const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    
+    const audio = new Audio(audioUrl);
+    
+    return new Promise((resolve, reject) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        resolve();
+      };
       
-      const audio = new Audio(audioUrl);
+      audio.onerror = (error) => {
+        URL.revokeObjectURL(audioUrl);
+        reject(new Error(`Audio playback failed: ${error}`));
+      };
       
-      return new Promise((resolve, reject) => {
-        audio.onended = () => {
-          URL.revokeObjectURL(audioUrl);
-          resolve();
-        };
-        
-        audio.onerror = (error) => {
-          URL.revokeObjectURL(audioUrl);
-          reject(new Error(`Audio playback failed: ${error}`));
-        };
-        
-        audio.play().catch(reject);
-      });
+      audio.play().catch(reject);
+    });
+  }
 
-    } catch (error) {
-      console.error("Text-to-speech failed:", error);
-      throw new Error(`Text-to-speech failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  async transcribe(model: string, blob: Blob): Promise<string> {
+    const data = new FormData();
+    data.append('file', blob);
+
+    if(model) {
+      data.append('model', model);
     }
+
+    const response = await fetch(new URL("/api/v1/audio/transcriptions", window.location.origin), {
+      method: "POST",
+      body: data,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Transcription request failed with status ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.text || '';
   }
 
   private toTools(tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {
