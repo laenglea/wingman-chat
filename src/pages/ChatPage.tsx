@@ -7,6 +7,7 @@ import { useNavigation } from "../contexts/NavigationContext";
 import { useLayout } from "../hooks/useLayout";
 import { useChat } from "../hooks/useChat";
 import { useVoice } from "../hooks/useVoice";
+import { useBackground } from "../hooks/useBackground";
 import { ChatInput } from "../components/ChatInput";
 import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
@@ -22,6 +23,9 @@ export function ChatPage() {
   
   const { layoutMode } = useLayout();
   const { isAvailable, startVoice, stopVoice } = useVoice();
+  
+  // Background styles and className from useBackground hook
+  const { backgroundStyles, backgroundClassName } = useBackground();
   
   // Local state for voice mode (UI state)
   const [isVoiceMode, setIsVoiceMode] = useState(false);
@@ -125,6 +129,11 @@ export function ChatPage() {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
+      {/* Background image - only show when no messages */}
+      {messages.length === 0 && (
+        <div className={backgroundClassName} style={backgroundStyles} />
+      )}
+      
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {messages.length === 0 ? (
           <div className="flex-1 flex items-center justify-center pt-16 relative">
