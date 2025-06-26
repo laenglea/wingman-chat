@@ -5,6 +5,7 @@ import { useNavigation } from "../contexts/NavigationContext";
 import { useLayout } from "../hooks/useLayout";
 import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
+import { BackgroundImage } from "../contexts/BackgroundImage";
 
 export function TranslatePage() {
   const { setRightActions } = useNavigation();
@@ -103,6 +104,10 @@ export function TranslatePage() {
 
   return (
     <div className="h-full w-full flex flex-col overflow-hidden relative">
+      {/* Background image - classes applied directly here for xl and up */}
+      <div className="hidden xl:block absolute inset-0 w-full h-full z-0">
+        <BackgroundImage />
+      </div>
       <main className="flex-1 flex flex-col overflow-hidden relative">
         
         {/* Text Translation Section */}
@@ -112,7 +117,7 @@ export function TranslatePage() {
               ? 'max-w-full md:max-w-[80vw] mx-auto' 
               : 'xl:max-w-[1200px] mx-auto'
           }`}>
-            <div className="relative h-full w-full overflow-hidden border-0 bg-transparent xl:border xl:border-neutral-200 xl:dark:border-neutral-900 xl:bg-white/20 xl:dark:bg-black/15 xl:backdrop-blur-2xl xl:rounded-2xl xl:shadow-2xl xl:shadow-black/60 xl:dark:shadow-black/80">
+            <div className="relative h-full w-full overflow-hidden border-0 bg-transparent xl:border xl:border-neutral-200 xl:dark:border-neutral-900 xl:bg-neutral-50/70 xl:dark:bg-neutral-950/85 xl:backdrop-blur-lg xl:rounded-2xl xl:shadow-2xl xl:shadow-black/60 xl:dark:shadow-black/80">
               {/* Responsive layout: vertical stack on mobile/narrow screens, horizontal on wide screens */}
               <div className="h-full flex flex-col md:flex-row min-h-0">
                 {/* Source section */}
@@ -141,11 +146,11 @@ export function TranslatePage() {
                   {/* Show selected file in center */}
                   {selectedFile ? (
                     <div className="absolute inset-2 flex items-center justify-center">
-                      <div className="bg-white/30 dark:bg-black/20 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-white/40 dark:border-white/25 flex flex-col items-center gap-4 relative">
+                      <div className="bg-neutral-50/60 dark:bg-neutral-900/50 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-neutral-200/60 dark:border-neutral-700/50 flex flex-col items-center gap-4 relative">
                         {/* Subtle delete button in top-right */}
                         <Button
                           onClick={handleFileClear}
-                          className="absolute -top-2 -right-2 !p-1.5 !bg-white/40 dark:!bg-black/30 backdrop-blur-lg hover:!bg-white/60 dark:hover:!bg-black/40 rounded-full opacity-70 hover:opacity-100 transition-all border border-white/50 dark:border-white/30 shadow-sm"
+                          className="absolute -top-2 -right-2 !p-1.5 !bg-neutral-50/70 dark:!bg-neutral-900/60 backdrop-blur-lg hover:!bg-neutral-50/80 dark:hover:!bg-neutral-900/70 rounded-full opacity-70 hover:opacity-100 transition-all border border-neutral-200/70 dark:border-neutral-700/60 shadow-sm"
                           title="Remove file"
                         >
                           <XIcon size={12} />
@@ -174,7 +179,7 @@ export function TranslatePage() {
                   
                   <Button
                     onClick={handleTranslateButtonClick}
-                    className="!bg-white/30 dark:!bg-black/20 backdrop-blur-lg border border-white/40 dark:border-white/25 hover:!bg-white/50 dark:hover:!bg-black/30 !text-neutral-700 dark:!text-neutral-300 hover:!text-neutral-900 dark:hover:!text-neutral-100 z-10 relative px-2 py-2 rounded-lg shadow-lg transition-all"
+                    className="!bg-neutral-50/60 dark:!bg-neutral-900/50 backdrop-blur-lg border border-neutral-200/60 dark:border-neutral-700/50 hover:!bg-neutral-50/70 dark:hover:!bg-neutral-900/60 !text-neutral-700 dark:!text-neutral-300 hover:!text-neutral-900 dark:hover:!text-neutral-100 z-10 relative px-2 py-2 rounded-lg shadow-lg transition-all"
                     title={selectedFile ? `Translate file to ${selectedLanguage?.name || 'Selected Language'}` : `Translate to ${selectedLanguage?.name || 'Selected Language'}`}
                     disabled={
                       isLoading || 
@@ -202,7 +207,7 @@ export function TranslatePage() {
                       <MenuItems
                         transition
                         anchor="bottom start"
-                        className="!max-h-[50vh] mt-2 rounded-lg bg-white/95 dark:bg-neutral-900/95 backdrop-blur-lg border border-neutral-200 dark:border-neutral-700 overflow-y-auto shadow-lg z-50"
+                        className="!max-h-[50vh] mt-2 rounded-lg bg-neutral-50/95 dark:bg-neutral-900/95 backdrop-blur-lg border border-neutral-200 dark:border-neutral-700 overflow-y-auto shadow-lg z-50"
                       >
                         {languages.map((lang) => (
                           <MenuItem key={lang.code}>
@@ -228,7 +233,7 @@ export function TranslatePage() {
                   {translatedFileUrl && translatedFileName && (
                     <div className="absolute inset-2 flex items-center justify-center">
                       <div 
-                        className="bg-white/30 dark:bg-black/20 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-white/40 dark:border-white/25 flex flex-col items-center gap-4 cursor-pointer hover:bg-white/40 dark:hover:bg-black/30 transition-all"
+                        className="bg-neutral-50/60 dark:bg-neutral-900/50 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-neutral-200/60 dark:border-neutral-700/50 flex flex-col items-center gap-4 cursor-pointer hover:bg-neutral-50/70 dark:hover:bg-neutral-900/60 transition-all"
                         onClick={handleDownload} 
                         title="Download translated file"
                       >
@@ -249,7 +254,7 @@ export function TranslatePage() {
                   {/* Show loading state for file translation */}
                   {selectedFile && isLoading && (
                     <div className="absolute inset-2 flex items-center justify-center">
-                      <div className="bg-white/30 dark:bg-black/20 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-white/40 dark:border-white/25 flex flex-col items-center gap-4">
+                      <div className="bg-neutral-50/60 dark:bg-neutral-900/50 backdrop-blur-lg p-6 rounded-xl shadow-lg border border-neutral-200/60 dark:border-neutral-700/50 flex flex-col items-center gap-4">
                         <Loader2 size={48} className="animate-spin text-neutral-700 dark:text-neutral-300" />
                         <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200 text-center">
                           Translating...
@@ -262,7 +267,7 @@ export function TranslatePage() {
                   {selectedFile && !isLoading && !translatedFileUrl && !translatedText && (
                     <div className="absolute inset-2 flex items-center justify-center">
                       <div 
-                        className="bg-white/20 dark:bg-black/10 backdrop-blur-lg border-2 border-dashed border-white/50 dark:border-white/30 p-6 rounded-xl flex flex-col items-center gap-4 cursor-pointer hover:bg-white/30 dark:hover:bg-black/20 transition-all"
+                        className="bg-neutral-50/40 dark:bg-neutral-900/30 backdrop-blur-lg border-2 border-dashed border-neutral-200/70 dark:border-neutral-700/60 p-6 rounded-xl flex flex-col items-center gap-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/40 transition-all"
                         onClick={handleTranslateButtonClick} 
                         title="Click to translate file"
                       >
