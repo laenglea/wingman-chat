@@ -5,7 +5,7 @@ import { useNavigation } from "../contexts/NavigationContext";
 import { useLayout } from "../hooks/useLayout";
 import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
-import { BackgroundImage } from "../contexts/BackgroundImage";
+import { BackgroundImage } from "../components/BackgroundImage";
 
 export function TranslatePage() {
   const { setRightActions } = useNavigation();
