@@ -28,7 +28,15 @@ const sections = [
 ];
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const { theme, setTheme, layoutMode, setLayoutMode } = useSettings();
+  const { 
+    theme, 
+    setTheme, 
+    layoutMode, 
+    setLayoutMode,
+    backgroundPacks,
+    backgroundSetting,
+    setBackground
+  } = useSettings();
   const { chats, deleteChat } = useChat();
   const [activeSection, setActiveSection] = useState('general');
 
@@ -108,6 +116,98 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </Listbox>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 System will follow your device's theme setting.
+              </p>
+            </div>
+
+            {/* Background Setting */}
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                Background
+              </label>
+              <Listbox value={backgroundSetting} onChange={setBackground}>
+                <div className="relative">
+                  <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-white dark:bg-neutral-800 py-3 pl-4 pr-10 text-left shadow-sm border border-neutral-300 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <span className="block truncate text-neutral-900 dark:text-neutral-100">
+                      {backgroundSetting 
+                        ? backgroundSetting
+                        : 'None (Default)'
+                      }
+                    </span>
+                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                      <svg className="h-5 w-5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" clipRule="evenodd" />
+                      </svg>
+                    </span>
+                  </Listbox.Button>
+                  <Transition
+                    as={Fragment}
+                    leave="transition ease-in duration-100"
+                    leaveFrom="opacity-100"
+                    leaveTo="opacity-0"
+                  >
+                    <Listbox.Options className="absolute mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-neutral-800 py-1 text-base shadow-lg ring-1 ring-black/5 dark:ring-white/5 focus:outline-none sm:text-sm z-[70]">
+                      {/* None option */}
+                      <Listbox.Option
+                        key="none"
+                        className={({ active }) =>
+                          `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                            active ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'
+                          }`
+                        }
+                        value={null}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                              None (Default)
+                            </span>
+                            {selected ? (
+                              <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600 dark:text-blue-400">
+                                <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                                </svg>
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </Listbox.Option>
+                      {/* Background pack options */}
+                      {backgroundPacks.map((pack) => {
+                        const value = pack.name;
+                        const isSelected = backgroundSetting === pack.name;
+                        return (
+                          <Listbox.Option
+                            key={pack.name}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                                active ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100' : 'text-neutral-900 dark:text-neutral-100'
+                              }`
+                            }
+                            value={value}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                  {pack.name}
+                                </span>
+                                {(selected || isSelected) ? (
+                                  <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600 dark:text-blue-400">
+                                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+                                    </svg>
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </Listbox.Option>
+                        );
+                      })}
+                    </Listbox.Options>
+                  </Transition>
+                </div>
+              </Listbox>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                Choose a background image pack or use the default background.
               </p>
             </div>
 

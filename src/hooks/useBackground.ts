@@ -1,21 +1,20 @@
-import { useState } from "react";
+import { useBackgroundContext } from '../contexts/BackgroundContext';
 
+/**
+ * Hook to access background settings and pack management.
+ */
 export function useBackground() {
-  // Random background image
-  const [randomBackgroundImage] = useState(() => {
-    return `/assets/background_01.jpg`;
-  });
-
-  const getBackgroundStyles = () => ({
-    backgroundImage: `url(${randomBackgroundImage})`,
-  });
-
-  const getBackgroundClassName = () =>
-    "absolute inset-0 bg-cover bg-center bg-no-repeat z-0 transition-opacity duration-700 ease-out opacity-60";
+  const {
+    backgroundPacks,
+    backgroundSetting,
+    setBackground,
+    backgroundImage,
+  } = useBackgroundContext();
 
   return {
-    backgroundImage: randomBackgroundImage,
-    backgroundStyles: getBackgroundStyles(),
-    backgroundClassName: getBackgroundClassName(),
+    backgroundImage,
+    backgroundPacks,
+    backgroundSetting,
+    setBackground,
   };
 }

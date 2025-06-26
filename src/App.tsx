@@ -7,6 +7,7 @@ import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { NavigationProvider, useNavigation } from "./contexts/NavigationContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LayoutProvider } from "./contexts/LayoutContext";
+import { BackgroundProvider } from "./contexts/BackgroundContext";
 import { ChatProvider } from "./contexts/ChatContext";
 import { TranslateProvider } from "./contexts/TranslateContext";
 import { VoiceProvider } from "./contexts/VoiceContext";
@@ -147,17 +148,19 @@ function App() {
   return (
     <ThemeProvider>
       <LayoutProvider>
-        <SidebarProvider>
-          <NavigationProvider>
-            <ChatProvider>
-              <VoiceProvider>
-                <TranslateProvider>
-                  <AppContent />
-                </TranslateProvider>
-              </VoiceProvider>
-            </ChatProvider>
-          </NavigationProvider>
-        </SidebarProvider>
+        <BackgroundProvider>
+          <SidebarProvider>
+            <NavigationProvider>
+              <ChatProvider>
+                <VoiceProvider>
+                  <TranslateProvider>
+                    <AppContent />
+                  </TranslateProvider>
+                </VoiceProvider>
+              </ChatProvider>
+            </NavigationProvider>
+          </SidebarProvider>
+        </BackgroundProvider>
       </LayoutProvider>
     </ThemeProvider>
   );
