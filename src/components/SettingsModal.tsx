@@ -130,7 +130,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <span className="block truncate text-neutral-900 dark:text-neutral-100">
                       {backgroundSetting 
                         ? backgroundSetting
-                        : 'None (Default)'
+                        : 'None'
                       }
                     </span>
                     <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
@@ -159,7 +159,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         {({ selected }) => (
                           <>
                             <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                              None (Default)
+                              None
                             </span>
                             {selected ? (
                               <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-blue-600 dark:text-blue-400">
@@ -207,7 +207,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
               </Listbox>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                Choose a background image pack or use the default background.
+                Choose a background image pack.
               </p>
             </div>
 
