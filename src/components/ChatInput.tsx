@@ -20,6 +20,7 @@ import { getConfig } from "../config";
 import { useChat } from "../hooks/useChat";
 import { useTextPaste } from "../hooks/useTextPaste";
 import { useTranscription } from "../hooks/useTranscription";
+import { useDropZone } from "../hooks/useDropZone";
 
 export function ChatInput() {
   const config = getConfig();
@@ -51,6 +52,48 @@ export function ChatInput() {
 
   // Transcription hook
   const { canTranscribe, isTranscribing, startTranscription, stopTranscription } = useTranscription();
+
+  const handleFiles = async (files: FileList | File[]) => {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileId = `${file.name}-${Date.now()}-${i}`;
+
+      setExtractingAttachments(prev => new Set([...prev, fileId]));
+      try {
+        let attachment: Attachment | null = null;
+
+        if (textTypes.includes(file.type) || textTypes.includes(getFileExt(file.name))) {
+          const text = await readAsText(file);
+          attachment = { type: AttachmentType.Text, name: file.name, data: text };
+        }
+
+        if (imageTypes.includes(file.type) || imageTypes.includes(getFileExt(file.name))) {
+          const blob = await resizeImageBlob(file, 1920, 1920);
+          const url = await readAsDataURL(blob);
+          attachment = { type: AttachmentType.Image, name: file.name, data: url };
+        }
+
+        if (documentTypes.includes(file.type) || documentTypes.includes(getFileExt(file.name))) {
+          const text = await client.extractText(file);
+          attachment = { type: AttachmentType.Text, name: file.name, data: text };
+        }
+
+        if (attachment) {
+          setAttachments(prev => [...prev, attachment]);
+        }
+      } catch (error) {
+        console.error("Error processing file:", error);
+      } finally {
+        setExtractingAttachments(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(fileId);
+          return newSet;
+        });
+      }
+    }
+  };
+
+  const isDragging = useDropZone(containerRef, handleFiles);
 
   // Handle prompt suggestions click
   const handlePromptSuggestionsClick = async () => {
@@ -228,63 +271,10 @@ export function ChatInput() {
     }
   };
 
-  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-
     if (files) {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const fileId = `${file.name}-${Date.now()}-${i}`;
-        
-        // Add to loading state
-        setExtractingAttachments(prev => new Set([...prev, fileId]));
-        
-        try {
-          let attachment: Attachment | null = null;
-
-          if (textTypes.includes(file.type) || textTypes.includes(getFileExt(file.name))) {
-            const text = await readAsText(file);
-            attachment = {
-              type: AttachmentType.Text,
-              name: file.name,
-              data: text,
-            };
-          }
-
-          if (imageTypes.includes(file.type) || imageTypes.includes(getFileExt(file.name))) {
-            const blob = await resizeImageBlob(file, 1920, 1920);
-            const url = await readAsDataURL(blob);
-            attachment = {
-              type: AttachmentType.Image,
-              name: file.name,
-              data: url,
-            };
-          }
-
-          if (documentTypes.includes(file.type) || documentTypes.includes(getFileExt(file.name))) {
-            const text = await client.extractText(file);
-            attachment = {
-              type: AttachmentType.Text,
-              name: file.name,
-              data: text,
-            };
-          }
-
-          if (attachment) {
-            setAttachments((prev) => [...prev, attachment!]);
-          }
-        } catch (error) {
-          console.error("Error processing file:", error);
-        } finally {
-          // Remove from loading state
-          setExtractingAttachments(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(fileId);
-            return newSet;
-          });
-        }
-      }
-
+      handleFiles(files);
       e.target.value = "";
     }
   };
@@ -331,7 +321,7 @@ export function ChatInput() {
     <form onSubmit={handleSubmit}>
       <div 
         ref={containerRef}
-        className="chat-input-container border border-neutral-200 dark:border-neutral-700 bg-white/30 dark:bg-black/25 backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 dark:ring-1 dark:ring-white/10"
+        className={`chat-input-container border border-neutral-200 dark:border-neutral-700 bg-white/30 dark:bg-black/25 backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 dark:ring-1 dark:ring-white/10 ${isDragging ? 'bg-white/50 dark:bg-black/40 border-blue-400 dark:border-blue-600' : ''}`}
       >
         <input
           type="file"
