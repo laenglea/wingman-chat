@@ -73,7 +73,7 @@ func main() {
 
 			Bridge *bridgeType `json:"bridge,omitempty" yaml:"bridge,omitempty"`
 
-			Backgrounds map[string]backgroundType `json:"backgrounds,omitempty" yaml:"backgrounds,omitempty"`
+			Backgrounds map[string][]backgroundType `json:"backgrounds,omitempty" yaml:"backgrounds,omitempty"`
 		}
 
 		config := configType{
