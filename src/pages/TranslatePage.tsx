@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useDropZone } from "../hooks/useDropZone";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, XIcon, DownloadIcon } from "lucide-react";
 import { useNavigation } from "../contexts/NavigationContext";
@@ -10,6 +11,7 @@ export function TranslatePage() {
   const { setRightActions } = useNavigation();
   const { layoutMode } = useLayout();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Use translate context
   const {
@@ -61,6 +63,22 @@ export function TranslatePage() {
       fileInputRef.current.value = '';
     }
   };
+
+  const handleDropFiles = (files: File[]) => {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    const file = files.find(f => allowedTypes.includes(f.type));
+    if (file) {
+      selectFile(file);
+    } else {
+      alert('Please drop a valid file type: .docx, .pptx, or .xlsx');
+    }
+  };
+
+  const isDragging = useDropZone(containerRef, handleDropFiles);
 
   const handleDownload = () => {
     if (translatedFileUrl && translatedFileName) {
@@ -116,7 +134,10 @@ export function TranslatePage() {
               {/* Responsive layout: vertical stack on mobile/narrow screens, horizontal on wide screens */}
               <div className="h-full flex flex-col md:flex-row min-h-0">
                 {/* Source section */}
-                <div className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">
+                <div
+                  ref={containerRef}
+                  className={`flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden ${isDragging ? 'bg-white/50 dark:bg-black/40 border border-blue-400 dark:border-blue-600' : ''}`}
+                >
                   {/* File upload controls */}
                   <div className="absolute top-2 left-4 z-10">
                     {!selectedFile && (
