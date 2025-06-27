@@ -30,8 +30,11 @@ export function ChatInput() {
   const { sendMessage: onSend, models, model, setModel: onModelChange, messages } = useChat();
 
   const [content, setContent] = useState("");
+  const [transcribingContent, setTranscribingContent] = useState(false);
+
   const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [loadingAttachments, setLoadingAttachments] = useState<Set<string>>(new Set());
+  const [extractingAttachments, setExtractingAttachments] = useState<Set<string>>(new Set());
+
   const [bridgeTools, setBridgeTools] = useState<Tool[]>([]);
   
   // Prompt suggestions state
@@ -202,7 +205,7 @@ export function ChatInput() {
 
   const handleScreenshotClick = async () => {
     const screenshotId = `screenshot-${Date.now()}`;
-    setLoadingAttachments(prev => new Set([...prev, screenshotId]));
+    setExtractingAttachments(prev => new Set([...prev, screenshotId]));
     
     try {
       const data = await captureScreenshot();
@@ -217,7 +220,7 @@ export function ChatInput() {
     } catch (error) {
       console.error("Error capturing screenshot:", error);
     } finally {
-      setLoadingAttachments(prev => {
+      setExtractingAttachments(prev => {
         const newSet = new Set(prev);
         newSet.delete(screenshotId);
         return newSet;
@@ -234,7 +237,7 @@ export function ChatInput() {
         const fileId = `${file.name}-${Date.now()}-${i}`;
         
         // Add to loading state
-        setLoadingAttachments(prev => new Set([...prev, fileId]));
+        setExtractingAttachments(prev => new Set([...prev, fileId]));
         
         try {
           let attachment: Attachment | null = null;
@@ -274,7 +277,7 @@ export function ChatInput() {
           console.error("Error processing file:", error);
         } finally {
           // Remove from loading state
-          setLoadingAttachments(prev => {
+          setExtractingAttachments(prev => {
             const newSet = new Set(prev);
             newSet.delete(fileId);
             return newSet;
@@ -300,6 +303,7 @@ export function ChatInput() {
   // Handle transcription button click
   const handleTranscriptionClick = async () => {
     if (isTranscribing) {
+      setTranscribingContent(true);
       try {
         const text = await stopTranscription();
         if (text.trim()) {
@@ -311,6 +315,8 @@ export function ChatInput() {
         }
       } catch (error) {
         console.error('Transcription failed:', error);
+      } finally {
+        setTranscribingContent(false);
       }
     } else {
       try {
@@ -337,17 +343,17 @@ export function ChatInput() {
         />
 
         {/* Attachments display */}
-        {(attachments.length > 0 || loadingAttachments.size > 0) && (
+        {(attachments.length > 0 || extractingAttachments.size > 0) && (
           <div className="flex flex-wrap gap-3 p-3">
             {/* Loading attachments */}
-            {Array.from(loadingAttachments).map((fileId, index) => (
+            {Array.from(extractingAttachments).map((fileId, index) => (
               <div
                 key={fileId}
                 className="relative size-14 bg-white/30 dark:bg-black/20 backdrop-blur-lg rounded-xl border-2 border-dashed border-white/50 dark:border-white/30 flex items-center justify-center animate-pulse"
                 title="Processing file..."
               >
                 <Loader2 size={18} className="animate-spin text-neutral-500 dark:text-neutral-400" />
-                {loadingAttachments.size > 1 && (
+                {extractingAttachments.size > 1 && (
                   <div className="absolute -bottom-1 -right-1 size-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
                     {index + 1}
                   </div>
@@ -537,18 +543,29 @@ export function ChatInput() {
                 <Send size={16} />
               </Button>
             ) : canTranscribe ? (
-              <Button
-                type="button"
-                className={`p-1.5 focus:outline-none cursor-pointer transition-colors ${
-                  isTranscribing 
-                    ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200' 
-                    : 'text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
-                }`}
-                onClick={handleTranscriptionClick}
-                title={isTranscribing ? 'Stop recording' : 'Start recording'}
-              >
-                {isTranscribing ? <Square size={16} /> : <Mic size={16} />}
-              </Button>
+              transcribingContent ? (
+                <Button
+                  type="button"
+                  className="p-1.5 text-neutral-600 dark:text-neutral-400"
+                  disabled
+                  title="Processing audio..."
+                >
+                  <Loader2 size={16} className="animate-spin" />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className={`p-1.5 focus:outline-none cursor-pointer transition-colors ${
+                    isTranscribing 
+                      ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200' 
+                      : 'text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
+                  }`}
+                  onClick={handleTranscriptionClick}
+                  title={isTranscribing ? 'Stop recording' : 'Start recording'}
+                >
+                  {isTranscribing ? <Square size={16} /> : <Mic size={16} />}
+                </Button>
+              )
             ) : (
               <Button
                 className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
