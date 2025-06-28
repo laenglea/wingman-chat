@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 
 export function useDropZone<T extends HTMLElement = HTMLElement>(
-  ref: React.RefObject<T>,
+  ref: React.RefObject<T | null>,
   onFiles: (files: File[]) => void
 ): boolean {
   const [isDragging, setIsDragging] = useState(false);
