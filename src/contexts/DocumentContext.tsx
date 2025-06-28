@@ -1,19 +1,20 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import pLimit from 'p-limit';
 import { Client } from '../lib/client';
-import { VectorDB, ProcessedDocument } from '../lib/vectordb';
+import { VectorDB, Document } from '../lib/vectordb';
 
 export interface FileItem {
   id: string;
   file: File;
+
   status: 'pending' | 'processing' | 'completed' | 'error';
   progress: number;
-  extractedText?: string;
+  
+  text?: string;
   segments?: Array<{
     text: string;
     vector: number[];
   }>;
-  storedInVectorDB?: boolean;
   error?: string;
 }
 
@@ -95,6 +96,19 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
       
       const chunks = await Promise.all(embeddingPromises);
 
+      // Store each chunk as a separate document in vector database
+      chunks.forEach((chunk, index) => {
+        const chunkDoc: Document = {
+          id: `${fileId}:${index}`,
+          text: chunk.text,
+          source: file.file.name,
+          vector: chunk.vector
+        };
+
+        vectorDB.addDocument(chunkDoc);
+      });
+
+      // Mark as completed only after everything including vector DB storage is done
       setFiles(prev => prev.map(f => 
         f.id === fileId ? { 
           ...f, 
@@ -102,20 +116,6 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
           status: 'completed', 
           progress: 100 
         } : f
-      ));
-
-      // Store in vector database
-      const processedDoc: ProcessedDocument = {
-        id: fileId,
-        text: text,
-        source: file.file.name,
-        segments: chunks
-      };
-
-      vectorDB.addProcessedDocument('playground', processedDoc, ['uploaded']);
-      
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, storedInVectorDB: true } : f
       ));
 
     } catch (error) {
