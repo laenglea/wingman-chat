@@ -4,7 +4,7 @@ import { Repository } from '../types/repository';
 type RepositoryContextType = {
   repositories: Repository[];
   currentRepository: Repository | null;
-  createRepository: (name: string, description?: string, systemPrompt?: string) => void;
+  createRepository: (name: string, instructions?: string) => void;
   updateRepository: (id: string, updates: Partial<Omit<Repository, 'id' | 'createdAt'>>) => void;
   deleteRepository: (id: string) => void;
   setCurrentRepository: (repository: Repository | null) => void;
@@ -20,12 +20,11 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
   const [currentRepository, setCurrentRepository] = useState<Repository | null>(null);
   const [showRepositoryDrawer, setShowRepositoryDrawer] = useState(false);
 
-  const createRepository = useCallback((name: string, description?: string, systemPrompt?: string) => {
+  const createRepository = useCallback((name: string, instructions?: string) => {
     const newRepository: Repository = {
       id: crypto.randomUUID(),
       name,
-      description,
-      systemPrompt,
+      instructions,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

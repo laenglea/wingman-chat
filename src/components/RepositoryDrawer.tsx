@@ -6,19 +6,18 @@ import { useRepositoryDocuments } from '../hooks/useRepositoryDocuments';
 import { Repository } from '../types/repository';
 
 interface CreateRepositoryFormProps {
-  onSubmit: (name: string, description: string, systemPrompt: string) => void;
+  onSubmit: (name: string, instructions: string) => void;
   onCancel: () => void;
 }
 
 function CreateRepositoryForm({ onSubmit, onCancel }: CreateRepositoryFormProps) {
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [systemPrompt, setSystemPrompt] = useState('');
+  const [instructions, setInstructions] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onSubmit(name.trim(), description.trim(), systemPrompt.trim());
+      onSubmit(name.trim(), instructions.trim());
     }
   };
 
@@ -46,26 +45,11 @@ function CreateRepositoryForm({ onSubmit, onCancel }: CreateRepositoryFormProps)
         
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-            Description
-          </label>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md 
-                     bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100
-                     focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Optional description"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-            System Prompt
+            Instructions
           </label>
           <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
             rows={3}
             className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md 
                      bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100
@@ -158,14 +142,9 @@ function RepositoryDetails({ repository, onEdit }: RepositoryDetailsProps) {
           )}
         </div>
         
-        {repository.description && (
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
-            {repository.description}
-          </p>
-        )}
-        {repository.systemPrompt && (
+        {repository.instructions && (
           <div className="text-xs text-neutral-500 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800 p-2 rounded">
-            <strong>System Prompt:</strong> {repository.systemPrompt}
+            <strong>Instructions:</strong> {repository.instructions}
           </div>
         )}
       </div>
@@ -260,21 +239,20 @@ function RepositoryDetails({ repository, onEdit }: RepositoryDetailsProps) {
 
 interface EditRepositoryFormProps {
   repository: Repository;
-  onSubmit: (id: string, name: string, description: string, systemPrompt: string) => void;
+  onSubmit: (id: string, name: string, instructions: string) => void;
   onCancel: () => void;
   onDelete: (id: string) => void;
 }
 
 function EditRepositoryForm({ repository, onSubmit, onCancel, onDelete }: EditRepositoryFormProps) {
   const [name, setName] = useState(repository.name);
-  const [description, setDescription] = useState(repository.description || '');
-  const [systemPrompt, setSystemPrompt] = useState(repository.systemPrompt || '');
+  const [instructions, setInstructions] = useState(repository.instructions || '');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      onSubmit(repository.id, name.trim(), description.trim(), systemPrompt.trim());
+      onSubmit(repository.id, name.trim(), instructions.trim());
     }
   };
 
@@ -336,26 +314,11 @@ function EditRepositoryForm({ repository, onSubmit, onCancel, onDelete }: EditRe
         
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-            Description
-          </label>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md 
-                     bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100
-                     focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Optional description"
-          />
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-            System Prompt
+            Instructions
           </label>
           <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
+            value={instructions}
+            onChange={(e) => setInstructions(e.target.value)}
             rows={3}
             className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-md 
                      bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100
@@ -411,16 +374,15 @@ export function RepositoryDrawer() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingRepository, setEditingRepository] = useState<Repository | null>(null);
 
-  const handleCreateRepository = (name: string, description: string, systemPrompt: string) => {
-    createRepository(name, description || undefined, systemPrompt || undefined);
+  const handleCreateRepository = (name: string, instructions: string) => {
+    createRepository(name, instructions || undefined);
     setShowCreateForm(false);
   };
 
-  const handleEditRepository = (id: string, name: string, description: string, systemPrompt: string) => {
+  const handleEditRepository = (id: string, name: string, instructions: string) => {
     updateRepository(id, {
       name,
-      description: description || undefined,
-      systemPrompt: systemPrompt || undefined
+      instructions: instructions || undefined
     });
     setEditingRepository(null);
   };

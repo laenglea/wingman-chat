@@ -22,14 +22,32 @@ export interface RepositoryDocumentHookReturn {
 // Global storage for files by repository ID
 const repositoryFilesMap = new Map<string, RepositoryFile[]>();
 
+// Global storage for vector databases by repository ID
+const repositoryVectorDBMap = new Map<string, VectorDB>();
+
+// Global storage for clients by repository ID
+const repositoryClientMap = new Map<string, Client>();
+
 export function useRepositoryDocuments(repositoryId: string): RepositoryDocumentHookReturn {
   // Initialize files for this repository if not exists
   const [files, setFiles] = useState<RepositoryFile[]>(() => {
     return repositoryFilesMap.get(repositoryId) || [];
   });
   
-  const [vectorDB] = useState(() => new VectorDB());
-  const [client] = useState(() => new Client());
+  // Get or create shared vectorDB and client for this repository
+  const vectorDB = (() => {
+    if (!repositoryVectorDBMap.has(repositoryId)) {
+      repositoryVectorDBMap.set(repositoryId, new VectorDB());
+    }
+    return repositoryVectorDBMap.get(repositoryId)!;
+  })();
+
+  const client = (() => {
+    if (!repositoryClientMap.has(repositoryId)) {
+      repositoryClientMap.set(repositoryId, new Client());
+    }
+    return repositoryClientMap.get(repositoryId)!;
+  })();
 
   // Update global map when files change
   useEffect(() => {
@@ -155,10 +173,13 @@ export function useRepositoryDocuments(repositoryId: string): RepositoryDocument
         // Extract fileId from document id (format: repositoryId:fileId:segmentIndex)
         const parts = result.document.id.split(':');
         const fileId = parts[1];
-        const fileItem = files.find(f => f.id === fileId);
+        
+        // Get files from global map to ensure we have the latest state
+        const currentFiles = repositoryFilesMap.get(repositoryId) || [];
+        const fileItem = currentFiles.find(f => f.id === fileId);
         
         return {
-          fileItem: fileItem!, // We know it exists since it's in the vector DB
+          fileItem: fileItem!,
           text: result.document.text,
           similarity: result.similarity
         };
@@ -169,19 +190,27 @@ export function useRepositoryDocuments(repositoryId: string): RepositoryDocument
       console.error('Search failed:', error);
       return [];
     }
-  }, [vectorDB, client, files, repositoryId]);
+  }, [vectorDB, client, repositoryId]);
 
   const queryTools = useCallback((): Tool[] => {
     return [
       {
-        name: 'query_repository_knowledge',
-        description: 'Find relevant information in the current repository knowledge database',
+        name: 'find_documents',
+        description: 'find possible relevant information to user queries.',
         parameters: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
-              description: 'The search query to find relevant information'
+              description: `The search query to find relevant information.
+              Transform the query into a better search query for retrieving relevant documents.
+              
+              Rules:
+              - Make queries more specific and descriptive
+              - Include technical terms and synonyms
+              - Expand abbreviations
+              - Add context when helpful
+              - Keep under 100 words`
             }
           },
           required: ['query']
@@ -194,6 +223,7 @@ export function useRepositoryDocuments(repositoryId: string): RepositoryDocument
 
           try {
             const results = await queryChunks(query, 5);
+            
             if (results.length === 0) {
               return JSON.stringify([]);
             }
