@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { useState, useCallback } from 'react';
 import pLimit from 'p-limit';
 import { Client } from '../lib/client';
 import { VectorDB, Document } from '../lib/vectordb';
@@ -18,55 +18,49 @@ export interface FileItem {
   error?: string;
 }
 
-interface DocumentContextType {
-  files: FileItem[];
-  vectorDB: VectorDB;
-  addFiles: (selectedFiles: FileList) => void;
-  removeFile: (fileId: string) => void;
-  processFile: (fileId: string) => Promise<void>;
-  processAllFiles: () => Promise<void>;
+export interface FileChunk {
+  fileItem: FileItem;
+  text: string;
+  similarity?: number;
 }
 
-const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
+export interface DocumentHookReturn {
+  files: FileItem[];
+  addFile: (file: File) => Promise<void>;
+  removeFile: (fileId: string) => void;
+  queryFileChunk: (query: string, topK?: number) => Promise<FileChunk[]>;
+}
 
-export function DocumentProvider({ children }: { children: ReactNode }) {
+export function useDocuments(): DocumentHookReturn {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [vectorDB] = useState(() => new VectorDB());
   const [client] = useState(() => new Client());
-
-  const addFiles = useCallback((selectedFiles: FileList) => {
-    const newFiles: FileItem[] = Array.from(selectedFiles).map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      status: 'pending',
-      progress: 0,
-    }));
-    
-    setFiles(prev => [...prev, ...newFiles]);
-  }, []);
 
   const removeFile = useCallback((fileId: string) => {
     setFiles(prev => prev.filter(f => f.id !== fileId));
   }, []);
 
-  const processFile = useCallback(async (fileId: string) => {
-    setFiles(prev => prev.map(f => 
-      f.id === fileId ? { ...f, status: 'processing', progress: 0 } : f
-    ));
+  const addFile = useCallback(async (file: File) => {
+    const fileId = crypto.randomUUID();
+    
+    // Add file to state as processing
+    setFiles(prev => [...prev, {
+      id: fileId,
+      file,
+      status: 'processing',
+      progress: 0,
+    }]);
 
     try {
-      const file = files.find(f => f.id === fileId);
-      if (!file) return;
-
       // Step 1: Extract text (0% -> 10%)
-      const text = await client.extractText(file.file);
+      const text = await client.extractText(file);
       
       setFiles(prev => prev.map(f => 
         f.id === fileId ? { ...f, text, progress: 10 } : f
       ));
 
       // Step 2: Segment text (10% -> 20%)
-      const segments = await client.segmentText(file.file);
+      const segments = await client.segmentText(file);
       
       setFiles(prev => prev.map(f => 
         f.id === fileId ? { ...f, progress: 20 } : f
@@ -101,7 +95,7 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
         const chunkDoc: Document = {
           id: `${fileId}:${index}`,
           text: chunk.text,
-          source: file.file.name,
+          source: file.name,
           vector: chunk.vector
         };
 
@@ -127,35 +121,44 @@ export function DocumentProvider({ children }: { children: ReactNode }) {
         } : f
       ));
     }
-  }, [files, vectorDB, client]);
+  }, [vectorDB, client]);
 
-  const processAllFiles = useCallback(async () => {
-    const pendingFiles = files.filter(f => f.status === 'pending');
-    for (const file of pendingFiles) {
-      await processFile(file.id);
+  const queryFileChunk = useCallback(async (query: string, topK: number = 5): Promise<FileChunk[]> => {
+    if (!query.trim()) {
+      return [];
     }
-  }, [files, processFile]);
 
-  return (
-    <DocumentContext.Provider
-      value={{
-        files,
-        vectorDB,
-        addFiles,
-        removeFile,
-        processFile,
-        processAllFiles,
-      }}
-    >
-      {children}
-    </DocumentContext.Provider>
-  );
-}
+    try {
+      // Generate embedding for search query
+      const queryVector = await client.embedText(query);
+      
+      // Search the vector database
+      const results = vectorDB.queryDocuments(queryVector, topK);
+      
+      // Convert QueryResult[] to FileChunk[]
+      const fileChunks: FileChunk[] = results.map(result => {
+        // Extract fileId from document id (format: fileId:segmentIndex)
+        const fileId = result.document.id.split(':')[0];
+        const fileItem = files.find(f => f.id === fileId);
+        
+        return {
+          fileItem: fileItem!, // We know it exists since it's in the vector DB
+          text: result.document.text,
+          similarity: result.similarity
+        };
+      }).filter(chunk => chunk.fileItem); // Filter out any chunks where fileItem wasn't found
+      
+      return fileChunks;
+    } catch (error) {
+      console.error('Search failed:', error);
+      return [];
+    }
+  }, [vectorDB, client, files]);
 
-export function useDocuments() {
-  const context = useContext(DocumentContext);
-  if (context === undefined) {
-    throw new Error('useDocuments must be used within a DocumentProvider');
-  }
-  return context;
+  return {
+    files,
+    removeFile,
+    addFile,
+    queryFileChunk,
+  };
 }
