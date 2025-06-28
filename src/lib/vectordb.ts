@@ -1,8 +1,20 @@
+export interface Segment {
+  text: string;
+  vector: number[];
+}
+
 export interface Document {
   id: string;
   source: string;
   vector: number[];
   text: string;
+}
+
+export interface ProcessedDocument {
+  id: string;
+  text: string;
+  source: string;
+  segments: Segment[];
 }
 
 export interface QueryResult {
@@ -241,5 +253,97 @@ export class VectorDB {
     } catch (error) {
       throw new Error(`Failed to import database: ${error}`);
     }
+  }
+  
+  /**
+   * Add a processed document with its segments to the vector database
+   */
+  addProcessedDocument(domain: string, processedDoc: ProcessedDocument, tags?: string[]): void {
+    // Store each segment as a separate document in the vector database
+    processedDoc.segments.forEach((segment, index) => {
+      const segmentDoc: Document = {
+        id: `${processedDoc.id}_segment_${index}`,
+        source: processedDoc.source,
+        vector: segment.vector,
+        text: segment.text
+      };
+      
+      // Add segment-specific tags
+      const segmentTags = [
+        ...(tags || []),
+        'segment',
+        `document:${processedDoc.id}`,
+        `source:${processedDoc.source}`
+      ];
+      
+      this.addDocument(domain, segmentDoc, segmentTags);
+    });
+    
+    // Also store the full document if it has an overall vector
+    // For now, we'll create an average vector from all segments
+    if (processedDoc.segments.length > 0) {
+      const avgVector = this.calculateAverageVector(processedDoc.segments.map(s => s.vector));
+      
+      const fullDoc: Document = {
+        id: processedDoc.id,
+        source: processedDoc.source,
+        vector: avgVector,
+        text: processedDoc.text
+      };
+      
+      const fullDocTags = [
+        ...(tags || []),
+        'full-document',
+        `source:${processedDoc.source}`
+      ];
+      
+      this.addDocument(domain, fullDoc, fullDocTags);
+    }
+  }
+  
+  /**
+   * Calculate average vector from multiple vectors
+   */
+  private calculateAverageVector(vectors: number[][]): number[] {
+    if (vectors.length === 0) return [];
+    
+    const dimension = vectors[0].length;
+    const avgVector = new Array(dimension).fill(0);
+    
+    for (const vector of vectors) {
+      for (let i = 0; i < dimension; i++) {
+        avgVector[i] += vector[i];
+      }
+    }
+    
+    for (let i = 0; i < dimension; i++) {
+      avgVector[i] /= vectors.length;
+    }
+    
+    return avgVector;
+  }
+  
+  /**
+   * Query for segments from a specific document
+   */
+  queryDocumentSegments(domain: string, documentId: string): Document[] {
+    if (!this.documents.has(domain)) {
+      return [];
+    }
+    
+    const domainDocs = this.documents.get(domain)!;
+    const segments: Document[] = [];
+    
+    for (const [id, doc] of domainDocs.entries()) {
+      if (id.startsWith(`${documentId}_segment_`)) {
+        segments.push(doc);
+      }
+    }
+    
+    return segments.sort((a, b) => {
+      const aIndex = parseInt(a.id.split('_segment_')[1]);
+      const bIndex = parseInt(b.id.split('_segment_')[1]);
+      return aIndex - bIndex;
+    });
   }
 }

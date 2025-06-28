@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { MessageCircle, Languages, PanelLeftOpen, PanelRightOpen } from "lucide-react";
+import { MessageCircle, Languages, PanelLeftOpen, PanelRightOpen, Beaker } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { ChatPage } from "./pages/ChatPage";
 import { TranslatePage } from "./pages/TranslatePage";
+import { PlaygroundPage } from "./pages/PlaygroundPage";
 import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
 import { NavigationProvider, useNavigation } from "./contexts/NavigationContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -13,7 +14,7 @@ import { TranslateProvider } from "./contexts/TranslateContext";
 import { VoiceProvider } from "./contexts/VoiceContext";
 import { SettingsButton } from "./components/SettingsButton";
 
-type Page = "chat" | "translate";
+type Page = "chat" | "translate" | "playground";
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
@@ -52,6 +53,7 @@ function AppContent() {
   const pages: { key: Page; label: string; icon: React.ReactNode }[] = [
     { key: "chat", label: "Chat", icon: <MessageCircle size={20} /> },
     { key: "translate", label: "Translate", icon: <Languages size={20} /> },
+    { key: "playground", label: "Playground", icon: <Beaker size={20} /> },
   ];
 
   return (
@@ -153,6 +155,7 @@ function AppContent() {
         <div className="flex-1 overflow-hidden">
           {currentPage === "chat" && <ChatPage />}
           {currentPage === "translate" && <TranslatePage />}
+          {currentPage === "playground" && <PlaygroundPage />}
         </div>
       </div>
     </div>
