@@ -321,7 +321,11 @@ export function ChatInput() {
     <form onSubmit={handleSubmit}>
       <div 
         ref={containerRef}
-        className={`chat-input-container border border-neutral-200 dark:border-neutral-700 bg-white/30 dark:bg-black/25 backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 dark:ring-1 dark:ring-white/10 ${isDragging ? 'bg-white/50 dark:bg-black/40 border-blue-400 dark:border-blue-600' : ''}`}
+        className={`chat-input-container border-2 ${
+          isDragging 
+            ? 'border-dashed border-slate-400 dark:border-slate-500 bg-slate-50/80 dark:bg-slate-900/40 shadow-2xl shadow-slate-500/30 dark:shadow-slate-400/20 scale-[1.02] transition-all duration-200' 
+            : 'border-solid border-neutral-200 dark:border-neutral-700 bg-white/30 dark:bg-black/25'
+        } backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 dark:ring-1 dark:ring-white/10 transition-all duration-200`}
       >
         <input
           type="file"
@@ -331,6 +335,18 @@ export function ChatInput() {
           className="hidden"
           onChange={handleFileChange}
         />
+
+        {/* Drop zone overlay */}
+        {isDragging && (
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-500/20 via-slate-600/30 to-slate-500/20 dark:from-slate-400/20 dark:via-slate-500/30 dark:to-slate-400/20 rounded-lg md:rounded-2xl flex flex-col items-center justify-center pointer-events-none z-10 backdrop-blur-sm">
+            <div className="text-slate-700 dark:text-slate-300 font-semibold text-lg text-center">
+              Drop files here
+            </div>
+            <div className="text-slate-600 dark:text-slate-400 text-sm mt-1 text-center">
+              Images, documents, and text files supported
+            </div>
+          </div>
+        )}
 
         {/* Attachments display */}
         {(attachments.length > 0 || extractingAttachments.size > 0) && (
