@@ -2,26 +2,12 @@ import { useState, useCallback, useRef } from "react";
 import { Upload, FileText, X, CheckCircle, AlertCircle, Database, Search } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { Client } from "../lib/client";
-import { VectorDB, ProcessedDocument, QueryResult } from "../lib/vectordb";
-
-interface FileItem {
-  id: string;
-  file: File;
-  status: 'pending' | 'processing' | 'completed' | 'error';
-  progress: number;
-  extractedText?: string;
-  segments?: Array<{
-    text: string;
-    vector: number[];
-  }>;
-  storedInVectorDB?: boolean;
-  error?: string;
-}
+import { QueryResult } from "../lib/vectordb";
+import { useDocuments, FileItem } from "../contexts/DocumentContext";
 
 export function PlaygroundPage() {
-  const [files, setFiles] = useState<FileItem[]>([]);
+  const { files, vectorDB, addFiles, removeFile, processFile, processAllFiles } = useDocuments();
   const [isDragOver, setIsDragOver] = useState(false);
-  const [vectorDB] = useState(() => new VectorDB());
   const [client] = useState(() => new Client());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<QueryResult[]>([]);
@@ -29,15 +15,8 @@ export function PlaygroundPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = useCallback((selectedFiles: FileList) => {
-    const newFiles: FileItem[] = Array.from(selectedFiles).map(file => ({
-      id: crypto.randomUUID(),
-      file,
-      status: 'pending',
-      progress: 0,
-    }));
-    
-    setFiles(prev => [...prev, ...newFiles]);
-  }, []);
+    addFiles(selectedFiles);
+  }, [addFiles]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -57,86 +36,6 @@ export function PlaygroundPage() {
     e.preventDefault();
     setIsDragOver(false);
   }, []);
-
-  const removeFile = useCallback((fileId: string) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId));
-  }, []);
-
-  const processFile = useCallback(async (fileId: string) => {
-    setFiles(prev => prev.map(f => 
-      f.id === fileId ? { ...f, status: 'processing', progress: 0 } : f
-    ));
-
-    try {
-      const file = files.find(f => f.id === fileId);
-      if (!file) return;
-
-      // Step 1: Extract text
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, progress: 25 } : f
-      ));
-      
-      const extractedText = await client.extractText(file.file);
-      
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, extractedText, progress: 50 } : f
-      ));
-
-      // Step 2: Segment text
-      const segments = await client.segmentText(file.file);
-      
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, progress: 75 } : f
-      ));
-
-      // Step 3: Embed segments
-      const embeddedSegments = await Promise.all(
-        segments.map(async (segment: string) => ({
-          text: segment,
-          vector: await client.embedText(segment)
-        }))
-      );
-
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { 
-          ...f, 
-          segments: embeddedSegments,
-          status: 'completed', 
-          progress: 100 
-        } : f
-      ));
-
-      // Store in vector database
-      const processedDoc: ProcessedDocument = {
-        id: fileId,
-        text: extractedText,
-        source: file.file.name,
-        segments: embeddedSegments
-      };
-
-      vectorDB.addProcessedDocument('playground', processedDoc, ['uploaded']);
-      
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { ...f, storedInVectorDB: true } : f
-      ));
-
-    } catch (error) {
-      setFiles(prev => prev.map(f => 
-        f.id === fileId ? { 
-          ...f, 
-          status: 'error', 
-          error: error instanceof Error ? error.message : 'Processing failed'
-        } : f
-      ));
-    }
-  }, [files, vectorDB, client]);
-
-  const processAllFiles = useCallback(async () => {
-    const pendingFiles = files.filter(f => f.status === 'pending');
-    for (const file of pendingFiles) {
-      await processFile(file.id);
-    }
-  }, [files, processFile]);
 
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) {
