@@ -1,45 +1,50 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import pLimit from 'p-limit';
 import { Client } from '../lib/client';
 import { VectorDB, Document } from '../lib/vectordb';
 import { Tool } from '../models/chat';
-
-export interface FileItem {
-  id: string;
-  file: File;
-
-  status: 'pending' | 'processing' | 'completed' | 'error';
-  progress: number;
-  
-  text?: string;
-  segments?: Array<{
-    text: string;
-    vector: number[];
-  }>;
-  error?: string;
-}
+import { RepositoryFile } from '../types/repository';
 
 export interface FileChunk {
-  fileItem: FileItem;
+  fileItem: RepositoryFile;
   text: string;
   similarity?: number;
 }
 
-export interface DocumentHookReturn {
-  files: FileItem[];
+export interface RepositoryDocumentHookReturn {
+  files: RepositoryFile[];
   addFile: (file: File) => Promise<void>;
   removeFile: (fileId: string) => void;
   queryChunks: (query: string, topK?: number) => Promise<FileChunk[]>;
   queryTools: () => Tool[];
 }
 
-export function useDocuments(): DocumentHookReturn {
-  const [files, setFiles] = useState<FileItem[]>([]);
+// Global storage for files by repository ID
+const repositoryFilesMap = new Map<string, RepositoryFile[]>();
+
+export function useRepositoryDocuments(repositoryId: string): RepositoryDocumentHookReturn {
+  // Initialize files for this repository if not exists
+  const [files, setFiles] = useState<RepositoryFile[]>(() => {
+    return repositoryFilesMap.get(repositoryId) || [];
+  });
+  
   const [vectorDB] = useState(() => new VectorDB());
   const [client] = useState(() => new Client());
 
+  // Update global map when files change
+  useEffect(() => {
+    repositoryFilesMap.set(repositoryId, files);
+  }, [repositoryId, files]);
+
+  // Load files for this repository when repositoryId changes
+  useEffect(() => {
+    const repositoryFiles = repositoryFilesMap.get(repositoryId) || [];
+    setFiles(repositoryFiles);
+  }, [repositoryId]);
+
   const removeFile = useCallback((fileId: string) => {
     setFiles(prev => prev.filter(f => f.id !== fileId));
+    // TODO: Also remove from vector database
   }, []);
 
   const addFile = useCallback(async (file: File) => {
@@ -48,9 +53,12 @@ export function useDocuments(): DocumentHookReturn {
     // Add file to state as processing
     setFiles(prev => [...prev, {
       id: fileId,
+      repositoryId,
+      name: file.name,
       file,
       status: 'processing',
       progress: 0,
+      uploadedAt: new Date(),
     }]);
 
     try {
@@ -92,10 +100,10 @@ export function useDocuments(): DocumentHookReturn {
       
       const chunks = await Promise.all(embeddingPromises);
 
-      // Store each chunk as a separate document in vector database
+      // Store each chunk as a separate document in vector database with repository namespace
       chunks.forEach((chunk, index) => {
         const chunkDoc: Document = {
-          id: `${fileId}:${index}`,
+          id: `${repositoryId}:${fileId}:${index}`,
           text: chunk.text,
           source: file.name,
           vector: chunk.vector
@@ -123,7 +131,7 @@ export function useDocuments(): DocumentHookReturn {
         } : f
       ));
     }
-  }, [vectorDB, client]);
+  }, [vectorDB, client, repositoryId]);
 
   const queryChunks = useCallback(async (query: string, topK: number = 5): Promise<FileChunk[]> => {
     if (!query.trim()) {
@@ -137,10 +145,16 @@ export function useDocuments(): DocumentHookReturn {
       // Search the vector database
       const results = vectorDB.queryDocuments(queryVector, topK);
       
+      // Filter results to only include documents from this repository
+      const repositoryResults = results.filter(result => 
+        result.document.id.startsWith(`${repositoryId}:`)
+      );
+      
       // Convert QueryResult[] to FileChunk[]
-      const fileChunks: FileChunk[] = results.map(result => {
-        // Extract fileId from document id (format: fileId:segmentIndex)
-        const fileId = result.document.id.split(':')[0];
+      const fileChunks: FileChunk[] = repositoryResults.map(result => {
+        // Extract fileId from document id (format: repositoryId:fileId:segmentIndex)
+        const parts = result.document.id.split(':');
+        const fileId = parts[1];
         const fileItem = files.find(f => f.id === fileId);
         
         return {
@@ -155,13 +169,13 @@ export function useDocuments(): DocumentHookReturn {
       console.error('Search failed:', error);
       return [];
     }
-  }, [vectorDB, client, files]);
+  }, [vectorDB, client, files, repositoryId]);
 
   const queryTools = useCallback((): Tool[] => {
     return [
       {
-        name: 'query_knowledge',
-        description: 'Find relevant information in knowledge database',
+        name: 'query_repository_knowledge',
+        description: 'Find relevant information in the current repository knowledge database',
         parameters: {
           type: 'object',
           properties: {
@@ -186,15 +200,15 @@ export function useDocuments(): DocumentHookReturn {
 
             // Format results as JSON array
             const jsonResults = results.map(result => ({
-              file_name: result.fileItem.file.name,
+              file_name: result.fileItem.name,
               file_chunk: result.text,
               similarity: result.similarity || 0
             }));
 
             return JSON.stringify(jsonResults);
           } catch (error) {
-            console.error('Knowledge query failed:', error);
-            return JSON.stringify({ error: 'Failed to query knowledge database' });
+            console.error('Repository knowledge query failed:', error);
+            return JSON.stringify({ error: 'Failed to query repository knowledge database' });
           }
         }
       }
