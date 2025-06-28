@@ -12,6 +12,9 @@ import { ChatProvider } from "./contexts/ChatContext";
 import { TranslateProvider } from "./contexts/TranslateContext";
 import { VoiceProvider } from "./contexts/VoiceContext";
 import { SettingsButton } from "./components/SettingsButton";
+import { RepositoryProvider } from "./contexts/RepositoryContext";
+import { useRepository } from "./hooks/useRepository";
+import { RepositoryDrawer } from "./components/RepositoryDrawer";
 
 type Page = "chat" | "translate";
 
@@ -19,6 +22,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
+  const { showRepositoryDrawer } = useRepository();
 
   // Auto-close sidebar on mobile screens on mount and resize
   useEffect(() => {
@@ -150,9 +154,21 @@ function AppContent() {
         </nav>
         
         {/* Content area - no padding so it can scroll under the nav */}
-        <div className="flex-1 overflow-hidden">
-          {currentPage === "chat" && <ChatPage />}
-          {currentPage === "translate" && <TranslatePage />}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Main content */}
+          <div className={`flex-1 overflow-hidden transition-all duration-300 ${
+            showRepositoryDrawer ? 'mr-80' : ''
+          }`}>
+            {currentPage === "chat" && <ChatPage />}
+            {currentPage === "translate" && <TranslatePage />}
+          </div>
+          
+          {/* Repository drawer - right side */}
+          {showRepositoryDrawer && (
+            <div className="w-80 bg-white/90 dark:bg-black/10 backdrop-blur-lg shadow-2xl border-l border-neutral-200 dark:border-neutral-800 fixed right-0 top-16 bottom-0 z-40">
+              <RepositoryDrawer />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -166,13 +182,15 @@ function App() {
         <BackgroundProvider>
           <SidebarProvider>
             <NavigationProvider>
-              <ChatProvider>
-                <VoiceProvider>
-                  <TranslateProvider>
-                    <AppContent />
-                  </TranslateProvider>
-                </VoiceProvider>
-              </ChatProvider>
+              <RepositoryProvider>
+                <ChatProvider>
+                  <VoiceProvider>
+                    <TranslateProvider>
+                      <AppContent />
+                    </TranslateProvider>
+                  </VoiceProvider>
+                </ChatProvider>
+              </RepositoryProvider>
             </NavigationProvider>
           </SidebarProvider>
         </BackgroundProvider>
