@@ -12,6 +12,7 @@ import { BackgroundProvider } from "./contexts/BackgroundContext";
 import { ChatProvider } from "./contexts/ChatContext";
 import { TranslateProvider } from "./contexts/TranslateContext";
 import { VoiceProvider } from "./contexts/VoiceContext";
+import { DocumentProvider } from "./contexts/DocumentContext";
 import { SettingsButton } from "./components/SettingsButton";
 
 type Page = "chat" | "translate" | "playground";
@@ -172,7 +173,9 @@ function App() {
               <ChatProvider>
                 <VoiceProvider>
                   <TranslateProvider>
-                    <AppContent />
+                    <DocumentProvider>
+                      <AppContent />
+                    </DocumentProvider>
                   </TranslateProvider>
                 </VoiceProvider>
               </ChatProvider>
