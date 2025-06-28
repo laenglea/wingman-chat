@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Plus as PlusIcon, Mic, MicOff, FolderOpen } from "lucide-react";
+import { Plus as PlusIcon, Mic, MicOff, Database } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useSidebar } from "../contexts/SidebarContext";
@@ -69,7 +69,7 @@ export function ChatPage() {
           onClick={toggleRepositoryDrawer}
           title={showRepositoryDrawer ? 'Close repositories' : 'Open repositories'}
         >
-          <FolderOpen size={20} />
+          <Database size={20} />
         </Button>
         {isAvailable && (
           <Button
