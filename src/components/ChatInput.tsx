@@ -21,6 +21,8 @@ import { useChat } from "../hooks/useChat";
 import { useTextPaste } from "../hooks/useTextPaste";
 import { useTranscription } from "../hooks/useTranscription";
 import { useDropZone } from "../hooks/useDropZone";
+import { useRepository } from "../hooks/useRepository";
+import { useRepositoryDocuments } from "../hooks/useRepositoryDocuments";
 
 export function ChatInput() {
   const config = getConfig();
@@ -28,6 +30,11 @@ export function ChatInput() {
   const bridge = config.bridge;
 
   const { sendMessage: onSend, models, model, setModel: onModelChange, messages } = useChat();
+  const { currentRepository } = useRepository();
+  
+  // Get repository tools if we have a current repository
+  const { queryTools } = useRepositoryDocuments(currentRepository?.id || '');
+  const repositoryTools = currentRepository ? queryTools() : [];
 
   const [content, setContent] = useState("");
   const [transcribingContent, setTranscribingContent] = useState(false);
@@ -140,7 +147,9 @@ export function ChatInput() {
       attachments: attachments,
     };
 
-    onSend(message);
+    // Combine bridge tools with repository tools
+    const allTools = [...bridgeTools, ...repositoryTools];
+    onSend(message, allTools);
     
     // Clear attachments after sending
     setAttachments([]);
@@ -229,7 +238,9 @@ export function ChatInput() {
         attachments: attachments,
       };
 
-      onSend(message);
+      // Combine bridge tools with repository tools
+      const allTools = [...bridgeTools, ...repositoryTools];
+      onSend(message, allTools);
       setContent("");
       setAttachments([]);
       

@@ -1,8 +1,7 @@
 export interface Repository {
   id: string;
   name: string;
-  description?: string;
-  systemPrompt?: string; // instruction for this repository
+  instructions?: string; // instruction for this repository
   createdAt: Date;
   updatedAt: Date;
 }
