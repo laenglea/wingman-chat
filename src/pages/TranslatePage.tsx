@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useDropZone } from "../hooks/useDropZone";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, XIcon, DownloadIcon } from "lucide-react";
 import { useNavigation } from "../contexts/NavigationContext";
@@ -11,6 +12,7 @@ export function TranslatePage() {
   const { setRightActions } = useNavigation();
   const { layoutMode } = useLayout();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Use translate context
   const {
@@ -62,6 +64,22 @@ export function TranslatePage() {
       fileInputRef.current.value = '';
     }
   };
+
+  const handleDropFiles = (files: File[]) => {
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+    const file = files.find(f => allowedTypes.includes(f.type));
+    if (file) {
+      selectFile(file);
+    } else {
+      alert('Please drop a valid file type: .docx, .pptx, or .xlsx');
+    }
+  };
+
+  const isDragging = useDropZone(containerRef, handleDropFiles);
 
   const handleDownload = () => {
     if (translatedFileUrl && translatedFileName) {
@@ -119,9 +137,16 @@ export function TranslatePage() {
           }`}>
             <div className="relative h-full w-full overflow-hidden border-0 bg-transparent xl:border xl:border-neutral-200 xl:dark:border-neutral-900 xl:bg-neutral-50/70 xl:dark:bg-neutral-950/85 xl:backdrop-blur-lg xl:rounded-2xl xl:shadow-2xl xl:shadow-black/60 xl:dark:shadow-black/80">
               {/* Responsive layout: vertical stack on mobile/narrow screens, horizontal on wide screens */}
-              <div className="h-full flex flex-col md:flex-row min-h-0">
+              <div className={`h-full flex flex-col md:flex-row min-h-0 ${isDragging ? 'p-2' : ''} transition-all duration-200`}>
                 {/* Source section */}
-                <div className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">
+                <div
+                  ref={containerRef}
+                  className={`flex-1 flex flex-col relative min-w-0 min-h-0 ${
+                    isDragging 
+                      ? 'border-2 border-dashed border-slate-400 dark:border-slate-500 bg-slate-50/80 dark:bg-slate-900/40 shadow-2xl shadow-slate-500/30 dark:shadow-slate-400/20 scale-[1.01] rounded-lg' 
+                      : 'overflow-hidden'
+                  } transition-all duration-200`}
+                >
                   {/* File upload controls */}
                   <div className="absolute top-2 left-4 z-10">
                     {!selectedFile && (
@@ -142,6 +167,18 @@ export function TranslatePage() {
                       className="hidden"
                     />
                   </div>
+                  
+                  {/* Drop zone overlay */}
+                  {isDragging && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-500/20 via-slate-600/30 to-slate-500/20 dark:from-slate-400/20 dark:via-slate-500/30 dark:to-slate-400/20 rounded-lg flex flex-col items-center justify-center pointer-events-none z-20 backdrop-blur-sm">
+                      <div className="text-slate-700 dark:text-slate-300 font-semibold text-lg text-center">
+                        Drop files here
+                      </div>
+                      <div className="text-slate-600 dark:text-slate-400 text-sm mt-1 text-center">
+                        .docx, .pptx, and .xlsx files supported
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Show selected file in center */}
                   {selectedFile ? (
