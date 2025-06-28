@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import pLimit from 'p-limit';
 import { Client } from '../lib/client';
 import { VectorDB, Document } from '../lib/vectordb';
+import { Tool } from '../models/chat';
 
 export interface FileItem {
   id: string;
@@ -28,7 +29,8 @@ export interface DocumentHookReturn {
   files: FileItem[];
   addFile: (file: File) => Promise<void>;
   removeFile: (fileId: string) => void;
-  queryFileChunk: (query: string, topK?: number) => Promise<FileChunk[]>;
+  queryChunks: (query: string, topK?: number) => Promise<FileChunk[]>;
+  queryTools: () => Tool[];
 }
 
 export function useDocuments(): DocumentHookReturn {
@@ -123,7 +125,7 @@ export function useDocuments(): DocumentHookReturn {
     }
   }, [vectorDB, client]);
 
-  const queryFileChunk = useCallback(async (query: string, topK: number = 5): Promise<FileChunk[]> => {
+  const queryChunks = useCallback(async (query: string, topK: number = 5): Promise<FileChunk[]> => {
     if (!query.trim()) {
       return [];
     }
@@ -155,10 +157,55 @@ export function useDocuments(): DocumentHookReturn {
     }
   }, [vectorDB, client, files]);
 
+  const queryTools = useCallback((): Tool[] => {
+    return [
+      {
+        name: 'query_knowledge',
+        description: 'Find relevant information in knowledge database',
+        parameters: {
+          type: 'object',
+          properties: {
+            query: {
+              type: 'string',
+              description: 'The search query to find relevant information'
+            }
+          },
+          required: ['query']
+        },
+        function: async (args: Record<string, unknown>): Promise<string> => {
+          const query = args.query as string;
+          if (!query) {
+            return JSON.stringify({ error: 'No query provided' });
+          }
+
+          try {
+            const results = await queryChunks(query, 5);
+            if (results.length === 0) {
+              return JSON.stringify([]);
+            }
+
+            // Format results as JSON array
+            const jsonResults = results.map(result => ({
+              file_name: result.fileItem.file.name,
+              file_chunk: result.text,
+              similarity: result.similarity || 0
+            }));
+
+            return JSON.stringify(jsonResults);
+          } catch (error) {
+            console.error('Knowledge query failed:', error);
+            return JSON.stringify({ error: 'Failed to query knowledge database' });
+          }
+        }
+      }
+    ];
+  }, [queryChunks]);
+
   return {
     files,
     removeFile,
     addFile,
-    queryFileChunk,
+    queryChunks,
+    queryTools,
   };
 }

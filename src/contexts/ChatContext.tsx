@@ -1,5 +1,5 @@
 import { createContext, useState, useCallback } from "react";
-import { Chat, Message, Model, Role } from "../models/chat";
+import { Chat, Message, Model, Role, Tool } from "../models/chat";
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
 import { getConfig } from "../config";
@@ -22,8 +22,7 @@ export interface ChatContextType {
   updateChat: (chatId: string, updates: Partial<Chat>) => void;
 
   addMessage: (message: Message) => void;
-  sendMessage: (message: Message) => Promise<void>;
-
+  sendMessage: (message: Message, tools?: Tool[]) => Promise<void>;
 }
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -112,7 +111,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   );
 
   const sendMessage = useCallback(
-    async (message: Message) => {
+    async (message: Message, tools?: Tool[]) => {
       const { id, chat: chatObj } = getOrCreateChat();
 
       const existingMessages = chats.find(c => c.id === id)?.messages || [];
@@ -122,11 +121,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
       updateMessages([...conversation, { role: Role.Assistant, content: '' }]);
 
     try {
-      const tools = await bridge.listTools();
+      const bridgeTools = await bridge.listTools();
+
+      const completionTools = [...bridgeTools, ...(tools || [])];
 
       const completion = await client.complete(
         model!.id,
-        tools,
+        completionTools,
         conversation,
         (_, snapshot) => updateMessages([...conversation, { role: Role.Assistant, content: snapshot }])
       );
@@ -168,7 +169,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
     // Message actions
     addMessage,
     sendMessage,
-
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
