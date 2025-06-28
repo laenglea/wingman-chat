@@ -27,7 +27,6 @@ export function ChatInput() {
   const client = config.client;
   const bridge = config.bridge;
 
-  // Use only context values
   const { sendMessage: onSend, models, model, setModel: onModelChange, messages } = useChat();
 
   const [content, setContent] = useState("");
