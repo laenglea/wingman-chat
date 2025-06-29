@@ -255,22 +255,14 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
   const queryTools = useCallback((): Tool[] => {
     return [
       {
-        name: 'find_documents',
-        description: 'find possible relevant information to user queries.',
+        name: 'query_knowledge_database',
+        description: 'Search and retrieve information from a knowledge database using natural language queries. Returns relevant documents, facts, or answers based on the search criteria.',
         parameters: {
           type: 'object',
           properties: {
             query: {
               type: 'string',
-              description: `The search query to find relevant information.
-              Transform the query into a better search query for retrieving relevant documents.
-              
-              Rules:
-              - Make queries more specific and descriptive
-              - Include technical terms and synonyms
-              - Expand abbreviations
-              - Add context when helpful
-              - Keep under 100 words`
+              description: `The search query or question to find relevant information in the knowledge database. Use natural language and be specific about what information you're looking for.`
             }
           },
           required: ['query']
