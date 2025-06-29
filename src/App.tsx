@@ -3,18 +3,18 @@ import { MessageCircle, Languages, PanelLeftOpen, PanelRightOpen } from "lucide-
 import { Button } from "@headlessui/react";
 import { ChatPage } from "./pages/ChatPage";
 import { TranslatePage } from "./pages/TranslatePage";
-import { SidebarProvider } from "./contexts/SidebarContext";
+import { SidebarProvider } from "./contexts/SidebarProvider";
 import { useSidebar } from "./hooks/useSidebar";
-import { NavigationProvider } from "./contexts/NavigationContext";
+import { NavigationProvider } from "./contexts/NavigationProvider";
 import { useNavigation } from "./hooks/useNavigation";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { LayoutProvider } from "./contexts/LayoutContext";
-import { BackgroundProvider } from "./contexts/BackgroundContext";
-import { ChatProvider } from "./contexts/ChatContext";
-import { TranslateProvider } from "./contexts/TranslateContext";
-import { VoiceProvider } from "./contexts/VoiceContext";
+import { ThemeProvider } from "./contexts/ThemeProvider";
+import { LayoutProvider } from "./contexts/LayoutProvider";
+import { BackgroundProvider } from "./contexts/BackgroundProvider";
+import { ChatProvider } from "./contexts/ChatProvider";
+import { TranslateProvider } from "./contexts/TranslateProvider";
+import { VoiceProvider } from "./contexts/VoiceProvider";
 import { SettingsButton } from "./components/SettingsButton";
-import { RepositoryProvider } from "./contexts/RepositoryContext";
+import { RepositoryProvider } from "./contexts/RepositoryProvider";
 import { useRepositories } from "./hooks/useRepositories";
 import { RepositoryDrawer } from "./components/RepositoryDrawer";
 

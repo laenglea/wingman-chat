@@ -1,22 +1,7 @@
-import { createContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { useState, useCallback, ReactNode, useEffect } from 'react';
 import { Repository, RepositoryFile } from '../types/repository';
 import { setValue, getValue } from '../lib/db';
-
-type RepositoryContextType = {
-  repositories: Repository[];
-  currentRepository: Repository | null;
-  createRepository: (name: string, instructions?: string) => void;
-  updateRepository: (id: string, updates: Partial<Omit<Repository, 'id' | 'createdAt'>>) => void;
-  deleteRepository: (id: string) => Promise<void>;
-  setCurrentRepository: (repository: Repository | null) => void;
-  showRepositoryDrawer: boolean;
-  setShowRepositoryDrawer: (show: boolean) => void;
-  toggleRepositoryDrawer: () => void;
-  upsertFile: (repoId: string, file: RepositoryFile) => void;
-  removeFile: (repoId: string, fileId: string) => void;
-};
-
-export const RepositoryContext = createContext<RepositoryContextType | undefined>(undefined);
+import { RepositoryContext, RepositoryContextType } from './RepositoryContext';
 
 const REPOSITORIES_DB_KEY = 'repositories';
 const REPOSITORY_STORAGE_KEY = 'app_project';
@@ -154,22 +139,22 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
     setShowRepositoryDrawer(prev => !prev);
   }, []);
 
+  const value: RepositoryContextType = {
+    repositories,
+    currentRepository,
+    createRepository,
+    updateRepository,
+    deleteRepository,
+    setCurrentRepository,
+    showRepositoryDrawer,
+    setShowRepositoryDrawer,
+    toggleRepositoryDrawer,
+    upsertFile,
+    removeFile,
+  };
+
   return (
-    <RepositoryContext.Provider
-      value={{
-        repositories,
-        currentRepository,
-        createRepository,
-        updateRepository,
-        deleteRepository,
-        setCurrentRepository,
-        showRepositoryDrawer,
-        setShowRepositoryDrawer,
-        toggleRepositoryDrawer,
-        upsertFile,
-        removeFile,
-      }}
-    >
+    <RepositoryContext.Provider value={value}>
       {children}
     </RepositoryContext.Provider>
   );
