@@ -179,7 +179,7 @@ function AppContent() {
         <div className="flex-1 overflow-hidden flex">
           {/* Main content */}
           <div className={`flex-1 overflow-hidden transition-all duration-300 ${
-            showRepositoryDrawer ? 'mr-80' : ''
+            showRepositoryDrawer ? 'mr-80 pr-3' : ''
           }`}>
             {currentPage === "chat" && <ChatPage />}
             {currentPage === "translate" && <TranslatePage />}

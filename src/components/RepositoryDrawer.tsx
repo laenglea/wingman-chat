@@ -82,7 +82,10 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
           </p>
         ) : (
           <div className="flex flex-wrap gap-3">
-            {files.map((file: RepositoryFile) => (
+            {files
+              .slice()
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((file: RepositoryFile) => (
               <div
                 key={file.id}
                 className="relative group"
@@ -370,37 +373,7 @@ export function RepositoryDrawer() {
     );
   }
 
-  if (repositories.length === 0) {
-    return (
-      <div className="h-full flex flex-col rounded-xl overflow-hidden animate-in fade-in duration-200">
-        {/* Header */}
-        <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            Repositories
-          </h2>
-        </div>
 
-        {/* Empty state */}
-        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-          <Folder size={48} className="text-neutral-300 dark:text-neutral-600 mb-4" />
-          <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
-            No Repositories Yet
-          </h3>
-          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
-            Create your first repository to organize documents and instructions
-          </p>
-          <Button
-            onClick={() => startCreatingNew()}
-            className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-md 
-                     transition-colors cursor-pointer"
-          >
-            <Plus size={16} />
-            Create Repository
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="h-full flex flex-col rounded-xl overflow-hidden animate-in fade-in duration-200">
@@ -506,7 +479,10 @@ export function RepositoryDrawer() {
             </Menu.Item>
 
             {/* Existing Repositories */}
-            {repositories.map((repository) => {
+            {repositories
+              .slice()
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((repository) => {
               const isCurrentRepo = currentRepository?.id === repository.id;
               const isBeingEdited = inlineEditingId === repository.id;
               
@@ -604,24 +580,30 @@ export function RepositoryDrawer() {
               );
             })}
 
-            {/* Empty state in dropdown */}
-            {repositories.length === 0 && (
-              <div className="px-3 py-4 text-center">
-                <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                  No repositories yet
-                </p>
-              </div>
-            )}
+
           </Menu.Items>
         </Menu>
       </div>
 
       {/* Repository Details */}
-      {currentRepository && (
+      {currentRepository ? (
         <RepositoryDetails 
           key={currentRepository.id} 
           repository={currentRepository}
         />
+      ) : (
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+          <Folder size={48} className="text-neutral-300 dark:text-neutral-600 mb-4" />
+          <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">
+            No Repository Selected
+          </h3>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-6">
+            {repositories.length === 0 
+              ? "Create your first repository to organize documents and instructions"
+              : "Select a repository from the dropdown above to view and manage its files"
+            }
+          </p>
+        </div>
       )}
     </div>
   );
