@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Plus, Folder, FileText, Upload, X, ChevronDown, Check, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { Button, Listbox, Menu } from '@headlessui/react';
+import { useRepositories } from '../hooks/useRepositories';
 import { useRepository } from '../hooks/useRepository';
-import { useRepositoryDocuments } from '../hooks/useRepositoryDocuments';
-import { Repository } from '../types/repository';
+import { Repository, RepositoryFile } from '../types/repository';
 
 interface CreateRepositoryFormProps {
   onSubmit: (name: string, instructions: string) => void;
@@ -85,7 +85,7 @@ interface RepositoryDetailsProps {
 }
 
 function RepositoryDetails({ repository }: RepositoryDetailsProps) {
-  const { files, addFile, removeFile } = useRepositoryDocuments(repository.id);
+  const { files, addFile, removeFile } = useRepository(repository.id);
   const [isDragOver, setIsDragOver] = useState(false);
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -163,7 +163,7 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
           </p>
         ) : (
           <div className="flex flex-wrap gap-3">
-            {files.map((file) => (
+            {files.map((file: RepositoryFile) => (
               <div
                 key={file.id}
                 className="relative group"
@@ -358,7 +358,7 @@ export function RepositoryDrawer() {
     setCurrentRepository,
     updateRepository,
     deleteRepository
-  } = useRepository();
+  } = useRepositories();
   
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingRepository, setEditingRepository] = useState<Repository | null>(null);

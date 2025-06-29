@@ -2,7 +2,7 @@ import { createContext, useState, useCallback, useEffect } from "react";
 import { useVoiceWebSockets } from "../hooks/useVoiceWebSockets";
 import { useChat } from "../hooks/useChat";
 import { getConfig } from "../config";
-import { Role } from "../models/chat";
+import { Role } from "../types/chat";
 
 export interface VoiceContextType {
   isAvailable: boolean;

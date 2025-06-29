@@ -4,13 +4,13 @@ export interface Repository {
   instructions?: string; // instruction for this repository
   createdAt: Date;
   updatedAt: Date;
+  files?: RepositoryFile[]; // files are stored with the repository
 }
 
 export interface RepositoryFile {
   id: string;
-  repositoryId: string;
   name: string;
-  file: File;
+  content: Blob;
   status: 'pending' | 'processing' | 'completed' | 'error';
   progress: number;
   text?: string;

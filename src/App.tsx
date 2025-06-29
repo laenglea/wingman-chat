@@ -3,8 +3,10 @@ import { MessageCircle, Languages, PanelLeftOpen, PanelRightOpen } from "lucide-
 import { Button } from "@headlessui/react";
 import { ChatPage } from "./pages/ChatPage";
 import { TranslatePage } from "./pages/TranslatePage";
-import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
-import { NavigationProvider, useNavigation } from "./contexts/NavigationContext";
+import { SidebarProvider } from "./contexts/SidebarContext";
+import { useSidebar } from "./hooks/useSidebar";
+import { NavigationProvider } from "./contexts/NavigationContext";
+import { useNavigation } from "./hooks/useNavigation";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LayoutProvider } from "./contexts/LayoutContext";
 import { BackgroundProvider } from "./contexts/BackgroundContext";
@@ -13,7 +15,7 @@ import { TranslateProvider } from "./contexts/TranslateContext";
 import { VoiceProvider } from "./contexts/VoiceContext";
 import { SettingsButton } from "./components/SettingsButton";
 import { RepositoryProvider } from "./contexts/RepositoryContext";
-import { useRepository } from "./hooks/useRepository";
+import { useRepositories } from "./hooks/useRepositories";
 import { RepositoryDrawer } from "./components/RepositoryDrawer";
 
 type Page = "chat" | "translate";
@@ -22,7 +24,7 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
-  const { showRepositoryDrawer } = useRepository();
+  const { showRepositoryDrawer } = useRepositories();
 
   // Auto-close sidebar on mobile screens on mount and resize
   useEffect(() => {
