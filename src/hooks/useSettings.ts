@@ -1,5 +1,5 @@
 import { useLayout } from './useLayout';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from './useTheme';
 import { useBackground } from './useBackground';
 
 export const useSettings = () => {

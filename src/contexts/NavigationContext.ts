@@ -1,4 +1,4 @@
-import { createContext, useState, ReactNode } from 'react';
+import { createContext, ReactNode } from 'react';
 
 /**
  * NavigationContext provides a way for pages to set custom actions 
@@ -28,21 +28,3 @@ export type NavigationContextType = {
 };
 
 export const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
-
-export function NavigationProvider({ children }: { children: ReactNode }) {
-  const [leftActions, setLeftActions] = useState<ReactNode>(null);
-  const [rightActions, setRightActions] = useState<ReactNode>(null);
-
-  return (
-    <NavigationContext.Provider
-      value={{
-        leftActions,
-        setLeftActions,
-        rightActions,
-        setRightActions,
-      }}
-    >
-      {children}
-    </NavigationContext.Provider>
-  );
-}

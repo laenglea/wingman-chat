@@ -5,6 +5,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useChat } from '../hooks/useChat';
 import type { Theme } from '../contexts/ThemeContext';
 import type { LayoutMode } from '../types/settings';
+import type { BackgroundPack } from '../contexts/BackgroundContext';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -75,7 +76,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
-  const backgroundOptions = [{ value: null, label: 'None' }, ...backgroundPacks.map(p => ({ value: p.name, label: p.name }))];
+  const backgroundOptions = [{ value: null, label: 'None' }, ...backgroundPacks.map((p: BackgroundPack) => ({ value: p.name, label: p.name }))];
   const sectionOptions = sections.map(s => ({ value: s.id, label: s.label }));
 
   const renderSectionContent = () => {
