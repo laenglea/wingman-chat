@@ -25,6 +25,8 @@ function AppContent() {
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
   const { showRepositoryDrawer } = useRepositories();
+  const [isRepositoryDrawerAnimating, setIsRepositoryDrawerAnimating] = useState(false);
+  const [shouldRenderDrawer, setShouldRenderDrawer] = useState(false);
 
   // Auto-close sidebar on mobile screens on mount and resize
   useEffect(() => {
@@ -39,6 +41,24 @@ function AppContent() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [setShowSidebar]);
+
+  // Handle repository drawer animation
+  useEffect(() => {
+    if (showRepositoryDrawer) {
+      setShouldRenderDrawer(true);
+      // Small delay to ensure the element is in the DOM before animating
+      setTimeout(() => {
+        setIsRepositoryDrawerAnimating(true);
+      }, 10);
+    } else {
+      setIsRepositoryDrawerAnimating(false);
+      // Remove from DOM after animation completes
+      const timer = setTimeout(() => {
+        setShouldRenderDrawer(false);
+      }, 300); // Match the transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [showRepositoryDrawer]);
 
   // Prevent default file-drop behavior on the rest of the page (avoid navigation)
   useEffect(() => {
@@ -166,8 +186,12 @@ function AppContent() {
           </div>
           
           {/* Repository drawer - right side */}
-          {showRepositoryDrawer && (
-            <div className="w-80 bg-white/90 dark:bg-black/10 backdrop-blur-lg shadow-2xl border-l border-neutral-200 dark:border-neutral-800 fixed right-0 top-16 bottom-0 z-40">
+          {shouldRenderDrawer && (
+            <div className={`w-80 bg-white/90 dark:bg-black/10 backdrop-blur-lg shadow-2xl border-l border-neutral-200 dark:border-neutral-800 fixed right-3 top-16 bottom-4 z-40 rounded-xl transition-all duration-300 ease-out transform ${
+              isRepositoryDrawerAnimating 
+                ? 'translate-x-0 opacity-100 scale-100' 
+                : 'translate-x-full opacity-0 scale-95'
+            }`}>
               <RepositoryDrawer />
             </div>
           )}
