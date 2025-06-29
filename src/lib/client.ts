@@ -2,8 +2,8 @@ import { z } from "zod";
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 
-import { Tool } from "../models/chat";
-import { Message, Model, Role, AttachmentType } from "../models/chat";
+import { Tool } from "../types/chat";
+import { Message, Model, Role, AttachmentType } from "../types/chat";
 
 export class Client {
   private oai: OpenAI;

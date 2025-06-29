@@ -3,7 +3,7 @@ import { Eye, Code } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { CopyButton } from './CopyButton';
 import { ChatContext } from '../contexts/ChatContext';
-import { Role } from '../models/chat';
+import { Role } from '../types/chat';
 
 interface AdaptiveCardRendererProps {
     cardJson: string;

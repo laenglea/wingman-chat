@@ -1,5 +1,5 @@
 import { createContext, useState, useCallback } from "react";
-import { Chat, Message, Model, Role, Tool } from "../models/chat";
+import { Chat, Message, Model, Role, Tool } from "../types/chat";
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
 import { getConfig } from "../config";

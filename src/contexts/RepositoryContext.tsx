@@ -1,7 +1,6 @@
 import { createContext, useState, useCallback, ReactNode, useEffect } from 'react';
-import { Repository } from '../types/repository';
+import { Repository, RepositoryFile } from '../types/repository';
 import { setValue, getValue } from '../lib/db';
-import { cleanupRepositoryData } from '../hooks/useRepositoryDocuments';
 
 type RepositoryContextType = {
   repositories: Repository[];
@@ -13,12 +12,14 @@ type RepositoryContextType = {
   showRepositoryDrawer: boolean;
   setShowRepositoryDrawer: (show: boolean) => void;
   toggleRepositoryDrawer: () => void;
+  upsertFile: (repoId: string, file: RepositoryFile) => void;
+  removeFile: (repoId: string, fileId: string) => void;
 };
 
 export const RepositoryContext = createContext<RepositoryContextType | undefined>(undefined);
 
 const REPOSITORIES_DB_KEY = 'repositories';
-const CURRENT_REPOSITORY_DB_KEY = 'currentRepository';
+const REPOSITORY_STORAGE_KEY = 'app_project';
 
 export function RepositoryProvider({ children }: { children: ReactNode }) {
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -26,12 +27,12 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
   const [showRepositoryDrawer, setShowRepositoryDrawer] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Load repositories from database on mount
+  // Load repositories from database and state from localStorage on mount
   useEffect(() => {
-    const loadRepositories = async () => {
+    const loadData = async () => {
       try {
+        // Load repositories from database
         const savedRepositories = await getValue<Repository[]>(REPOSITORIES_DB_KEY);
-        const savedCurrentRepository = await getValue<Repository>(CURRENT_REPOSITORY_DB_KEY);
         
         if (savedRepositories) {
           // Parse dates from stored data
@@ -43,28 +44,24 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
           
           setRepositories(repositoriesWithDates);
           
-          // Restore current repository if it exists in the loaded repositories
-          if (savedCurrentRepository) {
-            const currentRepoWithDates = {
-              ...savedCurrentRepository,
-              createdAt: new Date(savedCurrentRepository.createdAt),
-              updatedAt: new Date(savedCurrentRepository.updatedAt),
-            };
-            
-            const repoExists = repositoriesWithDates.some(r => r.id === currentRepoWithDates.id);
-            if (repoExists) {
-              setCurrentRepository(currentRepoWithDates);
+          // Load current repository from localStorage (simple string)
+          const savedCurrentRepositoryId = localStorage.getItem(REPOSITORY_STORAGE_KEY);
+          if (savedCurrentRepositoryId) {
+            const foundRepository = repositoriesWithDates.find(r => r.id === savedCurrentRepositoryId);
+            if (foundRepository) {
+              setCurrentRepository(foundRepository);
             }
           }
         }
+
       } catch (error) {
-        console.error('Failed to load repositories from database:', error);
+        console.error('Failed to load data:', error);
       } finally {
         setIsLoaded(true);
       }
     };
 
-    loadRepositories();
+    loadData();
   }, []);
 
   // Save repositories to database whenever they change
@@ -82,24 +79,15 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
     saveRepositories();
   }, [repositories, isLoaded]);
 
-  // Save current repository to database whenever it changes
+  // Save current repository to localStorage whenever it changes
   useEffect(() => {
     if (!isLoaded) return; // Don't save during initial load
     
-    const saveCurrentRepository = async () => {
-      try {
-        if (currentRepository) {
-          await setValue(CURRENT_REPOSITORY_DB_KEY, currentRepository);
-        } else {
-          // Clear saved current repository if none is selected
-          await setValue(CURRENT_REPOSITORY_DB_KEY, null);
-        }
-      } catch (error) {
-        console.error('Failed to save current repository to database:', error);
-      }
-    };
-
-    saveCurrentRepository();
+    if (currentRepository) {
+      localStorage.setItem(REPOSITORY_STORAGE_KEY, currentRepository.id);
+    } else {
+      localStorage.removeItem(REPOSITORY_STORAGE_KEY);
+    }
   }, [currentRepository, isLoaded]);
 
   const createRepository = useCallback((name: string, instructions?: string) => {
@@ -135,11 +123,33 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
     if (currentRepository?.id === id) {
       setCurrentRepository(null);
     }
-    
-    // Clean up repository data (files, vector DB, etc.)
-    await cleanupRepositoryData(id);
   }, [currentRepository]);
 
+  // Add or update a file in a repository
+  const upsertFile = useCallback((repoId: string, file: RepositoryFile) => {
+    setRepositories(prev => prev.map(repo => {
+      if (repo.id !== repoId) return repo;
+      const files = repo.files ? [...repo.files] : [];
+      const existingIdx = files.findIndex(f => f.id === file.id);
+      if (existingIdx !== -1) {
+        files[existingIdx] = file;
+      } else {
+        files.push(file);
+      }
+      return { ...repo, files, updatedAt: new Date() };
+    }));
+  }, []);
+
+  // Remove a file from a repository
+  const removeFile = useCallback((repoId: string, fileId: string) => {
+    setRepositories(prev => prev.map(repo => {
+      if (repo.id !== repoId) return repo;
+      const files = repo.files ? repo.files.filter(f => f.id !== fileId) : [];
+      return { ...repo, files, updatedAt: new Date() };
+    }));
+  }, []);
+
+  // Toggle repository drawer
   const toggleRepositoryDrawer = useCallback(() => {
     setShowRepositoryDrawer(prev => !prev);
   }, []);
@@ -156,6 +166,8 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
         showRepositoryDrawer,
         setShowRepositoryDrawer,
         toggleRepositoryDrawer,
+        upsertFile,
+        removeFile,
       }}
     >
       {children}

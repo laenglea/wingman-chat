@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Plus as PlusIcon, Mic, MicOff, Database } from "lucide-react";
+import { Plus as PlusIcon, Mic, MicOff, Package } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { useSidebar } from "../contexts/SidebarContext";
-import { useNavigation } from "../contexts/NavigationContext";
+import { useSidebar } from "../hooks/useSidebar";
+import { useNavigation } from "../hooks/useNavigation";
 import { useLayout } from "../hooks/useLayout";
 import { useChat } from "../hooks/useChat";
 import { useVoice } from "../hooks/useVoice";
@@ -13,7 +13,7 @@ import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
 import { VoiceWaves } from "../components/VoiceWaves";
 import { BackgroundImage } from "../components/BackgroundImage";
-import { useRepository } from "../hooks/useRepository";
+import { useRepositories } from "../hooks/useRepositories";
 
 export function ChatPage() {
   const {
@@ -25,7 +25,7 @@ export function ChatPage() {
   
   const { layoutMode } = useLayout();
   const { isAvailable, startVoice, stopVoice } = useVoice();
-  const { toggleRepositoryDrawer, showRepositoryDrawer } = useRepository();
+  const { toggleRepositoryDrawer, showRepositoryDrawer } = useRepositories();
   
   // Only need backgroundImage to check if background should be shown
   const { backgroundImage } = useBackground();
@@ -69,7 +69,7 @@ export function ChatPage() {
           onClick={toggleRepositoryDrawer}
           title={showRepositoryDrawer ? 'Close repositories' : 'Open repositories'}
         >
-          <Database size={20} />
+          <Package size={20} />
         </Button>
         {isAvailable && (
           <Button
