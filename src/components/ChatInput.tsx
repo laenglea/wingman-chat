@@ -1,9 +1,9 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, Link, File, Loader2, FileText, Lightbulb, Mic, Square } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square } from "lucide-react";
 
-import { Attachment, AttachmentType, Message, Role, Tool } from "../types/chat";
+import { Attachment, AttachmentType, Message, Role } from "../types/chat";
 import {
   captureScreenshot,
   getFileExt,
@@ -21,28 +21,18 @@ import { useChat } from "../hooks/useChat";
 import { useTextPaste } from "../hooks/useTextPaste";
 import { useTranscription } from "../hooks/useTranscription";
 import { useDropZone } from "../hooks/useDropZone";
-import { useRepositories } from "../hooks/useRepositories";
-import { useRepository } from "../hooks/useRepository";
 
 export function ChatInput() {
   const config = getConfig();
   const client = config.client;
-  const bridge = config.bridge;
 
-  const { sendMessage: onSend, models, model, setModel: onModelChange, messages } = useChat();
-  const { currentRepository } = useRepositories();
-  
-  // Get repository tools if we have a current repository
-  const { queryTools } = useRepository(currentRepository?.id || '');
-  const repositoryTools = currentRepository ? queryTools() : [];
+  const { sendMessage, models, model, setModel: onModelChange, messages } = useChat();
 
   const [content, setContent] = useState("");
   const [transcribingContent, setTranscribingContent] = useState(false);
 
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [extractingAttachments, setExtractingAttachments] = useState<Set<string>>(new Set());
-
-  const [bridgeTools, setBridgeTools] = useState<Tool[]>([]);
   
   // Prompt suggestions state
   const [showPromptSuggestions, setShowPromptSuggestions] = useState(false);
@@ -147,9 +137,7 @@ export function ChatInput() {
       attachments: attachments,
     };
 
-    // Combine bridge tools with repository tools
-    const allTools = [...bridgeTools, ...repositoryTools];
-    onSend(message, allTools);
+    sendMessage(message);
     
     // Clear attachments after sending
     setAttachments([]);
@@ -171,28 +159,6 @@ export function ChatInput() {
         return <File size={24} />;
     }
   };
-
-  // Fetch bridge tools when bridge is connected
-  useEffect(() => {
-    const fetchTools = async () => {
-      if (bridge.isConnected()) {
-        try {
-          const tools = await bridge.listTools();
-          setBridgeTools(tools);
-        } catch (error) {
-          console.error("Failed to fetch bridge tools:", error);
-          setBridgeTools([]);
-        }
-      } else {
-        setBridgeTools([]);
-      }
-    };
-
-    fetchTools();
-    
-    const interval = setInterval(fetchTools, 5000);    
-    return () => clearInterval(interval);
-  }, [bridge]);
 
   // Force layout recalculation on mount to fix initial sizing issues
   useEffect(() => {
@@ -238,9 +204,7 @@ export function ChatInput() {
         attachments: attachments,
       };
 
-      // Combine bridge tools with repository tools
-      const allTools = [...bridgeTools, ...repositoryTools];
-      onSend(message, allTools);
+      sendMessage(message);
       setContent("");
       setAttachments([]);
       
@@ -502,33 +466,6 @@ export function ChatInput() {
                 ))}
               </MenuItems>
             </Menu>
-            
-            {bridge.isConnected() && (
-              <div 
-                className="flex items-center gap-1 pr-1.5 py-1.5 text-neutral-600 dark:text-neutral-400 text-sm relative group"
-                title={bridgeTools.length > 0 ? `Available tools: ${bridgeTools.map(t => t.name).join(', ')}` : "Bridge connected"}
-              >
-                <Link size={14} />
-                <span>Bridge</span>
-                {bridgeTools.length > 0 && (
-                  <div className="absolute bottom-full left-0 mb-2 w-64 bg-neutral-800 dark:bg-neutral-700 text-white text-xs rounded-md p-2 shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                    <div className="font-semibold mb-1">Available Tools ({bridgeTools.length}):</div>
-                    <div className="space-y-1">
-                      {bridgeTools.map((tool, index) => (
-                        <div key={index} className="flex flex-col">
-                          <span className="font-medium">{tool.name}</span>
-                          {tool.description && (
-                            <span className="text-neutral-300 dark:text-neutral-400 text-xs truncate" title={tool.description}>
-                              {tool.description}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="flex items-center gap-1">

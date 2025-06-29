@@ -17,6 +17,8 @@ import { SettingsButton } from "./components/SettingsButton";
 import { RepositoryProvider } from "./contexts/RepositoryProvider";
 import { useRepositories } from "./hooks/useRepositories";
 import { RepositoryDrawer } from "./components/RepositoryDrawer";
+import { BridgeProvider } from "./contexts/BridgeProvider";
+import { BridgeIndicator } from "./components/BridgeIndicator";
 
 type Page = "chat" | "translate";
 
@@ -170,6 +172,7 @@ function AppContent() {
             {/* Right section */}
             <div className="flex items-center gap-2 justify-end flex-1">
               <SettingsButton />
+              <BridgeIndicator />
               {rightActions}
             </div>
           </div>
@@ -208,15 +211,17 @@ function App() {
         <BackgroundProvider>
           <SidebarProvider>
             <NavigationProvider>
-              <RepositoryProvider>
-                <ChatProvider>
-                  <VoiceProvider>
-                    <TranslateProvider>
-                      <AppContent />
-                    </TranslateProvider>
-                  </VoiceProvider>
-                </ChatProvider>
-              </RepositoryProvider>
+              <BridgeProvider>
+                <RepositoryProvider>
+                  <ChatProvider>
+                    <VoiceProvider>
+                      <TranslateProvider>
+                        <AppContent />
+                      </TranslateProvider>
+                    </VoiceProvider>
+                  </ChatProvider>
+                </RepositoryProvider>
+              </BridgeProvider>
             </NavigationProvider>
           </SidebarProvider>
         </BackgroundProvider>

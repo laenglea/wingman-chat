@@ -2,6 +2,9 @@ import { useState, useCallback } from "react";
 import { Message, Model, Tool, Role } from "../types/chat";
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
+import { useRepositories } from "../hooks/useRepositories";
+import { useRepository } from "../hooks/useRepository";
+import { useBridge } from "../hooks/useBridge";
 import { getConfig } from "../config";
 import { ChatContext, ChatContextType } from './ChatContext';
 
@@ -12,10 +15,12 @@ interface ChatProviderProps {
 export function ChatProvider({ children }: ChatProviderProps) {
   const config = getConfig();
   const client = config.client;
-  const bridge = config.bridge;
 
   const { models, selectedModel, setSelectedModel } = useModels();
   const { chats, createChat: createChatHook, updateChat, deleteChat: deleteChatHook } = useChats();
+  const { currentRepository } = useRepositories();
+  const { queryTools } = useRepository(currentRepository?.id || '');
+  const { bridgeTools } = useBridge();
   const [chatId, setChatId] = useState<string | null>(null);
 
   const chat = chats.find(c => c.id === chatId) ?? null;
@@ -99,9 +104,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       updateMessages([...conversation, { role: Role.Assistant, content: '' }]);
 
     try {
-      const bridgeTools = await bridge.listTools();
-
-      const completionTools = [...bridgeTools, ...(tools || [])];
+      // Get repository tools dynamically
+      const repositoryTools = currentRepository ? queryTools() : [];
+      const completionTools = [...bridgeTools, ...repositoryTools, ...(tools || [])];
 
       const completion = await client.complete(
         model!.id,
@@ -125,7 +130,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
       updateMessages([...conversation, errorMessage]);
     }
-  }, [getOrCreateChat, updateChat, bridge, client, model, chats]);
+  }, [getOrCreateChat, updateChat, client, model, chats, bridgeTools, currentRepository, queryTools]);
 
   const value: ChatContextType = {
     // Models
