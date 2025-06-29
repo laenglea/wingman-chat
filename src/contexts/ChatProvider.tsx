@@ -108,10 +108,17 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const repositoryTools = currentRepository ? queryTools() : [];
       const completionTools = [...bridgeTools, ...repositoryTools, ...(tools || [])];
 
+      let instructions = '';
+
+      if (repositoryTools.length > 0) {
+        instructions = `Use the knowledge base tools to retreive context from user's documets and files`;
+      }
+
       const completion = await client.complete(
         model!.id,
-        completionTools,
+        instructions,
         conversation,
+        completionTools,
         (_, snapshot) => updateMessages([...conversation, { role: Role.Assistant, content: snapshot }])
       );
 

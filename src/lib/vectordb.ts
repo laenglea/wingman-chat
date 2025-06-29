@@ -77,17 +77,6 @@ export class VectorDB {
   deleteDocument(docId: string): boolean {
     return this.documents.delete(docId);
   }
-
-  /**
-   * Get database statistics
-   */
-  getStats(): {
-    totalDocuments: number;
-  } {
-    return {
-      totalDocuments: this.documents.size
-    };
-  }
   
   clear(): void {
     this.documents.clear();

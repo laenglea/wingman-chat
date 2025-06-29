@@ -24,8 +24,15 @@ export class Client {
     }));
   }
 
-  async complete(model: string, tools: Tool[], input: Message[], handler?: (delta: string, snapshot: string) => void): Promise<Message> {
+  async complete(model: string, instructions: string, input: Message[], tools: Tool[], handler?: (delta: string, snapshot: string) => void): Promise<Message> {
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
+
+    if (instructions) {
+      messages.push({
+        role: "system",
+        content: [{ type: "text", text: instructions }],
+      });
+    }
 
     for (const m of input) {
       const content: OpenAI.Chat.ChatCompletionContentPart[] = [];
