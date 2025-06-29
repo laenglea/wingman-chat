@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Plus as PlusIcon, Mic, MicOff, Package } from "lucide-react";
+import { Plus as PlusIcon, Mic, MicOff, Package, PackageOpen } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
 import { useSidebar } from "../hooks/useSidebar";
@@ -61,15 +61,11 @@ export function ChatPage() {
     setRightActions(
       <div className="flex items-center gap-2">
         <Button
-          className={`p-2 rounded transition-all duration-150 ease-out cursor-pointer ${
-            showRepositoryDrawer 
-              ? 'text-blue-600 dark:text-blue-400 hover:text-neutral-800 dark:hover:text-neutral-200' 
-              : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
-          }`}
+          className="p-2 rounded transition-all duration-150 ease-out cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
           onClick={toggleRepositoryDrawer}
           title={showRepositoryDrawer ? 'Close repositories' : 'Open repositories'}
         >
-          <Package size={20} />
+          {showRepositoryDrawer ? <PackageOpen size={20} /> : <Package size={20} />}
         </Button>
         {isAvailable && (
           <Button
