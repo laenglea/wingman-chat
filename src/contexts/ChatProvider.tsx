@@ -103,41 +103,52 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
       updateMessages([...conversation, { role: Role.Assistant, content: '' }]);
 
-    try {
-      // Get repository tools dynamically
-      const repositoryTools = currentRepository ? queryTools() : [];
-      const completionTools = [...bridgeTools, ...repositoryTools, ...(tools || [])];
+      try {
+        // Get repository tools dynamically
+        const repositoryTools = currentRepository ? queryTools() : [];
+        const completionTools = [...bridgeTools, ...repositoryTools, ...(tools || [])];
 
-      let instructions = '';
+        let instructions = '';
 
-      if (repositoryTools.length > 0) {
-        instructions = `Use the knowledge base tools to retreive context from user's documets and files`;
+        if (repositoryTools.length > 0) {
+          instructions = `You are an intelligent document-retrieval assistant.
+
+          Your mission:
+          1. For *every* user query, you MUST first invoke the \`query_knowledge_database\` tool with a concise, natural-language query.
+          2. Examine the tool's results.
+             - If you get ≥1 relevant documents or facts, answer the user *solely* using those results.
+             - Include source citations (e.g. doc IDs, relevance scores, or text snippets).
+          3. Only if the tool returns no relevant information, you may answer from general knowledge—but still note "no document match; using fallback knowledge".
+          4. If the tool call fails, report the failure and either retry or ask the user to clarify.
+          5. Be concise, accurate, and transparent about sources.
+
+          Use GitHub Flavored Markdown to format your responses including tables, code blocks, links, and lists.`;
+        }
+
+        const completion = await client.complete(
+          model!.id,
+          instructions,
+          conversation,
+          completionTools,
+          (_, snapshot) => updateMessages([...conversation, { role: Role.Assistant, content: snapshot }])
+        );
+
+        updateMessages([...conversation, completion]);
+
+        if (!chatObj.title || conversation.length % 3 === 0) {
+          client
+            .summarize(model!.id, conversation)
+            .then(title => updateChat(id, { title }));
+        }
+      } catch (error) {
+        console.error(error);
+
+        if (error?.toString().includes('missing finish_reason')) return;
+
+        const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
+        updateMessages([...conversation, errorMessage]);
       }
-
-      const completion = await client.complete(
-        model!.id,
-        instructions,
-        conversation,
-        completionTools,
-        (_, snapshot) => updateMessages([...conversation, { role: Role.Assistant, content: snapshot }])
-      );
-
-      updateMessages([...conversation, completion]);
-
-      if (!chatObj.title || conversation.length % 3 === 0) {
-        client
-          .summarize(model!.id, conversation)
-          .then(title => updateChat(id, { title }));
-      }
-    } catch (error) {
-      console.error(error);
-
-      if (error?.toString().includes('missing finish_reason')) return;
-
-      const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
-      updateMessages([...conversation, errorMessage]);
-    }
-  }, [getOrCreateChat, updateChat, client, model, chats, bridgeTools, currentRepository, queryTools]);
+    }, [getOrCreateChat, updateChat, client, model, chats, bridgeTools, currentRepository, queryTools]);
 
   const value: ChatContextType = {
     // Models

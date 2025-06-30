@@ -128,16 +128,15 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
                     </div>
                   )}
                   
-                  {/* Remove button */}
-                  {file.status !== 'processing' && (
-                    <button
-                      type="button"
-                      className="absolute top-1 right-1 size-5 bg-neutral-800/80 hover:bg-neutral-900 dark:bg-neutral-200/80 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm shadow-sm"
-                      onClick={() => removeFile(file.id)}
-                    >
-                      <X size={10} />
-                    </button>
-                  )}
+                  {/* Remove button - always available */}
+                  <button
+                    type="button"
+                    className="absolute top-1 right-1 size-5 bg-neutral-800/80 hover:bg-neutral-900 dark:bg-neutral-200/80 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm shadow-sm"
+                    onClick={() => removeFile(file.id)}
+                    title={file.status === 'processing' ? 'Cancel upload and remove file' : 'Remove file'}
+                  >
+                    <X size={10} />
+                  </button>
                 </div>
               </div>
             ))}
