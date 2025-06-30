@@ -261,9 +261,9 @@ Return only the prompts themselves, without numbering or bullet points.`,
       });
   }
 
-  async embedText(text: string): Promise<number[]> {
+  async embedText(model: string, text: string): Promise<number[]> {
     const embedding = await this.oai.embeddings.create({
-      model: "text-embedding-3-small",
+      model: model,
       input: text,
       encoding_format: "float",
     });

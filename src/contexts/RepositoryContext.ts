@@ -2,6 +2,7 @@ import { createContext } from 'react';
 import { Repository, RepositoryFile } from '../types/repository';
 
 export type RepositoryContextType = {
+  isAvailable: boolean;
   repositories: Repository[];
   currentRepository: Repository | null;
   createRepository: (name: string, instructions?: string) => void;

@@ -24,8 +24,8 @@ export function ChatPage() {
   } = useChat();
   
   const { layoutMode } = useLayout();
-  const { isAvailable, startVoice, stopVoice } = useVoice();
-  const { toggleRepositoryDrawer, showRepositoryDrawer } = useRepositories();
+  const { isAvailable: voiceAvailable, startVoice, stopVoice } = useVoice();
+  const { isAvailable: repositoryAvailable, toggleRepositoryDrawer, showRepositoryDrawer } = useRepositories();
   
   // Only need backgroundImage to check if background should be shown
   const { backgroundImage } = useBackground();
@@ -60,14 +60,16 @@ export function ChatPage() {
   useEffect(() => {
     setRightActions(
       <div className="flex items-center gap-2">
-        <Button
-          className="p-2 rounded transition-all duration-150 ease-out cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-          onClick={toggleRepositoryDrawer}
-          title={showRepositoryDrawer ? 'Close repositories' : 'Open repositories'}
-        >
-          {showRepositoryDrawer ? <PackageOpen size={20} /> : <Package size={20} />}
-        </Button>
-        {isAvailable && (
+        {repositoryAvailable && (
+          <Button
+            className="p-2 rounded transition-all duration-150 ease-out cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+            onClick={toggleRepositoryDrawer}
+            title={showRepositoryDrawer ? 'Close repositories' : 'Open repositories'}
+          >
+            {showRepositoryDrawer ? <PackageOpen size={20} /> : <Package size={20} />}
+          </Button>
+        )}
+        {voiceAvailable && (
           <Button
             className={`p-2 rounded transition-all duration-150 ease-out cursor-pointer ${
               isVoiceMode 
@@ -93,7 +95,7 @@ export function ChatPage() {
     return () => {
       setRightActions(null);
     };
-  }, [setRightActions, createChat, isVoiceMode, toggleVoiceMode, isAvailable, showRepositoryDrawer, toggleRepositoryDrawer]);
+  }, [setRightActions, createChat, isVoiceMode, toggleVoiceMode, voiceAvailable, repositoryAvailable, showRepositoryDrawer, toggleRepositoryDrawer]);
 
   // Create sidebar content with useMemo to avoid infinite re-renders
   const sidebarContent = useMemo(() => {
