@@ -1,32 +1,12 @@
-import { createContext, useState, useCallback } from "react";
-import { Chat, Message, Model, Role } from "../models/chat";
+import { useState, useCallback } from "react";
+import { Message, Model, Tool, Role } from "../types/chat";
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
+import { useRepositories } from "../hooks/useRepositories";
+import { useRepository } from "../hooks/useRepository";
+import { useBridge } from "../hooks/useBridge";
 import { getConfig } from "../config";
-
-export interface ChatContextType {
-  // Models
-  models: Model[];
-  model: Model | null; // Current effective model (derived from chat.model || selectedModel || models[0])
-  setModel: (model: Model | null) => void;
-
-  // Chats
-  chats: Chat[];
-  chat: Chat | null;
-  messages: Message[];
-
-  // Chat actions
-  createChat: () => Chat;
-  selectChat: (chatId: string) => void;
-  deleteChat: (chatId: string) => void;
-  updateChat: (chatId: string, updates: Partial<Chat>) => void;
-
-  addMessage: (message: Message) => void;
-  sendMessage: (message: Message) => Promise<void>;
-
-}
-
-export const ChatContext = createContext<ChatContextType | undefined>(undefined);
+import { ChatContext, ChatContextType } from './ChatContext';
 
 interface ChatProviderProps {
   children: React.ReactNode;
@@ -35,10 +15,12 @@ interface ChatProviderProps {
 export function ChatProvider({ children }: ChatProviderProps) {
   const config = getConfig();
   const client = config.client;
-  const bridge = config.bridge;
 
   const { models, selectedModel, setSelectedModel } = useModels();
   const { chats, createChat: createChatHook, updateChat, deleteChat: deleteChatHook } = useChats();
+  const { currentRepository } = useRepositories();
+  const { queryTools } = useRepository(currentRepository?.id || '');
+  const { bridgeTools } = useBridge();
   const [chatId, setChatId] = useState<string | null>(null);
 
   const chat = chats.find(c => c.id === chatId) ?? null;
@@ -112,7 +94,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   );
 
   const sendMessage = useCallback(
-    async (message: Message) => {
+    async (message: Message, tools?: Tool[]) => {
       const { id, chat: chatObj } = getOrCreateChat();
 
       const existingMessages = chats.find(c => c.id === id)?.messages || [];
@@ -122,12 +104,21 @@ export function ChatProvider({ children }: ChatProviderProps) {
       updateMessages([...conversation, { role: Role.Assistant, content: '' }]);
 
     try {
-      const tools = await bridge.listTools();
+      // Get repository tools dynamically
+      const repositoryTools = currentRepository ? queryTools() : [];
+      const completionTools = [...bridgeTools, ...repositoryTools, ...(tools || [])];
+
+      let instructions = '';
+
+      if (repositoryTools.length > 0) {
+        instructions = `Use the knowledge base tools to retreive context from user's documets and files`;
+      }
 
       const completion = await client.complete(
         model!.id,
-        tools,
+        instructions,
         conversation,
+        completionTools,
         (_, snapshot) => updateMessages([...conversation, { role: Role.Assistant, content: snapshot }])
       );
 
@@ -146,7 +137,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
       updateMessages([...conversation, errorMessage]);
     }
-  }, [getOrCreateChat, updateChat, bridge, client, model, chats]);
+  }, [getOrCreateChat, updateChat, client, model, chats, bridgeTools, currentRepository, queryTools]);
 
   const value: ChatContextType = {
     // Models
@@ -168,7 +159,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
     // Message actions
     addMessage,
     sendMessage,
-
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

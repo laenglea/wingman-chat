@@ -1,4 +1,4 @@
-import { useBackgroundContext } from '../contexts/BackgroundContext';
+import { useBackgroundContext } from './useBackgroundContext';
 
 /**
  * Hook to access background settings and pack management.

@@ -3,15 +3,22 @@ import { MessageCircle, Languages, PanelLeftOpen, PanelRightOpen } from "lucide-
 import { Button } from "@headlessui/react";
 import { ChatPage } from "./pages/ChatPage";
 import { TranslatePage } from "./pages/TranslatePage";
-import { SidebarProvider, useSidebar } from "./contexts/SidebarContext";
-import { NavigationProvider, useNavigation } from "./contexts/NavigationContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { LayoutProvider } from "./contexts/LayoutContext";
-import { BackgroundProvider } from "./contexts/BackgroundContext";
-import { ChatProvider } from "./contexts/ChatContext";
-import { TranslateProvider } from "./contexts/TranslateContext";
-import { VoiceProvider } from "./contexts/VoiceContext";
+import { SidebarProvider } from "./contexts/SidebarProvider";
+import { useSidebar } from "./hooks/useSidebar";
+import { NavigationProvider } from "./contexts/NavigationProvider";
+import { useNavigation } from "./hooks/useNavigation";
+import { ThemeProvider } from "./contexts/ThemeProvider";
+import { LayoutProvider } from "./contexts/LayoutProvider";
+import { BackgroundProvider } from "./contexts/BackgroundProvider";
+import { ChatProvider } from "./contexts/ChatProvider";
+import { TranslateProvider } from "./contexts/TranslateProvider";
+import { VoiceProvider } from "./contexts/VoiceProvider";
 import { SettingsButton } from "./components/SettingsButton";
+import { RepositoryProvider } from "./contexts/RepositoryProvider";
+import { useRepositories } from "./hooks/useRepositories";
+import { RepositoryDrawer } from "./components/RepositoryDrawer";
+import { BridgeProvider } from "./contexts/BridgeProvider";
+import { BridgeIndicator } from "./components/BridgeIndicator";
 
 type Page = "chat" | "translate";
 
@@ -19,6 +26,9 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>("chat");
   const { showSidebar, setShowSidebar, toggleSidebar, sidebarContent } = useSidebar();
   const { leftActions, rightActions } = useNavigation();
+  const { showRepositoryDrawer } = useRepositories();
+  const [isRepositoryDrawerAnimating, setIsRepositoryDrawerAnimating] = useState(false);
+  const [shouldRenderDrawer, setShouldRenderDrawer] = useState(false);
 
   // Auto-close sidebar on mobile screens on mount and resize
   useEffect(() => {
@@ -33,6 +43,24 @@ function AppContent() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [setShowSidebar]);
+
+  // Handle repository drawer animation
+  useEffect(() => {
+    if (showRepositoryDrawer) {
+      setShouldRenderDrawer(true);
+      // Small delay to ensure the element is in the DOM before animating
+      setTimeout(() => {
+        setIsRepositoryDrawerAnimating(true);
+      }, 10);
+    } else {
+      setIsRepositoryDrawerAnimating(false);
+      // Remove from DOM after animation completes
+      const timer = setTimeout(() => {
+        setShouldRenderDrawer(false);
+      }, 300); // Match the transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [showRepositoryDrawer]);
 
   // Prevent default file-drop behavior on the rest of the page (avoid navigation)
   useEffect(() => {
@@ -144,15 +172,32 @@ function AppContent() {
             {/* Right section */}
             <div className="flex items-center gap-2 justify-end flex-1">
               <SettingsButton />
+              <BridgeIndicator />
               {rightActions}
             </div>
           </div>
         </nav>
         
         {/* Content area - no padding so it can scroll under the nav */}
-        <div className="flex-1 overflow-hidden">
-          {currentPage === "chat" && <ChatPage />}
-          {currentPage === "translate" && <TranslatePage />}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Main content */}
+          <div className={`flex-1 overflow-hidden transition-all duration-300 ${
+            showRepositoryDrawer ? 'mr-80 pr-3' : ''
+          }`}>
+            {currentPage === "chat" && <ChatPage />}
+            {currentPage === "translate" && <TranslatePage />}
+          </div>
+          
+          {/* Repository drawer - right side */}
+          {shouldRenderDrawer && (
+            <div className={`w-80 bg-white/90 dark:bg-black/10 backdrop-blur-lg shadow-2xl border-l border-neutral-200 dark:border-neutral-800 fixed right-3 top-16 bottom-4 z-40 rounded-xl transition-all duration-300 ease-out transform ${
+              isRepositoryDrawerAnimating 
+                ? 'translate-x-0 opacity-100 scale-100' 
+                : 'translate-x-full opacity-0 scale-95'
+            }`}>
+              <RepositoryDrawer />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -166,13 +211,17 @@ function App() {
         <BackgroundProvider>
           <SidebarProvider>
             <NavigationProvider>
-              <ChatProvider>
-                <VoiceProvider>
-                  <TranslateProvider>
-                    <AppContent />
-                  </TranslateProvider>
-                </VoiceProvider>
-              </ChatProvider>
+              <BridgeProvider>
+                <RepositoryProvider>
+                  <ChatProvider>
+                    <VoiceProvider>
+                      <TranslateProvider>
+                        <AppContent />
+                      </TranslateProvider>
+                    </VoiceProvider>
+                  </ChatProvider>
+                </RepositoryProvider>
+              </BridgeProvider>
             </NavigationProvider>
           </SidebarProvider>
         </BackgroundProvider>

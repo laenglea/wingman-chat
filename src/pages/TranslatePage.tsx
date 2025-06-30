@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useDropZone } from "../hooks/useDropZone";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, XIcon, DownloadIcon } from "lucide-react";
-import { useNavigation } from "../contexts/NavigationContext";
+import { useNavigation } from "../hooks/useNavigation";
 import { useLayout } from "../hooks/useLayout";
 import { useTranslate } from "../hooks/useTranslate";
 import { CopyButton } from "../components/CopyButton";
