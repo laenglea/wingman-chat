@@ -28,11 +28,16 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
   const { repositories, upsertFile, removeFile: removeFileFromRepo } = useRepositories();
   const [vectorDB, setVectorDB] = useState(() => new VectorDB());
   const currentRepositoryIdRef = useRef(repositoryId);
+  const repositoriesRef = useRef(repositories);
   
-  // Update ref whenever repositoryId changes
+  // Update refs whenever values change
   useEffect(() => {
     currentRepositoryIdRef.current = repositoryId;
   }, [repositoryId]);
+  
+  useEffect(() => {
+    repositoriesRef.current = repositories;
+  }, [repositories]);
 
   // Get files from the current repository
   const repository = repositories.find(r => r.id === repositoryId);
@@ -104,8 +109,12 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
     
     // Extract text
     const text = await client.extractText(file);
-    // Check if repository changed during processing
+    // Check if repository changed or file was removed during processing
     if (currentRepositoryIdRef.current !== currentRepoId) return;
+    
+    // Check if file still exists in repository (might have been deleted)
+    const currentRepo = repositoriesRef.current.find(r => r.id === currentRepoId);
+    if (!currentRepo?.files?.find(f => f.id === fileId)) return;
     
     upsertFile(repositoryId, {
       id: fileId,
@@ -119,8 +128,12 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
 
     // Segment text
     const segments = await client.segmentText(file);
-    // Check if repository changed during processing
+    // Check if repository changed or file was removed during processing
     if (currentRepositoryIdRef.current !== currentRepoId) return;
+    
+    // Check if file still exists in repository (might have been deleted)
+    const currentRepo2 = repositoriesRef.current.find(r => r.id === currentRepoId);
+    if (!currentRepo2?.files?.find(f => f.id === fileId)) return;
     
     upsertFile(repositoryId, {
       id: fileId,
@@ -134,7 +147,8 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
 
     // Embed segments with progress tracking
     const limit = pLimit(10);
-    const model = repository?.embedder || '';
+    const model = repository?.embedder ?? '';
+
     let completedCount = 0;
     
     const chunks = await Promise.all(
@@ -143,8 +157,12 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
           const vector = await client.embedText(model, segment);
           completedCount++;
           
-          // Check if repository changed during processing
+          // Check if repository changed or file was removed during processing
           if (currentRepositoryIdRef.current !== currentRepoId) return { text: segment, vector };
+          
+          // Check if file still exists in repository (might have been deleted)
+          const currentRepo3 = repositoriesRef.current.find(r => r.id === currentRepoId);
+          if (!currentRepo3?.files?.find(f => f.id === fileId)) return { text: segment, vector };
           
           const progress = 20 + (completedCount / segments.length) * 80;
           upsertFile(repositoryId, {
@@ -164,6 +182,10 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
 
     // Final check before storing results
     if (currentRepositoryIdRef.current !== currentRepoId) return;
+    
+    // Check if file still exists in repository (might have been deleted)
+    const currentRepo4 = repositoriesRef.current.find(r => r.id === currentRepoId);
+    if (!currentRepo4?.files?.find(f => f.id === fileId)) return;
 
     // Store in vector database
     chunks.forEach((chunk, index) => {
@@ -224,13 +246,12 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
     }
   }, [processFile, repositoryId, upsertFile]);
 
-  const queryChunks = useCallback(async (query: string, topK: number = 5): Promise<FileChunk[]> => {
+  const queryChunks = useCallback(async (query: string, topK: number = 10): Promise<FileChunk[]> => {
     if (!query.trim()) return [];
 
     try {
-      const model = repository?.embedder || '';
+      const model = repository?.embedder ?? '';
       const vector = await client.embedText(model, query);
-      
       const results = vectorDB.queryDocuments(vector, topK);
       
       // Filter and convert results
