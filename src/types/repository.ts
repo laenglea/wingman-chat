@@ -1,6 +1,9 @@
 export interface Repository {
   id: string;
   name: string;
+
+  embedder: string;
+  
   instructions?: string; // instruction for this repository
   createdAt: Date;
   updatedAt: Date;

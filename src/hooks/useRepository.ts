@@ -134,12 +134,13 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
 
     // Embed segments with progress tracking
     const limit = pLimit(10);
+    const model = repository?.embedder || '';
     let completedCount = 0;
     
     const chunks = await Promise.all(
       segments.map(segment =>
         limit(async () => {
-          const vector = await client.embedText(segment);
+          const vector = await client.embedText(model, segment);
           completedCount++;
           
           // Check if repository changed during processing
@@ -186,7 +187,7 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
       segments: chunks,
       uploadedAt: new Date(),
     });
-  }, [vectorDB, repositoryId, upsertFile]);
+  }, [upsertFile, repositoryId, repository?.embedder, vectorDB]);
 
   const addFile = useCallback(async (file: File) => {
     const fileId = crypto.randomUUID();
@@ -227,8 +228,10 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
     if (!query.trim()) return [];
 
     try {
-      const queryVector = await client.embedText(query);
-      const results = vectorDB.queryDocuments(queryVector, topK);
+      const model = repository?.embedder || '';
+      const vector = await client.embedText(model, query);
+      
+      const results = vectorDB.queryDocuments(vector, topK);
       
       // Filter and convert results
       return results
@@ -250,7 +253,7 @@ export function useRepository(repositoryId: string): RepositoryDocumentHookRetur
       console.error('Search failed:', error);
       return [];
     }
-  }, [vectorDB, repositoryId, files]);
+  }, [vectorDB, repositoryId, repository?.embedder, files]);
 
   const queryTools = useCallback((): Tool[] => {
     return [

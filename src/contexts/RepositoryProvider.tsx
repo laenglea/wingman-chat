@@ -2,6 +2,7 @@ import { useState, useCallback, ReactNode, useEffect } from 'react';
 import { Repository, RepositoryFile } from '../types/repository';
 import { setValue, getValue } from '../lib/db';
 import { RepositoryContext, RepositoryContextType } from './RepositoryContext';
+import { getConfig } from '../config';
 
 const REPOSITORIES_DB_KEY = 'repositories';
 const REPOSITORY_STORAGE_KEY = 'app_project';
@@ -11,6 +12,18 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
   const [currentRepository, setCurrentRepository] = useState<Repository | null>(null);
   const [showRepositoryDrawer, setShowRepositoryDrawer] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
+
+  // Check repository availability from config
+  useEffect(() => {
+    try {
+      const config = getConfig();
+      setIsAvailable(config.repository.enabled);
+    } catch (error) {
+      console.warn('Failed to get repository config:', error);
+      setIsAvailable(false);
+    }
+  }, []);
 
   // Load repositories from database and state from localStorage on mount
   useEffect(() => {
@@ -76,9 +89,14 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
   }, [currentRepository, isLoaded]);
 
   const createRepository = useCallback((name: string, instructions?: string) => {
+    const config = getConfig();
+
     const newRepository: Repository = {
       id: crypto.randomUUID(),
       name,
+
+      embedder: config.repository.embedder || '',
+      
       instructions,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -140,6 +158,7 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value: RepositoryContextType = {
+    isAvailable,
     repositories,
     currentRepository,
     createRepository,
