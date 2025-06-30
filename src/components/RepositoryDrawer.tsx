@@ -44,10 +44,10 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
 
       {/* File upload area */}
       <div
-        className={`m-4 border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer
+        className={`m-4 border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer bg-white/30 dark:bg-neutral-800/60 backdrop-blur-lg
           ${isDragOver 
-            ? 'border-slate-400 bg-slate-50 dark:bg-slate-950/20' 
-            : 'border-neutral-300 dark:border-neutral-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-slate-50/50 dark:hover:bg-slate-950/10'
+            ? 'border-slate-400 bg-slate-50/50 dark:bg-neutral-700/70' 
+            : 'border-neutral-300 dark:border-neutral-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-white/40 dark:hover:bg-neutral-800/70'
           }`}
         onDrop={handleDrop}
         onDragOver={(e) => {
@@ -93,10 +93,10 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
               >
                 <div className={`relative w-20 h-20 ${
                   file.status === 'processing' 
-                    ? 'bg-white/30 dark:bg-black/20 backdrop-blur-lg border-2 border-dashed border-white/50 dark:border-white/30'
+                    ? 'bg-white/30 dark:bg-neutral-800/60 backdrop-blur-lg border-2 border-dashed border-white/50 dark:border-white/30'
                     : file.status === 'error'
                     ? 'bg-red-100/40 dark:bg-red-900/25 backdrop-blur-lg border border-red-300/40 dark:border-red-600/25'
-                    : 'bg-white/40 dark:bg-black/25 backdrop-blur-lg border border-white/40 dark:border-white/25'
+                    : 'bg-white/40 dark:bg-neutral-800/60 backdrop-blur-lg border border-white/40 dark:border-white/25'
                 } rounded-xl shadow-sm flex flex-col items-center justify-center p-2 hover:shadow-md hover:border-white/60 dark:hover:border-white/40 transition-all`}>
                   
                   {file.status === 'processing' ? (
@@ -380,7 +380,7 @@ export function RepositoryDrawer() {
       {/* Header with Unified Repository Selector */}
       <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
         <Menu as="div" className="relative w-full">
-          <Menu.Button className="relative w-full cursor-pointer rounded-lg bg-white dark:bg-neutral-800 py-2 pl-3 pr-10 text-left shadow-md border border-neutral-300 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-slate-500 hover:border-neutral-400 dark:hover:border-neutral-500 transition-colors">
+          <Menu.Button className="relative w-full cursor-pointer rounded-lg bg-white/60 dark:bg-neutral-800 py-2 pl-3 pr-10 text-left shadow-md border border-neutral-300 dark:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-slate-500 hover:border-neutral-400 dark:hover:border-neutral-500 transition-colors backdrop-blur-lg">
             <span className="flex items-center gap-2">
               <Folder size={16} className="text-slate-600 dark:text-slate-400" />
               <span className="block truncate text-neutral-900 dark:text-neutral-100 font-medium">
@@ -392,7 +392,7 @@ export function RepositoryDrawer() {
             </span>
           </Menu.Button>
 
-          <Menu.Items className="absolute z-20 mt-1 w-full max-h-80 overflow-auto rounded-md bg-white dark:bg-neutral-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <Menu.Items className="absolute z-20 mt-1 w-full max-h-80 overflow-auto rounded-md bg-white/60 dark:bg-neutral-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none backdrop-blur-lg">
             {/* None Option */}
             <Menu.Item>
               {({ active }) => (

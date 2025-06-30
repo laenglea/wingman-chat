@@ -298,7 +298,11 @@ export function ChatInput() {
         className={`chat-input-container border-2 ${
           isDragging 
             ? 'border-dashed border-slate-400 dark:border-slate-500 bg-slate-50/80 dark:bg-slate-900/40 shadow-2xl shadow-slate-500/30 dark:shadow-slate-400/20 scale-[1.02] transition-all duration-200' 
-            : 'border-solid border-neutral-200 dark:border-neutral-700 bg-white/30 dark:bg-black/25'
+            : `border-solid border-neutral-200 dark:border-neutral-700 ${
+                messages.length === 0 
+                  ? 'bg-white/60 dark:bg-neutral-950/70' 
+                  : 'bg-white/30 dark:bg-neutral-950/50'
+              }`
         } backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 dark:ring-1 dark:ring-white/10 transition-all duration-200`}
       >
         <input

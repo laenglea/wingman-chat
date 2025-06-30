@@ -244,7 +244,7 @@ export function TranslatePage() {
                       <MenuItems
                         transition
                         anchor="bottom start"
-                        className="!max-h-[50vh] mt-2 rounded-lg bg-neutral-50/95 dark:bg-neutral-900/95 backdrop-blur-lg border border-neutral-200 dark:border-neutral-700 overflow-y-auto shadow-lg z-50"
+                        className="!max-h-[50vh] mt-2 rounded-lg bg-neutral-50/90 dark:bg-neutral-900/90 backdrop-blur-lg border border-neutral-200 dark:border-neutral-700 overflow-y-auto shadow-lg z-50"
                       >
                         {languages.map((lang) => (
                           <MenuItem key={lang.code}>
