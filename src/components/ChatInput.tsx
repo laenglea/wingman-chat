@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../types/chat";
 import {
@@ -18,6 +18,7 @@ import {
 } from "../lib/utils";
 import { getConfig } from "../config";
 import { useChat } from "../hooks/useChat";
+import { useRepositories } from "../hooks/useRepositories";
 import { useTextPaste } from "../hooks/useTextPaste";
 import { useTranscription } from "../hooks/useTranscription";
 import { useDropZone } from "../hooks/useDropZone";
@@ -27,6 +28,7 @@ export function ChatInput() {
   const client = config.client;
 
   const { sendMessage, models, model, setModel: onModelChange, messages } = useChat();
+  const { currentRepository, setCurrentRepository } = useRepositories();
 
   const [content, setContent] = useState("");
   const [transcribingContent, setTranscribingContent] = useState(false);
@@ -470,6 +472,22 @@ export function ChatInput() {
                 ))}
               </MenuItems>
             </Menu>
+
+            {currentRepository && (
+              <div className="group flex items-center gap-1 px-2 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 text-sm cursor-pointer">
+                <Package size={14} />
+                <span className="max-w-20 truncate" title={currentRepository.name}>
+                  {currentRepository.name}
+                </span>
+                <button
+                  onClick={() => setCurrentRepository(null)}
+                  className="opacity-0 group-hover:opacity-100 hover:text-red-500 dark:hover:text-red-400 transition-all ml-1"
+                  title="Clear project"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1">

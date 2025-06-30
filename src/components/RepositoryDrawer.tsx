@@ -131,7 +131,7 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
                   {/* Remove button - always available */}
                   <button
                     type="button"
-                    className="absolute top-1 right-1 size-5 bg-neutral-800/80 hover:bg-neutral-900 dark:bg-neutral-200/80 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm shadow-sm"
+                    className="absolute top-1 right-1 size-5 bg-neutral-800/80 hover:bg-neutral-900 dark:bg-neutral-200/80 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm shadow-sm cursor-pointer"
                     onClick={() => removeFile(file.id)}
                     title={file.status === 'processing' ? 'Cancel upload and remove file' : 'Remove file'}
                   >
@@ -402,7 +402,7 @@ export function RepositoryDrawer() {
                   }}
                   className={`${
                     active ? 'bg-slate-50 dark:bg-slate-900/20' : ''
-                  } group relative flex items-center justify-between px-3 py-2 w-full text-left border-b border-neutral-200 dark:border-neutral-600`}
+                  } group relative flex items-center justify-between px-3 py-2 w-full text-left border-b border-neutral-200 dark:border-neutral-600 cursor-pointer`}
                 >
                   <div className="flex items-center gap-2">
                     <X size={16} className="text-slate-600 dark:text-slate-400 flex-shrink-0" />
@@ -444,7 +444,7 @@ export function RepositoryDrawer() {
                           e.stopPropagation();
                           saveNewRepository(close);
                         }}
-                        className="p-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 rounded transition-colors"
+                        className="p-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 rounded transition-colors cursor-pointer"
                         title="Create"
                       >
                         <Check size={12} />
@@ -454,7 +454,7 @@ export function RepositoryDrawer() {
                           e.stopPropagation();
                           cancelNewRepository(close);
                         }}
-                        className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 rounded transition-colors"
+                        className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 rounded transition-colors cursor-pointer"
                         title="Cancel"
                       >
                         <X size={12} />
@@ -467,7 +467,7 @@ export function RepositoryDrawer() {
                         e.stopPropagation();
                         startCreatingNew();
                       }}
-                      className="flex items-center gap-2 w-full text-sm text-slate-600 dark:text-slate-400 font-medium"
+                      className="flex items-center gap-2 w-full text-sm text-slate-600 dark:text-slate-400 font-medium cursor-pointer"
                     >
                       <Plus size={16} />
                       Create New Repository
@@ -511,7 +511,7 @@ export function RepositoryDrawer() {
                                 e.stopPropagation();
                                 saveInlineEdit();
                               }}
-                              className="p-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 rounded transition-colors"
+                              className="p-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 rounded transition-colors cursor-pointer"
                               title="Save"
                             >
                               <Check size={12} />
@@ -521,7 +521,7 @@ export function RepositoryDrawer() {
                                 e.stopPropagation();
                                 cancelInlineEdit();
                               }}
-                              className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 rounded transition-colors"
+                              className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 rounded transition-colors cursor-pointer"
                               title="Cancel"
                             >
                               <X size={12} />
@@ -530,7 +530,7 @@ export function RepositoryDrawer() {
                         ) : (
                           <button
                             onClick={() => setCurrentRepository(repository)}
-                            className="flex items-center gap-2 flex-1 text-left min-w-0"
+                            className="flex items-center gap-2 flex-1 text-left min-w-0 cursor-pointer"
                           >
                             <span className={`block truncate text-sm ${
                               isCurrentRepo
@@ -551,7 +551,7 @@ export function RepositoryDrawer() {
                               e.stopPropagation();
                               startInlineEdit(repository);
                             }}
-                            className="p-1 text-neutral-400 hover:text-slate-600 dark:hover:text-slate-400 rounded transition-colors"
+                            className="p-1 text-neutral-400 hover:text-slate-600 dark:hover:text-slate-400 rounded transition-colors cursor-pointer"
                             title="Edit repository name"
                           >
                             <Edit size={12} />
@@ -566,7 +566,7 @@ export function RepositoryDrawer() {
                                 }
                               }
                             }}
-                            className="p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
+                            className="p-1 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors cursor-pointer"
                             title="Delete repository"
                           >
                             <Trash2 size={12} />
