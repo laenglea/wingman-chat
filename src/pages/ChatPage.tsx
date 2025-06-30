@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Plus as PlusIcon, Mic, MicOff } from "lucide-react";
+import { Plus as PlusIcon, Mic, MicOff, Package, PackageOpen } from "lucide-react";
 import { Button } from "@headlessui/react";
 import { useAutoScroll } from "../hooks/useAutoScroll";
-import { useSidebar } from "../contexts/SidebarContext";
-import { useNavigation } from "../contexts/NavigationContext";
+import { useSidebar } from "../hooks/useSidebar";
+import { useNavigation } from "../hooks/useNavigation";
 import { useLayout } from "../hooks/useLayout";
 import { useChat } from "../hooks/useChat";
 import { useVoice } from "../hooks/useVoice";
@@ -13,6 +13,7 @@ import { ChatMessage } from "../components/ChatMessage";
 import { ChatSidebar } from "../components/ChatSidebar";
 import { VoiceWaves } from "../components/VoiceWaves";
 import { BackgroundImage } from "../components/BackgroundImage";
+import { useRepositories } from "../hooks/useRepositories";
 
 export function ChatPage() {
   const {
@@ -23,7 +24,8 @@ export function ChatPage() {
   } = useChat();
   
   const { layoutMode } = useLayout();
-  const { isAvailable, startVoice, stopVoice } = useVoice();
+  const { isAvailable: voiceAvailable, startVoice, stopVoice } = useVoice();
+  const { isAvailable: repositoryAvailable, toggleRepositoryDrawer, showRepositoryDrawer } = useRepositories();
   
   // Only need backgroundImage to check if background should be shown
   const { backgroundImage } = useBackground();
@@ -58,7 +60,16 @@ export function ChatPage() {
   useEffect(() => {
     setRightActions(
       <div className="flex items-center gap-2">
-        {isAvailable && (
+        {repositoryAvailable && (
+          <Button
+            className="p-2 rounded transition-all duration-150 ease-out cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+            onClick={toggleRepositoryDrawer}
+            title={showRepositoryDrawer ? 'Close repositories' : 'Open repositories'}
+          >
+            {showRepositoryDrawer ? <PackageOpen size={20} /> : <Package size={20} />}
+          </Button>
+        )}
+        {voiceAvailable && (
           <Button
             className={`p-2 rounded transition-all duration-150 ease-out cursor-pointer ${
               isVoiceMode 
@@ -84,7 +95,7 @@ export function ChatPage() {
     return () => {
       setRightActions(null);
     };
-  }, [setRightActions, createChat, isVoiceMode, toggleVoiceMode, isAvailable]);
+  }, [setRightActions, createChat, isVoiceMode, toggleVoiceMode, voiceAvailable, repositoryAvailable, showRepositoryDrawer, toggleRepositoryDrawer]);
 
   // Create sidebar content with useMemo to avoid infinite re-renders
   const sidebarContent = useMemo(() => {
