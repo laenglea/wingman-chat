@@ -29,7 +29,7 @@ const layoutOptions: { value: LayoutMode; label: string }[] = [
 const sections = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'chats', label: 'Chats', icon: MessageSquare },
-  { id: 'personalization', label: 'Personalization', icon: User },
+  { id: 'profile', label: 'Profile', icon: User },
   { id: 'storage', label: 'Storage', icon: Database },
 ];
 
@@ -71,7 +71,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const {
     theme, setTheme, layoutMode, setLayoutMode,
     backgroundPacks, backgroundSetting, setBackground,
-    personalization, updatePersonalization, generateInstructions
+    profile, updateProfile
   } = useSettings();
   const { chats, deleteChat } = useChat();
   const { repositories, deleteRepository } = useRepositories();
@@ -138,18 +138,18 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <Select label="Layout" value={layoutMode} onChange={setLayoutMode} options={layoutOptions} helpText="Choose between normal or wide layout for larger screens." />
           </div>
         );
-      case 'personalization': {
+      case 'profile': {
         const availableTraits = [
           'chatty', 'concise', 'friendly', 'professional', 'creative', 
           'analytical', 'patient', 'encouraging', 'direct', 'detailed'
         ];
         
         const toggleTrait = (trait: string) => {
-          const currentTraits = personalization.traits;
+          const currentTraits = profile.traits || [];
           const newTraits = currentTraits.includes(trait)
-            ? currentTraits.filter(t => t !== trait)
+            ? currentTraits.filter((t: string) => t !== trait)
             : [...currentTraits, trait];
-          updatePersonalization({ traits: newTraits });
+          updateProfile({ traits: newTraits });
         };
 
         return (
@@ -158,8 +158,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Name</label>
               <input
                 type="text"
-                value={personalization.name}
-                onChange={(e) => updatePersonalization({ name: e.target.value })}
+                value={profile.name || ''}
+                onChange={(e) => updateProfile({ name: e.target.value })}
                 className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-neutral-900 dark:text-neutral-100"
                 placeholder="Your nickname or name"
               />
@@ -169,8 +169,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Role</label>
               <input
                 type="text"
-                value={personalization.role}
-                onChange={(e) => updatePersonalization({ role: e.target.value })}
+                value={profile.role || ''}
+                onChange={(e) => updateProfile({ role: e.target.value })}
                 className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-neutral-900 dark:text-neutral-100"
                 placeholder="e.g., Software Developer, Student, Designer"
               />
@@ -180,7 +180,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Traits</label>
               <div className="flex flex-wrap gap-2 mb-2">
                 {availableTraits.map((trait) => {
-                  const isSelected = personalization.traits.includes(trait);
+                  const isSelected = (profile.traits || []).includes(trait);
                   return (
                     <button
                       key={trait}
@@ -202,30 +202,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <div>
               <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Profile</label>
               <textarea
-                value={personalization.profile}
-                onChange={(e) => updatePersonalization({ profile: e.target.value })}
+                value={profile.profile || ''}
+                onChange={(e) => updateProfile({ profile: e.target.value })}
                 className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-neutral-900 dark:text-neutral-100 resize-none"
                 rows={2}
                 placeholder="Brief description about yourself, your interests, or context..."
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-sm font-medium text-neutral-900 dark:text-neutral-100">Instructions</label>
-                <button
-                  onClick={generateInstructions}
-                  className="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border border-blue-200 dark:border-blue-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                >
-                  Regenerate
-                </button>
-              </div>
-              <textarea
-                value={personalization.instructions}
-                onChange={(e) => updatePersonalization({ instructions: e.target.value })}
-                className="w-full px-3 py-2 text-sm rounded-lg bg-white dark:bg-neutral-800/60 border border-neutral-300 dark:border-neutral-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-neutral-900 dark:text-neutral-100 resize-none"
-                rows={3}
-                placeholder="Auto-generated from settings above..."
               />
             </div>
           </div>
