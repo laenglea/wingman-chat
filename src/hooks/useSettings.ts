@@ -1,12 +1,14 @@
 import { useLayout } from './useLayout';
 import { useTheme } from './useTheme';
 import { useBackground } from './useBackground';
+import { usePersonalization } from './usePersonalization';
 
 export const useSettings = () => {
   // Use existing context hooks
   const layoutContext = useLayout();
   const themeContext = useTheme();
   const backgroundContext = useBackground();
+  const personalizationContext = usePersonalization();
   
   return {
     // Layout settings
@@ -20,5 +22,9 @@ export const useSettings = () => {
     backgroundPacks: backgroundContext.backgroundPacks,
     backgroundSetting: backgroundContext.backgroundSetting,
     setBackground: backgroundContext.setBackground,
+    // Personalization settings
+    personalization: personalizationContext.settings,
+    updatePersonalization: personalizationContext.updateSettings,
+    generateInstructions: personalizationContext.generateInstructions,
   };
 };

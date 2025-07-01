@@ -16,6 +16,7 @@ import { VoiceProvider } from "./contexts/VoiceProvider";
 import { SettingsButton } from "./components/SettingsButton";
 import { RepositoryProvider } from "./contexts/RepositoryProvider";
 import { BridgeProvider } from "./contexts/BridgeProvider";
+import { PersonalizationProvider } from "./contexts/PersonalizationContext";
 import { BridgeIndicator } from "./components/BridgeIndicator";
 
 type Page = "chat" | "translate";
@@ -173,21 +174,23 @@ function App() {
     <ThemeProvider>
       <LayoutProvider>
         <BackgroundProvider>
-          <SidebarProvider>
-            <NavigationProvider>
-              <BridgeProvider>
-                <RepositoryProvider>
-                  <ChatProvider>
-                    <VoiceProvider>
-                      <TranslateProvider>
-                        <AppContent />
-                      </TranslateProvider>
-                    </VoiceProvider>
-                  </ChatProvider>
-                </RepositoryProvider>
-              </BridgeProvider>
-            </NavigationProvider>
-          </SidebarProvider>
+          <PersonalizationProvider>
+            <SidebarProvider>
+              <NavigationProvider>
+                <BridgeProvider>
+                  <RepositoryProvider>
+                    <ChatProvider>
+                      <VoiceProvider>
+                        <TranslateProvider>
+                          <AppContent />
+                        </TranslateProvider>
+                      </VoiceProvider>
+                    </ChatProvider>
+                  </RepositoryProvider>
+                </BridgeProvider>
+              </NavigationProvider>
+            </SidebarProvider>
+          </PersonalizationProvider>
         </BackgroundProvider>
       </LayoutProvider>
     </ThemeProvider>

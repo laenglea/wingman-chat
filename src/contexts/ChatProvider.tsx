@@ -5,6 +5,7 @@ import { useChats } from "../hooks/useChats";
 import { useRepositories } from "../hooks/useRepositories";
 import { useRepository } from "../hooks/useRepository";
 import { useBridge } from "../hooks/useBridge";
+import { usePersonalization } from "../hooks/usePersonalization";
 import { getConfig } from "../config";
 import { ChatContext, ChatContextType } from './ChatContext';
 
@@ -21,6 +22,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { currentRepository } = useRepositories();
   const { queryTools } = useRepository(currentRepository?.id || '');
   const { bridgeTools } = useBridge();
+  const { settings: personalization } = usePersonalization();
   const [chatId, setChatId] = useState<string | null>(null);
 
   const chat = chats.find(c => c.id === chatId) ?? null;
@@ -110,8 +112,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
         let instructions = '';
 
+        // Add personalization instructions first if they exist
+        if (personalization.instructions.trim()) {
+          instructions = personalization.instructions + '\n\n';
+        }
+
         if (repositoryTools.length > 0) {
-          instructions = `You are an intelligent document-retrieval assistant.
+          instructions += `You are an intelligent document-retrieval assistant.
 
           Your mission:
           1. For *every* user query, you MUST first invoke the \`query_knowledge_database\` tool with a concise, natural-language query.
@@ -148,7 +155,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
         updateMessages([...conversation, errorMessage]);
       }
-    }, [getOrCreateChat, updateChat, client, model, chats, bridgeTools, currentRepository, queryTools]);
+    }, [getOrCreateChat, updateChat, client, model, chats, bridgeTools, currentRepository, queryTools, personalization.instructions]);
 
   const value: ChatContextType = {
     // Models
