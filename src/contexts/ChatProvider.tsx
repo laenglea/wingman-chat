@@ -5,7 +5,7 @@ import { useChats } from "../hooks/useChats";
 import { useRepositories } from "../hooks/useRepositories";
 import { useRepository } from "../hooks/useRepository";
 import { useBridge } from "../hooks/useBridge";
-import { usePersonalization } from "../hooks/usePersonalization";
+import { useProfile } from "../hooks/useProfile";
 import { getConfig } from "../config";
 import { ChatContext, ChatContextType } from './ChatContext';
 
@@ -22,7 +22,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { currentRepository } = useRepositories();
   const { queryTools } = useRepository(currentRepository?.id || '');
   const { bridgeTools } = useBridge();
-  const { settings: personalization } = usePersonalization();
+  const { settings: profile, generateInstructions } = useProfile();
   const [chatId, setChatId] = useState<string | null>(null);
 
   const chat = chats.find(c => c.id === chatId) ?? null;
@@ -112,9 +112,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
         let instructions = '';
 
-        // Add personalization instructions first if they exist
-        if (personalization.instructions.trim()) {
-          instructions = personalization.instructions + '\n\n';
+        // Add profile instructions first if they exist
+        const profileInstructions = generateInstructions();
+        if (profileInstructions.trim()) {
+          instructions = profileInstructions + '\n\n';
         }
 
         if (repositoryTools.length > 0) {
@@ -155,7 +156,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
         updateMessages([...conversation, errorMessage]);
       }
-    }, [getOrCreateChat, updateChat, client, model, chats, bridgeTools, currentRepository, queryTools, personalization.instructions]);
+    }, [getOrCreateChat, chats, updateChat, currentRepository, queryTools, bridgeTools, profile, generateInstructions, client, model]);
 
   const value: ChatContextType = {
     // Models
