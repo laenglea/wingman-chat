@@ -7,7 +7,7 @@ import { BackgroundContext, BackgroundContextValue } from '../contexts/Backgroun
  */
 export function useBackground(): BackgroundContextValue {
   const context = useContext(BackgroundContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useBackground must be used within BackgroundProvider');
   }
   return context;
