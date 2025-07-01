@@ -10,14 +10,17 @@ interface ProfileProviderProps {
 const filterEmptySettings = (settings: ProfileSettings): ProfileSettings => {
   const filtered: ProfileSettings = {};
   
-  if (settings.name?.trim()) filtered.name = settings.name;
-  if (settings.role?.trim()) filtered.role = settings.role;
-  if (settings.profile?.trim()) filtered.profile = settings.profile;
-  
-  if (settings.traits?.length) {
-    const nonEmptyTraits = settings.traits.filter(trait => trait?.trim());
-    if (nonEmptyTraits.length > 0) filtered.traits = nonEmptyTraits;
-  }
+  Object.keys(settings).forEach(key => {
+    const value = settings[key as keyof ProfileSettings];
+    if (Array.isArray(value)) {
+      const nonEmptyValues = value.filter(item => item?.trim());
+      if (nonEmptyValues.length > 0) {
+        filtered[key as keyof ProfileSettings] = nonEmptyValues;
+      }
+    } else if (typeof value === 'string' && value.trim()) {
+      filtered[key as keyof ProfileSettings] = value;
+    }
+  });
   
   return filtered;
 };
