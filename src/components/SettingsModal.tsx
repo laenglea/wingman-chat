@@ -118,7 +118,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (window.confirm(`Are you sure you want to delete all ${chats.length} chat${chats.length === 1 ? '' : 's'}? This action cannot be undone.`)) {
       chats.forEach(chat => deleteChat(chat.id));
       // Recalculate storage after deletion
-      setTimeout(() => loadStorageInfo(), 100);
+      setTimeout(() => loadStorageInfo(), 750);
     }
   };
 
@@ -126,7 +126,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (window.confirm(`Are you sure you want to delete all ${repositories.length} repositor${repositories.length === 1 ? 'y' : 'ies'}? This action cannot be undone and will remove all files in these repositories.`)) {
       repositories.forEach(repo => deleteRepository(repo.id));
       // Recalculate storage after deletion
-      setTimeout(() => loadStorageInfo(), 100);
+      setTimeout(() => loadStorageInfo(), 750);
     }
   };
 
