@@ -543,7 +543,7 @@ export function ChatInput() {
           </div>
 
           <div className="flex items-center gap-1">
-            {supportsScreenshot() && (
+            {config.vision && supportsScreenshot() && (
               <Button
                 type="button"
                 className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-none cursor-pointer"
