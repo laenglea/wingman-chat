@@ -534,7 +534,7 @@ export function ChatInput() {
                 <button
                   onClick={() => setCurrentRepository(null)}
                   className="opacity-0 group-hover:opacity-100 hover:text-red-500 dark:hover:text-red-400 transition-all ml-1"
-                  title="Clear project"
+                  title="Clear repository"
                 >
                   <X size={10} />
                 </button>
