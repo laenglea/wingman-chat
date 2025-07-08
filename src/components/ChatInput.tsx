@@ -85,27 +85,24 @@ export function ChatInput() {
   // Transcription hook
   const { canTranscribe, isTranscribing, startTranscription, stopTranscription } = useTranscription();
 
-  const handleFiles = async (files: FileList | File[]) => {
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileId = `${file.name}-${Date.now()}-${i}`;
+  const handleFiles = async (files: File[]) => {
+    // Process all files in parallel for better performance
+    const processFile = async (file: File, index: number) => {
+      const fileId = `${file.name}-${index}`;
 
       setExtractingAttachments(prev => new Set([...prev, fileId]));
+      
       try {
         let attachment: Attachment | null = null;
 
         if (textTypes.includes(file.type) || textTypes.includes(getFileExt(file.name))) {
           const text = await readAsText(file);
           attachment = { type: AttachmentType.Text, name: file.name, data: text };
-        }
-
-        if (imageTypes.includes(file.type) || imageTypes.includes(getFileExt(file.name))) {
+        } else if (imageTypes.includes(file.type) || imageTypes.includes(getFileExt(file.name))) {
           const blob = await resizeImageBlob(file, 1920, 1920);
           const url = await readAsDataURL(blob);
           attachment = { type: AttachmentType.Image, name: file.name, data: url };
-        }
-
-        if (documentTypes.includes(file.type) || documentTypes.includes(getFileExt(file.name))) {
+        } else if (documentTypes.includes(file.type) || documentTypes.includes(getFileExt(file.name))) {
           const text = await client.extractText(file);
           attachment = { type: AttachmentType.Text, name: file.name, data: text };
         }
@@ -113,8 +110,11 @@ export function ChatInput() {
         if (attachment) {
           setAttachments(prev => [...prev, attachment]);
         }
+        
+        return attachment;
       } catch (error) {
-        console.error("Error processing file:", error);
+        console.error(`Error processing file ${file.name}:`, error);
+        return null;
       } finally {
         setExtractingAttachments(prev => {
           const newSet = new Set(prev);
@@ -122,7 +122,12 @@ export function ChatInput() {
           return newSet;
         });
       }
-    }
+    };
+
+    // Process all files in parallel using Promise.allSettled to handle individual failures gracefully
+    await Promise.allSettled(
+      files.map((file, index) => processFile(file, index))
+    );
   };
 
   const isDragging = useDropZone(containerRef, handleFiles);
@@ -284,7 +289,7 @@ export function ChatInput() {
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      handleFiles(files);
+      handleFiles(Array.from(files));
       e.target.value = "";
     }
   };
@@ -366,18 +371,13 @@ export function ChatInput() {
         {(attachments.length > 0 || extractingAttachments.size > 0) && (
           <div className="flex flex-wrap gap-3 p-3">
             {/* Loading attachments */}
-            {Array.from(extractingAttachments).map((fileId, index) => (
+            {Array.from(extractingAttachments).map((fileId) => (
               <div
                 key={fileId}
-                className="relative size-14 bg-white/30 dark:bg-black/20 backdrop-blur-lg rounded-xl border-2 border-dashed border-white/50 dark:border-white/30 flex items-center justify-center animate-pulse"
+                className="relative size-14 bg-white/30 dark:bg-neutral-800/60 backdrop-blur-lg rounded-xl border-2 border-dashed border-white/50 dark:border-white/30 flex items-center justify-center shadow-sm"
                 title="Processing file..."
               >
                 <Loader2 size={18} className="animate-spin text-neutral-500 dark:text-neutral-400" />
-                {extractingAttachments.size > 1 && (
-                  <div className="absolute -bottom-1 -right-1 size-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {index + 1}
-                  </div>
-                )}
               </div>
             ))}
             
