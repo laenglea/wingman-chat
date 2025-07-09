@@ -194,7 +194,12 @@ export function ChatPage() {
                     <img 
                       src="/logo.svg" 
                       alt="Wingman Chat" 
-                      className="h-24 w-24 opacity-80 dark:opacity-60"
+                      className="h-24 w-24 opacity-70 dark:hidden"
+                    />
+                    <img 
+                      src="/logo_dark.svg" 
+                      alt="Wingman Chat" 
+                      className="h-24 w-24 opacity-70 hidden dark:block"
                     />
                   </div>
                 )}
