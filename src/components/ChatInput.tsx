@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect, useMemo } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../types/chat";
 import {
@@ -508,16 +508,32 @@ export function ChatInput() {
                 <MenuItems
                   transition
                   anchor="bottom start"
-                  className="sidebar-scroll !max-h-[50vh] mt-2 rounded border bg-white/30 dark:bg-black/25 backdrop-blur-2xl border-white/30 dark:border-white/20 overflow-y-auto shadow-lg z-50"
+                  className="sidebar-scroll !max-h-[50vh] mt-2 rounded-xl border-2 bg-white/40 dark:bg-neutral-950/80 backdrop-blur-3xl border-white/40 dark:border-neutral-700/60 overflow-hidden shadow-2xl shadow-black/40 dark:shadow-black/80 z-50 min-w-52 dark:ring-1 dark:ring-white/10"
                 >
-                  {models.map((model) => (
-                    <MenuItem key={model.id}>
+                  {models.map((modelItem) => (
+                    <MenuItem key={modelItem.id}>
                       <Button
-                        onClick={() => onModelChange(model)}
-                        title={model.description}
-                        className="group flex w-full items-center px-4 py-2 data-[focus]:bg-white/40 dark:data-[focus]:bg-black/30 text-neutral-800 dark:text-neutral-200 focus:outline-none cursor-pointer"
+                        onClick={() => onModelChange(modelItem)}
+                        title={modelItem.description}
+                        className="group flex w-full flex-col items-start px-3 py-2 data-[focus]:bg-white/30 dark:data-[focus]:bg-white/8 hover:bg-white/25 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 focus:outline-none cursor-pointer transition-all duration-200 border-b border-white/20 dark:border-white/10 last:border-b-0"
                       >
-                        {model.name ?? model.id}
+                        <div className="flex items-center gap-2.5 w-full">
+                          <div className="flex-shrink-0 w-3.5 flex justify-center">
+                            {model?.id === modelItem.id && (
+                              <Check size={14} className="text-neutral-600 dark:text-neutral-400" />
+                            )}
+                          </div>
+                          <div className="flex flex-col items-start flex-1">
+                            <div className="font-semibold text-sm leading-tight">
+                              {modelItem.name ?? modelItem.id}
+                            </div>
+                            {modelItem.description && (
+                              <div className="text-xs text-neutral-600 dark:text-neutral-400 mt-0.5 text-left leading-relaxed opacity-90">
+                                {modelItem.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </Button>
                     </MenuItem>
                   ))}

@@ -231,7 +231,7 @@ export function ChatPage() {
                         } catch {
                           return "LLM";
                         }
-                      })()} can make mistakes. Check important info.
+                      })()}'s output may be inaccurate or incomplete. Verify before acting on it.
                     </p>
                   </div>
                 </div>
