@@ -1,5 +1,5 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect, useMemo } from "react";
-import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
+import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 
 import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check } from "lucide-react";
 
@@ -235,22 +235,24 @@ export function ChatInput() {
     };
   }, []);
 
-  // Auto-focus the chat input on mount for immediate typing
+  // Auto-focus the chat input when there are no messages (startup or new chat)
   useEffect(() => {
-    const focusInput = () => {
-      if (contentEditableRef.current) {
-        contentEditableRef.current.focus();
-      }
-    };
+    if (messages.length === 0) {
+      const focusInput = () => {
+        if (contentEditableRef.current) {
+          contentEditableRef.current.focus();
+        }
+      };
 
-    // Focus immediately and also with a small delay to ensure DOM is ready
-    focusInput();
-    const focusTimer = setTimeout(focusInput, 100);
-    
-    return () => {
-      clearTimeout(focusTimer);
-    };
-  }, []);
+      // Focus immediately and also with a small delay to ensure DOM is ready
+      focusInput();
+      const focusTimer = setTimeout(focusInput, 100);
+      
+      return () => {
+        clearTimeout(focusTimer);
+      };
+    }
+  }, [messages.length]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -267,7 +269,7 @@ export function ChatInput() {
       setAttachments([]);
       
       if (contentEditableRef.current) {
-        contentEditableRef.current.textContent = "";
+        contentEditableRef.current.innerHTML = "";
       }
     }
   };
@@ -332,7 +334,9 @@ export function ChatInput() {
           setContent(text);
           
           if (contentEditableRef.current) {
-            contentEditableRef.current.textContent = text;
+            // Convert newlines to <br> tags for proper display in contentEditable
+            const htmlText = text.replace(/\n/g, '<br>');
+            contentEditableRef.current.innerHTML = htmlText;
           }
         }
       } catch (error) {
@@ -474,7 +478,10 @@ export function ChatInput() {
             suppressContentEditableWarning={true}
             onInput={(e) => {
               const target = e.target as HTMLDivElement;
-              const newContent = target.textContent || "";
+              
+              // Simple approach: use innerText which preserves line breaks
+              const newContent = target.innerText || '';
+              
               setContent(newContent);
               
               // Hide prompt suggestions when user starts typing
