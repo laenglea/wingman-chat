@@ -235,6 +235,23 @@ export function ChatInput() {
     };
   }, []);
 
+  // Auto-focus the chat input on mount for immediate typing
+  useEffect(() => {
+    const focusInput = () => {
+      if (contentEditableRef.current) {
+        contentEditableRef.current.focus();
+      }
+    };
+
+    // Focus immediately and also with a small delay to ensure DOM is ready
+    focusInput();
+    const focusTimer = setTimeout(focusInput, 100);
+    
+    return () => {
+      clearTimeout(focusTimer);
+    };
+  }, []);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
 
@@ -472,7 +489,7 @@ export function ChatInput() {
           {/* CSS-animated placeholder */}
           {shouldShowPlaceholder && (
             <div 
-              className={`absolute top-3 md:top-4 left-3 md:left-4 pointer-events-none text-neutral-500 dark:text-neutral-400 ${
+              className={`absolute top-3 md:top-4 left-4 md:left-5 pointer-events-none text-neutral-500 dark:text-neutral-400 ${
                 messages.length === 0 ? 'typewriter-text' : ''
               }`}
               style={messages.length === 0 ? {
