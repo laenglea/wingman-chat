@@ -329,7 +329,11 @@ export function RepositoryDrawer() {
     closeMenu?.();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, closeMenu?: () => void) => {
+  const handleInputKeyDown = (e: React.KeyboardEvent, closeMenu?: () => void) => {
+    // Stop propagation to prevent Menu from handling these events
+    e.stopPropagation();
+    
+    // Handle special keys
     if (e.key === 'Enter') {
       e.preventDefault();
       if (isCreatingNew) {
@@ -345,6 +349,7 @@ export function RepositoryDrawer() {
         cancelInlineEdit();
       }
     }
+    // Allow all other keys (including Space) to work normally
   };
 
 
@@ -408,7 +413,7 @@ export function RepositoryDrawer() {
                         type="text"
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
-                        onKeyDown={(e) => handleKeyDown(e, close)}
+                        onKeyDown={(e) => handleInputKeyDown(e, close)}
                         autoFocus
                         className="flex-1 text-sm bg-white dark:bg-neutral-700 border border-slate-500 rounded px-2 py-1 text-neutral-900 dark:text-neutral-100 focus:ring-1 focus:ring-slate-500"
                         placeholder="Repository name"
@@ -476,7 +481,7 @@ export function RepositoryDrawer() {
                               type="text"
                               value={editingName}
                               onChange={(e) => setEditingName(e.target.value)}
-                              onKeyDown={(e) => handleKeyDown(e)}
+                              onKeyDown={(e) => handleInputKeyDown(e)}
                               autoFocus
                               className="flex-1 text-sm bg-white dark:bg-neutral-700 border border-slate-500 rounded px-2 py-1 text-neutral-900 dark:text-neutral-100 focus:ring-1 focus:ring-slate-500"
                               onClick={(e) => e.stopPropagation()}
