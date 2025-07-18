@@ -10,7 +10,7 @@ interface MermaidRendererProps {
 }
 
 interface MermaidAPI {
-  initialize: (config: any) => void;
+  initialize: (config: Record<string, unknown>) => void;
   render: (id: string, definition: string) => Promise<{ svg: string }>;
 }
 
