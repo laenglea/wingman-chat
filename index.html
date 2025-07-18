@@ -11,6 +11,23 @@
   <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Prevent theme flashing by setting the dark class immediately -->
+  <script>
+    (function() {
+      // Get stored theme or use system preference
+      const stored = localStorage.getItem('app_theme');
+      const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
+      // Determine if we should use dark mode
+      const shouldBeDark = stored === 'dark' || (stored !== 'light' && systemDark);
+      
+      // Apply dark class immediately if needed
+      if (shouldBeDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
 </head>
 
 <body>
