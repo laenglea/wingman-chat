@@ -208,10 +208,10 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
   if (!isComplete) {
     return (
       <div className="relative my-4">
-        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
         </div>
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
           <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
             <span className="ml-2">Loading diagram renderer...</span>
@@ -225,10 +225,10 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
   if (chart.trim() && !svg && !error) {
     return (
       <div className="relative my-4">
-        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
         </div>
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
           <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
             <div className="flex items-center space-x-3">
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-blue-500"></div>
@@ -244,10 +244,10 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
   if (!chart.trim()) {
     return (
       <div className="relative my-4">
-        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
         </div>
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
           <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
             <div className="animate-pulse">Waiting for diagram...</div>
           </div>
@@ -260,14 +260,14 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
   if (error) {
     return (
       <div className="relative my-4">
-        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
           <div className="flex items-center gap-2">
             <span className="text-xs text-red-500 dark:text-red-400 opacity-70">render failed</span>
             <CopyButton text={chart} />
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
           <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
             <code>{chart}</code>
           </pre>
@@ -280,7 +280,7 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
   if (svg) {
     return (
       <div className="relative my-4">
-        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
+        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
           <div className="flex items-center gap-2">
             {hasValidMermaid && (
@@ -299,7 +299,7 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
             <CopyButton text={chart} />
           </div>
         </div>
-        <div className="bg-white dark:bg-neutral-800 rounded-b-md">
+        <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
           {hasValidMermaid && !showCode ? (
             <div className="p-4 overflow-x-auto">
               <div 

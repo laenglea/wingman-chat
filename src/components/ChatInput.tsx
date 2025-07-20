@@ -355,15 +355,15 @@ export function ChatInput() {
     <form onSubmit={handleSubmit}>
       <div 
         ref={containerRef}
-        className={`chat-input-container border-2 ${
+        className={`chat-input-container ${
           isDragging 
-            ? 'border-dashed border-slate-400 dark:border-slate-500 bg-slate-50/80 dark:bg-slate-900/40 shadow-2xl shadow-slate-500/30 dark:shadow-slate-400/20 scale-[1.02] transition-all duration-200' 
-            : `border-solid border-neutral-200 dark:border-neutral-700 ${
+            ? 'border-2 border-dashed border-slate-400 dark:border-slate-500 bg-slate-50/80 dark:bg-slate-900/40 shadow-2xl shadow-slate-500/30 dark:shadow-slate-400/20 scale-[1.02] transition-all duration-200 rounded-lg md:rounded-2xl' 
+            : `border-0 md:border-2 border-t-2 border-solid border-neutral-200 dark:border-neutral-900 ${
                 messages.length === 0 
                   ? 'bg-white/60 dark:bg-neutral-950/70' 
                   : 'bg-white/30 dark:bg-neutral-950/50'
-              }`
-        } backdrop-blur-2xl rounded-lg md:rounded-2xl flex flex-col min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 dark:ring-1 dark:ring-white/10 transition-all duration-200`}
+              } rounded-t-2xl md:rounded-2xl`
+        } backdrop-blur-2xl flex flex-col min-h-[4rem] md:min-h-[3rem] shadow-2xl shadow-black/60 dark:shadow-black/80 dark:ring-1 dark:ring-white/10 transition-all duration-200`}
       >
         <input
           type="file"
@@ -376,7 +376,7 @@ export function ChatInput() {
 
         {/* Drop zone overlay */}
         {isDragging && (
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-500/20 via-slate-600/30 to-slate-500/20 dark:from-slate-400/20 dark:via-slate-500/30 dark:to-slate-400/20 rounded-lg md:rounded-2xl flex flex-col items-center justify-center pointer-events-none z-10 backdrop-blur-sm">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-500/20 via-slate-600/30 to-slate-500/20 dark:from-slate-400/20 dark:via-slate-500/30 dark:to-slate-400/20 rounded-t-2xl md:rounded-2xl flex flex-col items-center justify-center pointer-events-none z-10 backdrop-blur-sm">
             <div className="text-slate-700 dark:text-slate-300 font-semibold text-lg text-center">
               Drop files here
             </div>
@@ -508,7 +508,7 @@ export function ChatInput() {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between p-3 pt-0">
+        <div className="flex items-center justify-between p-3 pt-0 pb-6 md:pb-3">
           <div className="flex items-center gap-2">
             <Button
               type="button"

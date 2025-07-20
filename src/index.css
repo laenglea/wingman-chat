@@ -3,7 +3,6 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --viewport-height: 100vh;
   --viewport-height: 100dvh;
 }
 
@@ -23,14 +22,12 @@ html {
 
 body {
   background-color: inherit;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: var(--viewport-height);
   @apply text-black bg-neutral-50 dark:text-white dark:bg-neutral-950;
 }
 
 #root {
-  height: 100vh;
-  height: var(--viewport-height, 100vh);
+  height: var(--viewport-height);
   overflow: hidden;
 }
 
@@ -53,30 +50,6 @@ body {
 
 .dark .nav-header {
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-}
-
-.pt-safe-top {
-  padding-top: calc(constant(safe-area-inset-top) + 0.5rem);
-  padding-top: calc(env(safe-area-inset-top) + 0.5rem);
-}
-.pl-safe-left {
-  padding-left: calc(constant(safe-area-inset-left) + 0.75rem);
-  padding-left: calc(env(safe-area-inset-left) + 0.75rem);
-}
-.pr-safe-right {
-  padding-right: calc(constant(safe-area-inset-right) + 0.75rem);
-  padding-right: calc(env(safe-area-inset-right) + 0.75rem);
-}
-.pb-safe-bottom {
-  padding-bottom: calc(constant(safe-area-inset-bottom) + 1rem);
-  padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
-}
-
-@media all and (display-mode: standalone) {
-  .pb-safe-bottom {
-    padding-bottom: constant(safe-area-inset-bottom);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
 }
 
 .max-content-width {
@@ -132,12 +105,14 @@ body {
 
 .sidebar-item-hidden {
   opacity: 0;
-  transform: translateX(-50px);
+  transform: translateX(30px);
 }
 
 .sidebar-item-animate {
-  animation: slideInFromLeft 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-  animation-delay: calc(0.1s + (var(--item-index, 0) * 0.05s));
+  opacity: 0;
+  transform: translateX(30px);
+  animation: slideInFromRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation-delay: calc(0.05s + (var(--item-index, 0) * 0.03s));
 }
 
 .sidebar-item-selected {
@@ -149,7 +124,7 @@ body {
 }
 
 .chat-bubble-user {
-  @apply bg-neutral-200 dark:bg-neutral-700 dark:text-neutral-200;
+  @apply bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200;
 }
 
 .chat-bubble-assistant {
@@ -189,17 +164,24 @@ body {
   content: '';
 }
 
-@keyframes slideInFromLeft {
+@keyframes slideInFromRight {
   from {
-    transform: translateX(-100%) scale(0.95);
+    transform: translateX(100%);
     opacity: 0;
   }
-  60% {
-    transform: translateX(-2%) scale(1.02);
+  to {
+    transform: translateX(0);
     opacity: 1;
   }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
   to {
-    transform: translateX(0) scale(1);
+    transform: translateX(0);
     opacity: 1;
   }
 }
