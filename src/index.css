@@ -124,11 +124,11 @@ body {
 }
 
 .chat-bubble-user {
-  @apply bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200;
+  @apply bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-200;
 }
 
 .chat-bubble-assistant {
-  @apply bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-200;
+  @apply bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-200;
 }
 
 .chat-message-actions {
