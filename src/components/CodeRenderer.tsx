@@ -115,6 +115,7 @@ const NonMemoizedCodeRenderer = ({ code, language }: CodeRendererProps) => {
       </div>
       <div className="bg-white dark:bg-neutral-900 rounded-b-md overflow-hidden border-l border-r border-b border-gray-100 dark:border-neutral-800">
         <SyntaxHighlighter
+          key={isDark ? 'dark' : 'light'}
           language={normalizedLanguage}
           style={isDark ? styles.oneDark : styles.oneLight}
           customStyle={{

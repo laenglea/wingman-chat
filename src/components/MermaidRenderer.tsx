@@ -210,12 +210,30 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
       <div className="relative my-4">
         <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
-        </div>
-        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
-          <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-            <span className="ml-2">Loading diagram renderer...</span>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowCode(!showCode)}
+              className="text-neutral-300 hover:text-white transition-colors"
+              title={showCode ? 'Show preview' : 'Show code'}
+            >
+              {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
+            </Button>
+            <CopyButton text={chart} />
           </div>
+        </div>
+        <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
+          {showCode ? (
+            <div className="p-4">
+              <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
+                <code>{chart}</code>
+              </pre>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-600 dark:border-neutral-400"></div>
+              <span className="ml-2">Loading diagram renderer...</span>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -227,14 +245,32 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
       <div className="relative my-4">
         <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
-        </div>
-        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
-          <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
-            <div className="flex items-center space-x-3">
-              <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-blue-500"></div>
-              <span>Generating Content...</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowCode(!showCode)}
+              className="text-neutral-300 hover:text-white transition-colors"
+              title={showCode ? 'Show preview' : 'Show code'}
+            >
+              {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
+            </Button>
+            <CopyButton text={chart} />
           </div>
+        </div>
+        <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
+          {showCode ? (
+            <div className="p-4">
+              <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
+                <code>{chart}</code>
+              </pre>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
+              <div className="flex items-center space-x-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600 dark:border-neutral-600 dark:border-t-neutral-400"></div>
+                <span>Generating Content...</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -246,8 +282,18 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
       <div className="relative my-4">
         <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setShowCode(!showCode)}
+              className="text-neutral-300 hover:text-white transition-colors"
+              title={showCode ? 'Show preview' : 'Show code'}
+            >
+              {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
+            </Button>
+            <CopyButton text={chart} />
+          </div>
         </div>
-        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
+        <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
           <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
             <div className="animate-pulse">Waiting for diagram...</div>
           </div>
@@ -283,24 +329,24 @@ const NonMemoizedMermaidRenderer = ({ chart, language }: MermaidRendererProps) =
         <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
           <div className="flex items-center gap-2">
-            {hasValidMermaid && (
-              <Button
-                onClick={() => setShowCode(!showCode)}
-                className="text-neutral-300 hover:text-white transition-colors"
-                title={showCode ? 'Show preview' : 'Show code'}
-              >
-                {showCode ? (
-                  <Eye className="h-4" />
-                ) : (
-                  <Code className="h-4" />
-                )}
-              </Button>
-            )}
+            <Button
+              onClick={() => setShowCode(!showCode)}
+              className="text-neutral-300 hover:text-white transition-colors"
+              title={showCode ? 'Show preview' : 'Show code'}
+            >
+              {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
+            </Button>
             <CopyButton text={chart} />
           </div>
         </div>
         <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
-          {hasValidMermaid && !showCode ? (
+          {showCode ? (
+            <div className="p-4">
+              <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
+                <code>{chart}</code>
+              </pre>
+            </div>
+          ) : hasValidMermaid ? (
             <div className="p-4 overflow-x-auto">
               <div 
                 className="mermaid-diagram flex justify-center"
