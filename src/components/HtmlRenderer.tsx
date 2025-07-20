@@ -52,7 +52,7 @@ const NonMemoizedHtmlRenderer = ({ html, language }: HtmlRendererProps) => {
         <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
           <span>{extractedTitle || language}</span>
         </div>
-        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
+        <div className="bg-white dark:bg-neutral-900 p-4 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
           <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
             <div className="flex items-center space-x-3">
               <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-blue-500"></div>
@@ -106,7 +106,7 @@ const NonMemoizedHtmlRenderer = ({ html, language }: HtmlRendererProps) => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-neutral-900 rounded-b-md">
+      <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
         {isComplete && !showCode ? (
           <iframe
             key={html.length} // Force re-render when HTML changes
