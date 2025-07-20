@@ -508,7 +508,7 @@ export function ChatInput() {
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between p-3 pt-0 pb-6 md:pb-3">
+        <div className="flex items-center justify-between p-3 pt-0 pb-8 md:pb-3">
           <div className="flex items-center gap-2">
             <Button
               type="button"
