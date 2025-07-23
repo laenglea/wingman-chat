@@ -48,7 +48,7 @@ export function ChatInput() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Custom hook for plain text paste handling
-  const handlePaste = useTextPaste(contentEditableRef, setContent);
+  const handlePaste = useTextPaste();
 
   // Generate static random placeholder text for new chats, updates when profile name changes
   const randomPlaceholder = useMemo(() => {
