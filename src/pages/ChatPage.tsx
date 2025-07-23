@@ -222,7 +222,7 @@ export function ChatPage() {
                 })()}
                 
                 {messages.map((message, idx) => (
-                  <ChatMessage key={idx} message={message} />
+                  <ChatMessage key={idx} message={message} isLast={idx === messages.length - 1} />
                 ))}
                 
                 {/* sentinel for scrollIntoView */}
