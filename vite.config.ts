@@ -37,31 +37,52 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'markdown': [
-            'react-markdown',
-            'remark-gfm',
+          // Vendor chunks
+          'vendor-react': [
+            'react',
+            'react-dom'
+          ],
+          'vendor-openai': [
+            'openai'
+          ],
+          'vendor-markdown': [
+            'react-markdown', 
+            'remark-breaks', 
+            'remark-gfm', 
+            'rehype-raw', 
+            'rehype-sanitize',
             'markdown-it'
           ],
-
-          'syntax-highlighting': [
-            'react-syntax-highlighter',
-            'highlight.js'
+          'vendor-ui': [
+            '@headlessui/react',
+            '@floating-ui/react',
+            '@floating-ui/react-dom'
           ],
-
-          'adaptive-cards': ['adaptivecards'],
-          'cytoscape': ['cytoscape'],
-          'katex': ['katex'],
-          'mermaid': ['mermaid'],
+          'vendor-utils': [
+            'zod',
+            'p-limit',
+            'mime'
+          ],
+          'vendor-icons': ['lucide-react'],
+        },
+        chunkFileNames: (chunkInfo) => {
+          // Move shiki language bundles to shiki subfolder
+          if (chunkInfo.name?.includes('shiki') || 
+              chunkInfo.facadeModuleId?.includes('shiki') ||
+              (chunkInfo.moduleIds && chunkInfo.moduleIds.some(id => id.includes('shiki')))) {
+            return 'assets/shiki/[name]-[hash].js';
+          }
+          // Move mermaid bundles to mermaid subfolder
+          if (chunkInfo.name?.includes('mermaid') || 
+              chunkInfo.facadeModuleId?.includes('mermaid') ||
+              (chunkInfo.moduleIds && chunkInfo.moduleIds.some(id => id.includes('mermaid')))) {
+            return 'assets/mermaid/[name]-[hash].js';
+          }
+          return 'assets/[name]-[hash].js';
         }
       }
     },
-    // Increase chunk size warning limit since we're intentionally chunking
     chunkSizeWarningLimit: 1000,
-
-    // Enable source maps for production debugging (optional)
-    sourcemap: false,
-
-    // Optimize build
     minify: 'esbuild',
     target: 'esnext'
   }
