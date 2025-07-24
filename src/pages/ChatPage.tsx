@@ -78,7 +78,7 @@ export function ChatPage() {
       <div className="flex items-center gap-2">
         {repositoryAvailable && (
           <Button
-            className="p-2 rounded transition-all duration-150 ease-out cursor-pointer text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+            className="p-2 rounded transition-all duration-150 ease-out text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
             onClick={toggleRepositoryDrawer}
             title={showRepositoryDrawer ? 'Close repositories' : 'Open repositories'}
           >
@@ -87,7 +87,7 @@ export function ChatPage() {
         )}
         {voiceAvailable && (
           <Button
-            className={`p-2 rounded transition-all duration-150 ease-out cursor-pointer ${
+            className={`p-2 rounded transition-all duration-150 ease-out ${
               isVoiceMode 
                 ? 'text-red-600 dark:text-red-400 hover:text-neutral-800 dark:hover:text-neutral-200' 
                 : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200'
@@ -99,7 +99,7 @@ export function ChatPage() {
           </Button>
         )}
         <Button
-          className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out cursor-pointer"
+          className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out"
           onClick={createChat}
         >
           <PlusIcon size={20} />
@@ -316,13 +316,13 @@ export function ChatPage() {
             <div className="flex gap-3 justify-end">
               <Button
                 onClick={() => setShowVoicePreviewDialog(false)}
-                className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors"
               >
                 Cancel
               </Button>
               <Button
                 onClick={startVoiceMode}
-                className="px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-900 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-white rounded-lg transition-colors cursor-pointer"
+                className="px-4 py-2 text-sm font-medium bg-neutral-800 hover:bg-neutral-900 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-white rounded-lg transition-colors"
               >
                 Continue
               </Button>

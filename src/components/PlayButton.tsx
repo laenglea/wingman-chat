@@ -32,7 +32,7 @@ export function PlayButton({ text, ...props }: PlayButtonProps) {
     }
   };
 
-  const buttonClasses = "text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors opacity-60 hover:opacity-100 disabled:opacity-30 p-1 cursor-pointer";
+  const buttonClasses = "text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors opacity-60 hover:opacity-100 disabled:opacity-30 p-1";
   const iconSize = `h-${props.size ?? 3} w-${props.size ?? 3}`;
 
   return (
