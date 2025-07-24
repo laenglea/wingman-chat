@@ -201,7 +201,7 @@ const components: Partial<Components> = {
         // Auto-detect Adaptive Cards in JSON blocks using regex for faster detection
         if (language === "json") {
             // Fast regex check for Adaptive Card schema without full JSON parsing
-            const adaptiveCardRegex = /"\$schema"\s*:\s*"[^"]*adaptivecards\.io[^"]*"|"type"\s*:\s*"AdaptiveCard"/;
+            const adaptiveCardRegex = /['"]\$schema['"]\s*:\s*['"].*adaptivecards\.io.*['"]|['"]type['"]\s*:\s*['"]AdaptiveCard['"]/;
             if (adaptiveCardRegex.test(text)) {
                 return <CardRenderer cardJson={text} />;
             }

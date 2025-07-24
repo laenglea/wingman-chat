@@ -16,7 +16,7 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
     const [isComplete, setIsComplete] = useState(false);
     const [showCode, setShowCode] = useState(false);
     const cardsRef = useRef<any>(null);
-    
+
     const chatContext = useContext(ChatContext);
 
     // Load libraries once
@@ -32,7 +32,7 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
                 ]);
 
                 cardsRef.current = cardsModule;
-                
+
                 if (cardsModule.AdaptiveCard) {
                     cardsModule.AdaptiveCard.onProcessMarkdown = function (text: string, result: any) {
                         const processor = remarkModule.remark()
@@ -67,7 +67,7 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
     useEffect(() => {
         const renderCard = async () => {
             if (!cardsRef.current || !isComplete) return;
-            
+
             if (!cardJson.trim()) {
                 setError('');
                 setRenderedCard(null);
@@ -76,30 +76,30 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
 
             try {
                 setError('');
-                
+
                 // Basic validation - check if it looks like valid JSON
                 if (!isValidJson(cardJson)) {
                     return;
                 }
-                
+
                 const card = new cardsRef.current.AdaptiveCard();
                 card.parse(JSON.parse(cardJson));
 
                 // Handle actions
                 card.onExecuteAction = (action: any) => {
                     const actionType = action.getJsonTypeName();
-                    
+
                     if (actionType === 'Action.OpenUrl') {
                         window.open(action.url, '_blank', 'noopener,noreferrer');
                     } else if (actionType === 'Action.Execute' || actionType === 'Action.Submit') {
                         const data = action.data || {};
-                        const message = actionType === 'Action.Execute' 
+                        const message = actionType === 'Action.Execute'
                             ? `Execute: ${action.verb || 'action'}`
                             : 'Form submitted';
-                        
+
                         chatContext?.sendMessage({
                             role: Role.User,
-                            content: Object.keys(data).length > 0 
+                            content: Object.keys(data).length > 0
                                 ? `${message}\n\`\`\`json\n${JSON.stringify(data, null, 2)}\n\`\`\``
                                 : message
                         });
@@ -125,7 +125,7 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
 
         // Debounce rendering to avoid excessive re-renders during streaming
         const timeoutId = setTimeout(renderCard, 300);
-        
+
         return () => {
             clearTimeout(timeoutId);
         };
@@ -259,15 +259,13 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
                 </div>
             </div>
             <div className="bg-white dark:bg-neutral-800 rounded-b-md p-4">
-                <div 
+                <div
                     ref={containerRef}
-                    className={`adaptive-card-container [&_.ac-container]:!bg-transparent [&_.ac-container]:!border-none [&_*]:text-gray-900 [&_*]:dark:text-neutral-100 ${
-                        hasValidCard && !showCode ? 'block' : 'hidden'
-                    }`}
+                    className={`adaptive-card-container [&_.ac-container]:!bg-transparent [&_.ac-container]:!border-none [&_*]:text-gray-900 [&_*]:dark:text-neutral-100 ${hasValidCard && !showCode ? 'block' : 'hidden'
+                        }`}
                 />
-                <pre className={`text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto ${
-                    hasValidCard && !showCode ? 'hidden' : 'block'
-                }`}>
+                <pre className={`text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto ${hasValidCard && !showCode ? 'hidden' : 'block'
+                    }`}>
                     <code>{cardJson}</code>
                 </pre>
             </div>
