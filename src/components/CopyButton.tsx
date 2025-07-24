@@ -20,7 +20,7 @@ export const CopyButton = ({ text, ...props }: CopyButtonProps) => {
         }
     };
 
-    const buttonClasses = "text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors opacity-60 hover:opacity-100 p-1";
+    const buttonClasses = "text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors opacity-60 hover:opacity-100 p-1 cursor-pointer";
     const iconSize = `h-${props.size ?? 3} w-${props.size ?? 3}`;
 
     return (
