@@ -51,7 +51,8 @@ export default defineConfig({
             'remark-gfm', 
             'rehype-raw', 
             'rehype-sanitize',
-            'markdown-it'
+            'remark',
+            'remark-html'
           ],
           'vendor-ui': [
             '@headlessui/react',
