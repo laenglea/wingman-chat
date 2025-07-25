@@ -1,8 +1,8 @@
 import { createContext } from 'react';
-import { ArtifactFile, VirtualFilesystem } from '../types/artifacts';
+import { File, FileSystem } from '../types/file';
 
 export interface ArtifactsContextType {
-  filesystem: VirtualFilesystem;
+  filesystem: FileSystem;
   openTabs: string[];
   activeTab: string | null;
   showArtifactsDrawer: boolean;
@@ -12,7 +12,7 @@ export interface ArtifactsContextType {
   openTab: (path: string) => void;
   closeTab: (path: string) => void;
   setActiveTab: (path: string | null) => void;
-  getFile: (path: string) => ArtifactFile | undefined;
+  getFile: (path: string) => File | undefined;
   setShowArtifactsDrawer: (show: boolean) => void;
   toggleArtifactsDrawer: () => void;
 }
