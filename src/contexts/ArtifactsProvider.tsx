@@ -1,7 +1,6 @@
 import { useState, useCallback, ReactNode } from 'react';
 import { ArtifactsContext } from './ArtifactsContext';
 import { ArtifactFile, VirtualFilesystem } from '../types/artifacts';
-import { Tool } from '../types/chat';
 
 interface ArtifactsProviderProps {
   children: ReactNode;
@@ -38,12 +37,11 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     });
   }, [activeTab]);
 
-  const createFile = useCallback((path: string, content: string, language?: string) => {
+  const createFile = useCallback((path: string, content: Blob) => {
     const now = new Date();
     const file: ArtifactFile = {
       path,
       content,
-      language,
       createdAt: now,
       updatedAt: now,
     };
@@ -57,7 +55,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     openTab(path);
   }, [openTab]);
 
-  const updateFile = useCallback((path: string, content: string) => {
+  const updateFile = useCallback((path: string, content: Blob) => {
     setFilesystem(prev => {
       const existingFile = prev[path];
       if (!existingFile) return prev;
@@ -92,60 +90,6 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     setShowArtifactsDrawer(prev => !prev);
   }, []);
 
-  const artifactsTools: Tool[] = [
-    {
-      name: 'create_file',
-      description: 'Create a new file in the virtual filesystem with the specified path and content.',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: {
-            type: 'string',
-            description: 'The file path (e.g., /projects/test.go, /src/index.js). Should start with / and include the full directory structure.'
-          },
-          content: {
-            type: 'string',
-            description: 'The content of the file to create.'
-          },
-          language: {
-            type: 'string',
-            description: 'Optional programming language for syntax highlighting (e.g., javascript, typescript, go, python, etc.)'
-          }
-        },
-        required: ['path', 'content']
-      },
-      function: async (args: Record<string, unknown>): Promise<string> => {
-        const path = args.path as string;
-        const content = args.content as string;
-        const language = args.language as string | undefined;
-
-        console.log(`📄 Creating file: ${path}`);
-
-        if (!path || !content) {
-          return JSON.stringify({ error: 'Path and content are required' });
-        }
-
-        // Validate path format
-        if (!path.startsWith('/')) {
-          return JSON.stringify({ error: 'Path must start with /' });
-        }
-
-        try {
-          createFile(path, content, language);
-          console.log(`✅ File created successfully: ${path}`);
-          return JSON.stringify({ 
-            success: true, 
-            message: `File created: ${path}`,
-            path 
-          });
-        } catch (error) {
-          console.error('❌ Failed to create file:', error);
-          return JSON.stringify({ error: 'Failed to create file' });
-        }
-      }
-    }
-  ];
-
   const value = {
     filesystem,
     openTabs,
@@ -160,7 +104,6 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     getFile,
     setShowArtifactsDrawer,
     toggleArtifactsDrawer,
-    artifactsTools,
   };
 
   return (

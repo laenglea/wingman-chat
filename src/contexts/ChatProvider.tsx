@@ -117,7 +117,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const repositoryTools = currentRepository ? queryTools() : [];
         const repositoryInstructions = currentRepository?.instructions || '';
         
-        const completionTools = [...bridgeTools, ...repositoryTools, ...artifactsTools, ...(tools || [])];
+        const completionTools = [...bridgeTools, ...repositoryTools, ...artifactsTools(), ...(tools || [])];
 
         const instructions: string[] = [];
 

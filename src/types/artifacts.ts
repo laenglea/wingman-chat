@@ -1,7 +1,6 @@
 export interface ArtifactFile {
   path: string;
-  content: string;
-  language?: string;
+  content: Blob;
   createdAt: Date;
   updatedAt: Date;
 }
