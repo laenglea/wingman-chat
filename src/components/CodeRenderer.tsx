@@ -30,7 +30,11 @@ const CodeRenderer = memo(({ code, language }: CodeRendererProps) => {
         const langId = language.toLowerCase();
         
         try {
-          await highlighter.loadLanguage(langId as Parameters<typeof highlighter.loadLanguage>[0]);
+          // Check if the language is supported before loading
+          const { bundledLanguages } = await import('shiki');
+          if (bundledLanguages[langId as keyof typeof bundledLanguages]) {
+            await highlighter.loadLanguage(langId as keyof typeof bundledLanguages);
+          }
         } catch {
           console.warn(`Language '${language}' not found, falling back to plain text`);
         }
