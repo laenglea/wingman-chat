@@ -16,16 +16,51 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isEditingInstructions, setIsEditingInstructions] = useState(false);
   const [instructionsValue, setInstructionsValue] = useState('');
+  const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
+    
+    // Clear any pending timeout
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+      dragTimeoutRef.current = null;
+    }
     
     const droppedFiles = Array.from(e.dataTransfer.files);
     for (const file of droppedFiles) {
       await addFile(file);
     }
   };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    
+    if (!isDragOver) {
+      setIsDragOver(true);
+    }
+    
+    // Clear any existing timeout and set a new one
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+    }
+    
+    // Reset drag state after a short delay if no more drag events
+    dragTimeoutRef.current = setTimeout(() => {
+      setIsDragOver(false);
+      dragTimeoutRef.current = null;
+    }, 100);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -64,7 +99,26 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
   };
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
+    <div 
+      className={`relative flex flex-col flex-1 overflow-hidden ${
+        isDragOver ? 'bg-slate-50/50 dark:bg-slate-900/50' : ''
+      }`}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+    >
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div className="absolute inset-0 z-10 bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-dashed border-slate-400 dark:border-slate-500 rounded-lg flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-slate-600 dark:text-slate-400 mb-2">
+              <Plus size={32} className="mx-auto" />
+            </div>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              Drop files here to add to repository
+            </p>
+          </div>
+        </div>
+      )}
       {/* Instructions Edit Dialog */}
       <Transition appear show={isEditingInstructions} as={Fragment}>
         <Dialog as="div" className="relative z-50" onClose={cancelEditingInstructions}>
@@ -160,12 +214,6 @@ function RepositoryDetails({ repository }: RepositoryDetailsProps) {
                   ? 'border-slate-400 bg-slate-50/50 dark:bg-neutral-700/70' 
                   : 'border-neutral-300 dark:border-neutral-600 hover:border-slate-400 dark:hover:border-slate-500 hover:bg-white/40 dark:hover:bg-neutral-800/50'
                 }`}
-              onDrop={handleDrop}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragOver(true);
-              }}
-              onDragLeave={() => setIsDragOver(false)}
               onClick={() => document.getElementById('file-upload')?.click()}
             >
               <div className="flex items-center justify-center">
