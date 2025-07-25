@@ -623,17 +623,15 @@ export function ArtifactsDrawer() {
     
     for (const file of files) {
       try {
-        const content = await file.text();
         const path = `/${file.name}`;
         
-        // Create the file (convert text content to Blob)
-        const blob = new Blob([content], { type: 'text/plain' });
-        createFile(path, blob);
+        // Create the file using the original file as a Blob (preserves content and type)
+        createFile(path, file);
         
         // Open the file in a tab
         openTab(path);
       } catch (error) {
-        console.error(`Error reading file ${file.name}:`, error);
+        console.error(`Error processing file ${file.name}:`, error);
       }
     }
   };

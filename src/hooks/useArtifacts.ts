@@ -219,6 +219,88 @@ export function useArtifacts(): ArtifactsHook {
         }
       },
       {
+        name: 'read_file',
+        description: 'Read the content of a specific file from the virtual filesystem.',
+        parameters: {
+          type: 'object',
+          properties: {
+            path: {
+              type: 'string',
+              description: 'The file path to read (e.g., /src/index.js)'
+            }
+          },
+          required: ['path']
+        },
+        function: async (args: Record<string, unknown>): Promise<string> => {
+          const path = args.path as string;
+
+          console.log(`📖 Reading file: ${path}`);
+
+          if (!path) {
+            return JSON.stringify({ error: 'Path is required' });
+          }
+
+          const file = filesystem[path];
+          if (!file) {
+            return JSON.stringify({ error: `File not found: ${path}` });
+          }
+
+          try {
+            // Read the blob content as text
+            const textContent = await file.content.text();
+
+            const fileInfo = {
+              path,
+              size: file.content.size,
+              type: file.content.type,
+              createdAt: file.createdAt.toISOString(),
+              updatedAt: file.updatedAt.toISOString(),
+              content: textContent
+            };
+
+            console.log(`✅ File read successfully: ${path} (${file.content.size} bytes)`);
+            return JSON.stringify({ 
+              success: true, 
+              file: fileInfo
+            });
+          } catch (error) {
+            console.error('❌ Failed to read file:', error);
+            return JSON.stringify({ error: 'Failed to read file content' });
+          }
+        }
+      },
+      {
+        name: 'current_path',
+        description: 'Get the path of the currently active file in the artifacts drawer.',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: []
+        },
+        function: async (): Promise<string> => {
+          console.log(`📍 Getting current file path`);
+
+          try {
+            if (!activeTab) {
+              return JSON.stringify({ 
+                success: true,
+                message: 'No file is currently active',
+                currentPath: null
+              });
+            }
+
+            console.log(`✅ Current file path: ${activeTab}`);
+            return JSON.stringify({ 
+              success: true, 
+              currentPath: activeTab
+            });
+          } catch (error) {
+            console.error('❌ Failed to get current path:', error);
+            return JSON.stringify({ error: 'Failed to get current path' });
+          }
+        }
+      },
+      {
         name: 'current_file',
         description: 'Get information about the currently active file in the artifacts drawer.',
         parameters: {
@@ -245,15 +327,19 @@ export function useArtifacts(): ArtifactsHook {
               });
             }
 
+            // Read the blob content as text
+            const textContent = await file.content.text();
+
             const fileInfo = {
               path: activeTab,
               size: file.content.size,
+              type: file.content.type,
               createdAt: file.createdAt.toISOString(),
               updatedAt: file.updatedAt.toISOString(),
-              content: file.content
+              content: textContent
             };
 
-            console.log(`✅ Current file: ${activeTab}`);
+            console.log(`✅ Current file: ${activeTab} (${file.content.size} bytes)`);
             return JSON.stringify({ 
               success: true, 
               currentFile: fileInfo

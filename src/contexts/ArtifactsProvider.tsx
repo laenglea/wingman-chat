@@ -1,13 +1,13 @@
 import { useState, useCallback, ReactNode } from 'react';
 import { ArtifactsContext } from './ArtifactsContext';
-import { ArtifactFile, VirtualFilesystem } from '../types/artifacts';
+import { File, FileSystem } from '../types/file';
 
 interface ArtifactsProviderProps {
   children: ReactNode;
 }
 
 export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
-  const [filesystem, setFilesystem] = useState<VirtualFilesystem>({});
+  const [filesystem, setFilesystem] = useState<FileSystem>({});
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [showArtifactsDrawer, setShowArtifactsDrawer] = useState(false);
@@ -39,7 +39,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
 
   const createFile = useCallback((path: string, content: Blob) => {
     const now = new Date();
-    const file: ArtifactFile = {
+    const file: File = {
       path,
       content,
       createdAt: now,
@@ -82,7 +82,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     closeTab(path);
   }, [closeTab]);
 
-  const getFile = useCallback((path: string): ArtifactFile | undefined => {
+  const getFile = useCallback((path: string): File | undefined => {
     return filesystem[path];
   }, [filesystem]);
 
