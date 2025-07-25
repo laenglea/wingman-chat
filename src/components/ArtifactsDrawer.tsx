@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, FileText, Code, Edit3, Trash2, File, FolderTree, Folder, FolderOpen, ChevronRight, ChevronDown, Check } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { useArtifacts } from '../hooks/useArtifacts';
@@ -437,6 +437,7 @@ export function ArtifactsDrawer() {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [renamingFile, setRenamingFile] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get all files sorted by path
   const allFiles = Object.values(filesystem).sort((a, b) => a.path.localeCompare(b.path));
@@ -608,34 +609,15 @@ export function ArtifactsDrawer() {
   };
 
   // Drag and drop handlers
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Only hide the overlay if we're actually leaving the drop zone
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX;
-    const y = e.clientY;
-    
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-      setIsDragOver(false);
-    }
-  };
-
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDragOver(false);
+    
+    // Clear any pending timeout
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+      dragTimeoutRef.current = null;
+    }
 
     const files = Array.from(e.dataTransfer.files);
     
@@ -656,12 +638,38 @@ export function ArtifactsDrawer() {
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    
+    if (!isDragOver) {
+      setIsDragOver(true);
+    }
+    
+    // Clear any existing timeout and set a new one
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+    }
+    
+    // Reset drag state after a short delay if no more drag events
+    dragTimeoutRef.current = setTimeout(() => {
+      setIsDragOver(false);
+      dragTimeoutRef.current = null;
+    }, 100);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div 
       className="h-full flex flex-col rounded-xl overflow-hidden animate-in fade-in duration-200 relative"
-      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       {/* Drag overlay */}
