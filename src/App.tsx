@@ -15,6 +15,7 @@ import { TranslateProvider } from "./contexts/TranslateProvider";
 import { VoiceProvider } from "./contexts/VoiceProvider";
 import { SettingsButton } from "./components/SettingsButton";
 import { RepositoryProvider } from "./contexts/RepositoryProvider";
+import { ArtifactsProvider } from "./contexts/ArtifactsProvider";
 import { BridgeProvider } from "./contexts/BridgeProvider";
 import { ProfileProvider } from "./contexts/ProfileProvider";
 import { BridgeIndicator } from "./components/BridgeIndicator";
@@ -208,13 +209,15 @@ function App() {
               <NavigationProvider>
                 <BridgeProvider>
                   <RepositoryProvider>
-                    <ChatProvider>
-                      <VoiceProvider>
-                        <TranslateProvider>
-                          <AppContent />
-                        </TranslateProvider>
-                      </VoiceProvider>
-                    </ChatProvider>
+                    <ArtifactsProvider>
+                      <ChatProvider>
+                        <VoiceProvider>
+                          <TranslateProvider>
+                            <AppContent />
+                          </TranslateProvider>
+                        </VoiceProvider>
+                      </ChatProvider>
+                    </ArtifactsProvider>
                   </RepositoryProvider>
                 </BridgeProvider>
               </NavigationProvider>
