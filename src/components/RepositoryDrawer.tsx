@@ -430,38 +430,38 @@ export function RepositoryDrawer() {
 
 
   return (
-    <div className="h-full flex flex-col rounded-xl overflow-hidden animate-in fade-in duration-200">
+    <div className="h-full flex flex-col rounded-xl overflow-hidden animate-in fade-in duration-200 dark:bg-neutral-900/95 dark:backdrop-blur-lg dark:border dark:border-neutral-700/50 dark:shadow-2xl">
       {/* Header with Unified Repository Selector */}
-      <div className="p-4 border-b border-neutral-200 dark:border-neutral-700">
+      <div className="p-4 border-b border-neutral-200 dark:border-neutral-700/70">
         <div className="relative w-full" ref={dropdownRef}>
           <Button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="relative w-full rounded-lg bg-white/60 dark:bg-neutral-800/50 py-2 pl-3 pr-10 text-left shadow-md border border-neutral-300 dark:border-neutral-600 focus:ring-2 focus:ring-slate-500 hover:border-neutral-400 dark:hover:border-neutral-500 transition-colors backdrop-blur-lg"
+            className="relative w-full rounded-lg bg-white/60 dark:bg-neutral-800/80 py-2 pl-3 pr-10 text-left shadow-md border border-neutral-300 dark:border-neutral-600/70 focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-400 hover:border-neutral-400 dark:hover:border-neutral-500/70 transition-colors backdrop-blur-lg"
           >
             <span className="flex items-center gap-2">
-              <Folder size={16} className="text-slate-600 dark:text-slate-400" />
+              <Folder size={16} className="text-slate-600 dark:text-slate-300" />
               <span className="block truncate text-neutral-900 dark:text-neutral-100 font-medium">
                 {currentRepository?.name || 'None'}
               </span>
             </span>
             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-              <ChevronDown size={16} className={`text-neutral-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={16} className={`text-neutral-400 dark:text-neutral-300 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
             </span>
           </Button>
 
           {isDropdownOpen && (
-            <div className="absolute z-20 mt-1 w-full max-h-80 overflow-auto rounded-md bg-white dark:bg-neutral-800 py-1 shadow-lg ring-1 ring-black ring-opacity-5 backdrop-blur-lg">
+            <div className="absolute z-20 mt-1 w-full max-h-80 overflow-auto rounded-md bg-white dark:bg-neutral-800/95 py-1 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-neutral-600/50 dark:ring-opacity-75 backdrop-blur-lg dark:border dark:border-neutral-600/50">
               {/* None Option */}
               <div
-                className="group relative flex items-center justify-between px-3 py-2 w-full text-left border-b border-neutral-200 dark:border-neutral-600 hover:bg-slate-50 dark:hover:bg-slate-900/20 cursor-pointer"
+                className="group relative flex items-center justify-between px-3 py-2 w-full text-left border-b border-neutral-200 dark:border-neutral-600/70 hover:bg-slate-50 dark:hover:bg-slate-700/30 cursor-pointer"
                 onClick={() => handleRepositorySelect(null)}
               >
                 <div className="flex items-center gap-2">
-                  <X size={16} className="text-slate-600 dark:text-slate-400 flex-shrink-0" />
+                  <X size={16} className="text-slate-600 dark:text-slate-300 flex-shrink-0" />
                   <span className={`block truncate text-sm ${
                     !currentRepository
                       ? 'font-semibold text-neutral-900 dark:text-neutral-100' 
-                      : 'text-neutral-700 dark:text-neutral-300'
+                      : 'text-neutral-700 dark:text-neutral-200'
                   }`}>
                     None
                   </span>
