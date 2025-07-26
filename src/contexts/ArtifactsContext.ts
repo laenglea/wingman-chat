@@ -2,6 +2,7 @@ import { createContext } from 'react';
 import { File, FileSystem } from '../types/file';
 
 export interface ArtifactsContextType {
+  isAvailable: boolean;
   filesystem: FileSystem;
   openTabs: string[];
   activeTab: string | null;
