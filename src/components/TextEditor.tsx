@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 
 interface TextEditorProps {
   blob: Blob;
-  filename: string;
 }
 
 export function TextEditor({ blob }: TextEditorProps) {

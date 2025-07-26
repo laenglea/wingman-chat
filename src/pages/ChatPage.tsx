@@ -228,7 +228,7 @@ export function ChatPage() {
               ref={containerRef}
               onScroll={handleScroll}
             >
-              <div className={`px-3 pt-20 pb-28 ${
+              <div className={`px-3 pt-18 pb-28 ${
                 layoutMode === 'wide'
                   ? 'max-w-full md:max-w-[80vw] mx-auto' 
                   : 'max-content-width'

@@ -159,18 +159,15 @@ export function ArtifactsDrawer() {
     const file = getFile(activeTab);
     if (!file) return null;
 
-    const filename = activeTab.split('/').pop() || activeTab;
-    const kind = artifactKind(activeTab);
-
-    switch (kind) {
+    switch (artifactKind(activeTab)) {
       case 'html':
-        return <HtmlEditor blob={file.content} filename={filename} />;
+        return <HtmlEditor blob={file.content} />;
       case 'svg':
-        return <SvgEditor blob={file.content} filename={filename} />;
+        return <SvgEditor blob={file.content} />;
       case 'code':
       case 'text':
       default:
-        return <TextEditor blob={file.content} filename={filename} />;
+        return <TextEditor blob={file.content} />;
     }
   };
 
@@ -196,55 +193,64 @@ export function ArtifactsDrawer() {
       )}
       
       {/* Tab Bar with File Browser Button - Fixed at top */}
-      <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-600 relative h-9">
-        <div className="flex overflow-x-auto scrollbar-hide h-full">
-          {/* File Browser Button */}
-          <Button
-            onClick={() => setShowFileBrowser(!showFileBrowser)}
-            className={`flex items-center justify-center gap-1.5 px-2.5 h-full text-xs flex-shrink-0 border-r border-neutral-200 dark:border-neutral-600 ${
-              showFileBrowser
-                ? 'text-blue-700 dark:text-blue-300'
-                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/50 dark:hover:bg-neutral-700/30'
-            } transition-colors`}
-            title="Browse files"
-          >
-            <FolderTree size={14} />
-          </Button>
+      <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-600 relative h-9 flex">
+        {/* File Browser Button - Expands to match browser width */}
+        <Button
+          onClick={() => setShowFileBrowser(!showFileBrowser)}
+          className={`flex items-center px-2.5 h-full text-xs flex-shrink-0 border-r border-neutral-200 dark:border-neutral-600 transition-all duration-300 ease-out text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/50 dark:hover:bg-neutral-700/30 ${
+            showFileBrowser
+              ? 'w-64 justify-start gap-1.5'
+              : 'w-auto justify-center'
+          }`}
+          title="Browse files"
+        >
+          <FolderTree size={14} className="flex-shrink-0" />
+          {showFileBrowser && (
+            <span className="whitespace-nowrap">
+              Files
+            </span>
+          )}
+        </Button>
 
+        {/* Scrollable Tabs Container */}
+        <div className="flex-1 relative overflow-hidden">
           {/* Open File Tabs */}
-          {openTabs.map((path) => {
-            const file = getFile(path);
-            if (!file) return null;
-            
-            const filename = path.split('/').pop() || path;
-            const isActive = activeTab === path;
+          <div className="flex overflow-x-auto h-full hide-scrollbar" style={{ minWidth: '100%' }}>
+            {openTabs.map((path) => {
+              const file = getFile(path);
+              if (!file) return null;
+              
+              const filename = path.split('/').pop() || path;
+              const isActive = activeTab === path;
 
-            return (
-              <Button
-                key={path}
-                onClick={() => handleTabClick(path)}
-                className={`flex items-center gap-1.5 px-3 h-full text-xs border-r border-neutral-200 dark:border-neutral-600 min-w-0 flex-shrink-0 ${
-                  isActive
-                    ? 'text-neutral-900 dark:text-neutral-100 border-t-2 border-t-blue-500'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/50 dark:hover:bg-neutral-700/30'
-                } transition-colors`}
-              >
-                <FileIcon name={path} />
-                <span className="truncate max-w-[120px]" title={filename}>
-                  {filename}
-                </span>
+              return (
                 <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(path);
-                  }}
-                  className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors ml-0.5 opacity-70 hover:opacity-100"
+                  key={path}
+                  onClick={() => handleTabClick(path)}
+                  className={`flex items-center gap-1.5 px-3 h-full text-xs border-r border-neutral-200 dark:border-neutral-600 min-w-0 flex-shrink-0 whitespace-nowrap ${
+                    isActive
+                      ? 'text-neutral-900 dark:text-neutral-100 border-t-2 border-t-blue-500'
+                      : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/50 dark:hover:bg-neutral-700/30'
+                  } transition-colors`}
+                  style={{ minWidth: 'max-content' }}
                 >
-                  <X size={12} />
+                  <FileIcon name={path} />
+                  <span className="truncate max-w-[120px]" title={filename}>
+                    {filename}
+                  </span>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeTab(path);
+                    }}
+                    className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors ml-0.5 opacity-70 hover:opacity-100"
+                  >
+                    <X size={12} />
+                  </Button>
                 </Button>
-              </Button>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 

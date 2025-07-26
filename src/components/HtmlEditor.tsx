@@ -4,7 +4,7 @@ import { Button } from '@headlessui/react';
 import { TextEditor } from './TextEditor';
 
 // Component to display HTML content in iframe
-function HtmlPreview({ blob, filename }: { blob: Blob; filename: string }) {
+function HtmlPreview({ blob }: { blob: Blob }) {
   const [htmlContent, setHtmlContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -32,11 +32,10 @@ function HtmlPreview({ blob, filename }: { blob: Blob; filename: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 dark:border-neutral-600 h-full overflow-hidden">
+    <div className="h-full overflow-hidden">
       <iframe
         srcDoc={htmlContent}
         className="w-full h-full"
-        title={`Preview of ${filename}`}
         sandbox="allow-scripts allow-same-origin"
       />
     </div>
@@ -45,10 +44,9 @@ function HtmlPreview({ blob, filename }: { blob: Blob; filename: string }) {
 
 interface HtmlEditorProps {
   blob: Blob;
-  filename: string;
 }
 
-export function HtmlEditor({ blob, filename }: HtmlEditorProps) {
+export function HtmlEditor({ blob }: HtmlEditorProps) {
   const [viewMode, setViewMode] = useState<'code' | 'preview'>('code');
 
   return (
@@ -64,11 +62,11 @@ export function HtmlEditor({ blob, filename }: HtmlEditorProps) {
         </Button>
       </div>
       
-      <div className="flex-1 overflow-auto p-4">
+      <div className="flex-1 overflow-auto">
         {viewMode === 'preview' ? (
-          <HtmlPreview blob={blob} filename={filename} />
+          <HtmlPreview blob={blob} />
         ) : (
-          <TextEditor blob={blob} filename={filename} />
+          <TextEditor blob={blob}/>
         )}
       </div>
     </div>
