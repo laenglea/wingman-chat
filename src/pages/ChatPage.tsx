@@ -163,7 +163,7 @@ export function ChatPage() {
       
       {/* Main content area */}
       <div className={`flex-1 flex flex-col overflow-hidden relative transition-all duration-300 ${
-        showRepositoryDrawer ? 'md:mr-80 md:pr-3' : ''
+        showRepositoryDrawer ? 'md:mr-83 md:pr-3' : ''
       }`}>
         <main className="flex-1 flex flex-col overflow-hidden relative">
           {messages.length === 0 ? (
@@ -237,7 +237,7 @@ export function ChatPage() {
           <footer className={`fixed bottom-0 left-0 md:px-3 md:pb-4 pointer-events-none z-20 transition-all duration-300 ease-out ${
             messages.length === 0 ? 'md:bottom-1/3 md:transform md:translate-y-1/2' : ''
           } ${
-            showRepositoryDrawer ? 'right-0 md:right-80' : 'right-0'
+            showRepositoryDrawer ? 'right-0 md:right-83' : 'right-0'
           }`}>
             <div className="relative pointer-events-auto md:max-w-4xl mx-auto">
               <ChatInput />
@@ -248,7 +248,7 @@ export function ChatPage() {
         {/* Full-width waves during voice mode */}
         {isVoiceMode && (
           <div className={`fixed bottom-0 left-0 h-32 z-20 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent dark:from-neutral-900 dark:via-neutral-900/80 dark:to-transparent transition-all duration-300 ease-out ${
-            showRepositoryDrawer ? 'right-0 md:right-80' : 'right-0'
+            showRepositoryDrawer ? 'right-0 md:right-83' : 'right-0'
           }`}>
             <VoiceWaves />
           </div>
