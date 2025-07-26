@@ -196,8 +196,8 @@ export function ChatPage() {
       
       {/* Main content area */}
       <div className={`flex-1 flex flex-col overflow-hidden relative transition-all duration-300 ${
-        artifactsAvailable && showArtifactsDrawer ? 'md:mr-[calc(70vw+0.75rem)]' : 
-        repositoryAvailable && showRepositoryDrawer ? 'md:mr-80 md:pr-3' : ''
+        showArtifactsDrawer ? 'md:mr-[calc(70vw+0.75rem)]' : 
+        showRepositoryDrawer ? 'md:mr-[calc(20rem+0.75rem)]' : ''
       }`}>
         <main className="flex-1 flex flex-col overflow-hidden relative">
           {messages.length === 0 ? (
