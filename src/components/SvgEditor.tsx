@@ -4,7 +4,7 @@ import { Button } from '@headlessui/react';
 import { TextEditor } from './TextEditor';
 
 // Component to display SVG content
-function SvgPreview({ blob, filename }: { blob: Blob; filename: string }) {
+function SvgPreview({ blob }: { blob: Blob }) {
   const [svgContent, setSvgContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +48,6 @@ function SvgPreview({ blob, filename }: { blob: Blob; filename: string }) {
       <div 
         className="w-full h-full"
         dangerouslySetInnerHTML={{ __html: svgContent }}
-        title={`Preview of ${filename}`}
       />
     </div>
   );
@@ -56,10 +55,9 @@ function SvgPreview({ blob, filename }: { blob: Blob; filename: string }) {
 
 interface SvgEditorProps {
   blob: Blob;
-  filename: string;
 }
 
-export function SvgEditor({ blob, filename }: SvgEditorProps) {
+export function SvgEditor({ blob }: SvgEditorProps) {
   const [viewMode, setViewMode] = useState<'code' | 'preview'>('preview');
 
   return (
@@ -77,9 +75,9 @@ export function SvgEditor({ blob, filename }: SvgEditorProps) {
       
       <div className="flex-1 overflow-auto p-4">
         {viewMode === 'preview' ? (
-          <SvgPreview blob={blob} filename={filename} />
+          <SvgPreview blob={blob} />
         ) : (
-          <TextEditor blob={blob} filename={filename} />
+          <TextEditor blob={blob} />
         )}
       </div>
     </div>
