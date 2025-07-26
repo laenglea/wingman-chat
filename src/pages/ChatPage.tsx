@@ -313,7 +313,7 @@ export function ChatPage() {
 
       {/* Repository drawer - right side */}
       {repositoryAvailable && shouldRenderRepositoryDrawer && !showArtifactsDrawer && (
-        <div className={`w-80 bg-neutral-50/60 dark:bg-neutral-950/70 backdrop-blur-sm shadow-2xl border-l border-neutral-200 dark:border-neutral-900 top-16 bottom-4 z-40 rounded-xl transition-all duration-300 ease-out transform ${
+        <div className={`w-80 bg-neutral-50/60 dark:bg-neutral-950/70 backdrop-blur-sm shadow-2xl border-l border-neutral-200 dark:border-neutral-900 top-18 bottom-4 z-40 rounded-xl transition-all duration-300 ease-out transform ${
           isRepositoryDrawerAnimating 
             ? 'translate-x-0 opacity-100 scale-100' 
             : 'translate-x-full opacity-0 scale-95'
@@ -327,7 +327,7 @@ export function ChatPage() {
 
       {/* Artifacts drawer - right side - takes priority over repository drawer */}
       {artifactsAvailable && shouldRenderArtifactsDrawer && (
-        <div className={`w-full bg-neutral-50/60 dark:bg-neutral-950/70 backdrop-blur-sm shadow-2xl border-l border-neutral-200 dark:border-neutral-900 top-16 bottom-4 z-40 rounded-xl transition-all duration-300 ease-out transform ${
+        <div className={`w-full bg-neutral-50/60 dark:bg-neutral-950/70 backdrop-blur-sm shadow-2xl border-l border-neutral-200 dark:border-neutral-900 top-18 bottom-4 z-40 rounded-xl transition-all duration-300 ease-out transform ${
           isArtifactsDrawerAnimating 
             ? 'translate-x-0 opacity-100 scale-100' 
             : 'translate-x-full opacity-0 scale-95'
