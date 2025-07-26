@@ -3,6 +3,7 @@ import { X, Code, File, FolderTree } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { useArtifacts } from '../hooks/useArtifacts';
 import { HtmlEditor } from './HtmlEditor';
+import { SvgEditor } from './SvgEditor';
 import { TextEditor } from './TextEditor';
 import { ArtifactsBrowser } from './ArtifactsBrowser';
 import { artifactKind } from '../lib/artifacts';
@@ -165,20 +166,17 @@ export function ArtifactsDrawer() {
       case 'html':
         return <HtmlEditor blob={file.content} filename={filename} />;
       case 'svg':
+        return <SvgEditor blob={file.content} filename={filename} />;
       case 'code':
       case 'text':
       default:
-        return (
-          <div className="flex-1 overflow-auto">
-            <TextEditor blob={file.content} filename={filename} />
-          </div>
-        );
+        return <TextEditor blob={file.content} filename={filename} />;
     }
   };
 
   return (
     <div 
-      className="h-full flex flex-col rounded-xl overflow-hidden animate-in fade-in duration-200 relative"
+      className="h-full flex flex-col rounded-xl overflow-hidden animate-in fade-in duration-200 relative bg-white dark:bg-neutral-900"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
@@ -198,15 +196,15 @@ export function ArtifactsDrawer() {
       )}
       
       {/* Tab Bar with File Browser Button - Fixed at top */}
-      <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700 relative h-9">
+      <div className="flex-shrink-0 border-b border-neutral-200 dark:border-neutral-600 relative h-9">
         <div className="flex overflow-x-auto scrollbar-hide h-full">
           {/* File Browser Button */}
           <Button
             onClick={() => setShowFileBrowser(!showFileBrowser)}
-            className={`flex items-center justify-center gap-1.5 px-2.5 h-full text-xs flex-shrink-0 border-r border-neutral-200 dark:border-neutral-700 ${
+            className={`flex items-center justify-center gap-1.5 px-2.5 h-full text-xs flex-shrink-0 border-r border-neutral-200 dark:border-neutral-600 ${
               showFileBrowser
-                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-b-2 border-b-blue-500'
-                : 'bg-neutral-50 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-white dark:hover:bg-neutral-800'
+                ? 'text-blue-700 dark:text-blue-300'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/50 dark:hover:bg-neutral-700/30'
             } transition-colors`}
             title="Browse files"
           >
@@ -225,10 +223,10 @@ export function ArtifactsDrawer() {
               <Button
                 key={path}
                 onClick={() => handleTabClick(path)}
-                className={`flex items-center gap-1.5 px-3 h-full text-xs border-r border-neutral-200 dark:border-neutral-700 min-w-0 flex-shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 h-full text-xs border-r border-neutral-200 dark:border-neutral-600 min-w-0 flex-shrink-0 ${
                   isActive
-                    ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 border-b-2 border-b-blue-500'
-                    : 'bg-neutral-50 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:bg-white dark:hover:bg-neutral-800'
+                    ? 'text-neutral-900 dark:text-neutral-100 border-t-2 border-t-blue-500'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100/50 dark:hover:bg-neutral-700/30'
                 } transition-colors`}
               >
                 <FileIcon name={path} />
@@ -240,7 +238,7 @@ export function ArtifactsDrawer() {
                     e.stopPropagation();
                     closeTab(path);
                   }}
-                  className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors ml-0.5"
+                  className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors ml-0.5 opacity-70 hover:opacity-100"
                 >
                   <X size={12} />
                 </Button>
@@ -255,7 +253,7 @@ export function ArtifactsDrawer() {
         {/* Left Side Panel - File Browser */}
         <div className={`transition-all duration-300 ease-out ${
           showFileBrowser ? 'w-64' : 'w-0'
-        } flex-shrink-0 overflow-hidden bg-neutral-100 dark:bg-neutral-800 border-r border-neutral-200 dark:border-neutral-700`}>
+        } flex-shrink-0 overflow-hidden ${showFileBrowser ? 'border-r border-neutral-200 dark:border-neutral-600' : ''}`}>
           {showFileBrowser && (
             <ArtifactsBrowser
               files={allFiles}
