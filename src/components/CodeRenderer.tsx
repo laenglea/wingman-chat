@@ -1,5 +1,5 @@
 import { memo, useState, useEffect } from 'react';
-import { useTheme } from '../hooks/useTheme';
+import { useShiki } from '../hooks/useShiki';
 import { CopyButton } from './CopyButton';
 
 interface CodeRendererProps {
@@ -8,54 +8,39 @@ interface CodeRendererProps {
 }
 
 const CodeRenderer = memo(({ code, language }: CodeRendererProps) => {
-  const { isDark } = useTheme();
-  const [highlightedCode, setHighlightedCode] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
+  const { codeToHtml } = useShiki();
+  const [html, setHtml] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
+    if (!code) {
+      setHtml('');
+      return;
+    }
+
     let isCancelled = false;
+    setIsProcessing(true);
 
     const highlightCode = async () => {
       try {
-        const { createHighlighter } = await import('shiki');
-        
-        const highlighter = await createHighlighter({
-          themes: ['one-dark-pro', 'one-light'],
-          langs: [] // Start with no languages, load them dynamically
-        });
-
-        if (isCancelled) return;
-
-        // Try to load the language dynamically
         const langId = language.toLowerCase();
         
-        try {
-          // Check if the language is supported before loading
-          const { bundledLanguages } = await import('shiki');
-          if (bundledLanguages[langId as keyof typeof bundledLanguages]) {
-            await highlighter.loadLanguage(langId as keyof typeof bundledLanguages);
-          }
-        } catch {
-          console.warn(`Language '${language}' not found, falling back to plain text`);
-        }
+        if (isCancelled) return;
 
-        const theme = isDark ? 'one-dark-pro' : 'one-light';
+        const html = await codeToHtml(code, langId);
         
-        const html = highlighter.codeToHtml(code, {
-          lang: langId,
-          theme,
-          colorReplacements: {
-            '#fafafa': 'transparent', // one-light background
-            '#282c34': 'transparent', // one-dark-pro background
-          }
-        });
-        
-        setHighlightedCode(html);
+        if (!isCancelled) {
+          setHtml(html);
+        }
       } catch (error) {
         console.error('Failed to highlight code:', error);
-        setHighlightedCode('');
+        if (!isCancelled) {
+          setHtml('');
+        }
       } finally {
-        if (!isCancelled) setIsLoading(false);
+        if (!isCancelled) {
+          setIsProcessing(false);
+        }
       }
     };
 
@@ -64,7 +49,7 @@ const CodeRenderer = memo(({ code, language }: CodeRendererProps) => {
     return () => {
       isCancelled = true;
     };
-  }, [code, language, isDark]);
+  }, [code, language, codeToHtml]);
 
   const renderCodeBlock = (content: React.ReactNode, showSpinner = false) => (
     <div className="relative my-4">
@@ -83,6 +68,8 @@ const CodeRenderer = memo(({ code, language }: CodeRendererProps) => {
     </div>
   );
 
+  const isLoading = isProcessing;
+
   if (isLoading) {
     return renderCodeBlock(
       <pre className="p-4 text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
@@ -92,7 +79,7 @@ const CodeRenderer = memo(({ code, language }: CodeRendererProps) => {
     );
   }
 
-  if (!highlightedCode) {
+  if (!html) {
     return renderCodeBlock(
       <pre className="p-4 text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
         <code>{code}</code>
@@ -102,7 +89,7 @@ const CodeRenderer = memo(({ code, language }: CodeRendererProps) => {
 
   return renderCodeBlock(
     <div 
-      dangerouslySetInnerHTML={{ __html: highlightedCode }}
+      dangerouslySetInnerHTML={{ __html: html }}
       style={{
         margin: 0,
         padding: '1rem',

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Edit3, Trash2, File, Folder, FolderOpen, ChevronRight, ChevronDown, Check, X, Download } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { FileIcon } from './FileIcon';
+import { getFileName } from '../lib/utils';
 
 // Helper function to build folder tree structure
 interface FileNode {
@@ -375,7 +376,7 @@ export function ArtifactsBrowser({
   const handleDeleteFolder = (path: string) => {
     // Get all files within this folder
     const affectedFiles = files.filter(file => file.path.startsWith(path + '/'));
-    const folderName = path.split('/').pop() || path;
+    const folderName = getFileName(path);
     
     if (affectedFiles.length === 0) {
       // Empty folder, just confirm deletion

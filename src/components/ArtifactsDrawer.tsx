@@ -5,9 +5,11 @@ import { useArtifacts } from '../hooks/useArtifacts';
 import { HtmlEditor } from './HtmlEditor';
 import { SvgEditor } from './SvgEditor';
 import { TextEditor } from './TextEditor';
+import { CodeEditor } from './CodeEditor';
 import { ArtifactsBrowser } from './ArtifactsBrowser';
-import { artifactKind } from '../lib/artifacts';
+import { artifactKind, artifactLanguage } from '../lib/artifacts';
 import { FileIcon } from './FileIcon';
+import { getFileName } from '../lib/utils';
 
 export function ArtifactsDrawer() {
   const { 
@@ -39,7 +41,7 @@ export function ArtifactsDrawer() {
 
   const handleDeleteFile = (path: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete "${path.split('/').pop() || path}"?`)) {
+    if (window.confirm(`Are you sure you want to delete "${getFileName(path)}"?`)) {
       deleteFile(path);
     }
   };
@@ -165,6 +167,12 @@ export function ArtifactsDrawer() {
       case 'svg':
         return <SvgEditor blob={file.content} />;
       case 'code':
+        return (
+          <CodeEditor 
+            blob={file.content} 
+            language={artifactLanguage(file.path)} 
+          />
+        );
       case 'text':
       default:
         return <TextEditor blob={file.content} />;
@@ -220,7 +228,7 @@ export function ArtifactsDrawer() {
               const file = getFile(path);
               if (!file) return null;
               
-              const filename = path.split('/').pop() || path;
+              const filename = getFileName(path);
               const isActive = activeTab === path;
 
               return (
@@ -238,15 +246,15 @@ export function ArtifactsDrawer() {
                   <span className="truncate max-w-[120px]" title={filename}>
                     {filename}
                   </span>
-                  <Button
+                  <div
                     onClick={(e) => {
                       e.stopPropagation();
                       closeTab(path);
                     }}
-                    className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors ml-0.5 opacity-70 hover:opacity-100"
+                    className="p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded transition-colors ml-0.5 opacity-70 hover:opacity-100 cursor-pointer"
                   >
                     <X size={12} />
-                  </Button>
+                  </div>
                 </Button>
               );
             })}
