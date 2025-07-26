@@ -15,6 +15,7 @@
     "@tailwindcss/vite": "^4.1.8",
     "adaptivecards": "^3.0.5",
     "audit": "^0.0.6",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.525.0",
     "mermaid": "^11.6.0",
     "mime": "^4.0.7",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@types/jszip": "^3.4.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",

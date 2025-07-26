@@ -15,6 +15,7 @@ export interface ArtifactsContextType {
   getFile: (path: string) => File | undefined;
   setShowArtifactsDrawer: (show: boolean) => void;
   toggleArtifactsDrawer: () => void;
+  downloadAsZip: (filename?: string) => Promise<void>;
 }
 
 export const ArtifactsContext = createContext<ArtifactsContextType | null>(null);
