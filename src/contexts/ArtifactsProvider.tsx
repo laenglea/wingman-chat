@@ -1,7 +1,8 @@
-import { useState, useCallback, ReactNode } from 'react';
+import { useState, useCallback, ReactNode, useEffect } from 'react';
 import { ArtifactsContext } from './ArtifactsContext';
 import { File, FileSystem } from '../types/file';
 import { downloadFilesystemAsZip } from '../lib/fs';
+import { getConfig } from '../config';
 
 interface ArtifactsProviderProps {
   children: ReactNode;
@@ -12,6 +13,18 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   const [openTabs, setOpenTabs] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [showArtifactsDrawer, setShowArtifactsDrawer] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
+
+  // Check artifacts availability from config
+  useEffect(() => {
+    try {
+      const config = getConfig();
+      setIsAvailable(config.artifacts.enabled);
+    } catch (error) {
+      console.warn('Failed to get artifacts config:', error);
+      setIsAvailable(false);
+    }
+  }, []);
 
   const openTab = useCallback((path: string) => {
     setOpenTabs(prev => {
@@ -101,6 +114,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   }, [filesystem]);
 
   const value = {
+    isAvailable,
     filesystem,
     openTabs,
     activeTab,

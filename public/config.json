@@ -1,4 +1,7 @@
 {
+    "artifacts": {
+        "enabled": true
+    },
     "repository": {
         "enabled": true
     }
