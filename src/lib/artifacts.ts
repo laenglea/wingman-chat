@@ -1,6 +1,12 @@
 // Artifact kind type
 export type ArtifactKind = 'text' | 'code' | 'svg' | 'html';
 
+// Helper function to get the language/extension from a file path
+export function artifactLanguage(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() || '';
+  return ext;
+}
+
 // Helper function to determine the kind of artifact based on file extension
 export function artifactKind(filename: string): ArtifactKind {
   const ext = filename.split('.').pop()?.toLowerCase();

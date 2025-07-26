@@ -1,41 +1,60 @@
 import { useState, useEffect } from 'react';
+import { useShiki } from '../hooks/useShiki';
 
 interface CodeEditorProps {
   blob: Blob;
+  language?: string;
 }
 
-export function CodeEditor({ blob }: CodeEditorProps) {
+export function CodeEditor({ blob, language = '' }: CodeEditorProps) {
   const [content, setContent] = useState<string>('');
-    const [loading, setLoading] = useState(true);
+  const [html, setHtml] = useState<string>('');
+  const { codeToHtml } = useShiki();
   
-    useEffect(() => {
-      const readBlob = async () => {
-        try {
-          const text = await blob.text();
-          setContent(text);
-        } catch {
-          setContent('Error reading file content');
-        } finally {
-          setLoading(false);
-        }
-      };
+  // Read blob content
+  useEffect(() => {
+    const readBlob = async () => {
+      try {
+        const text = await blob.text();
+        setContent(text);
+      } catch {
+        setContent('Error reading file content');
+      }
+    };
+    
+    readBlob();
+  }, [blob]);
   
-      readBlob();
-    }, [blob]);
+  // Highlight code when content changes
+  useEffect(() => {
+    if (!content) return;
+    
+    const highlight = async () => {
+      try {
+        const highlighted = await codeToHtml(content, language);
+        setHtml(highlighted);
+      } catch (error) {
+        console.error('Highlighting failed:', error);
+        // Fallback to plain text
+        setHtml(`<pre><code>${content}</code></pre>`);
+      }
+    };
+    
+    highlight();
+  }, [content, language, codeToHtml]);
   
-    if (loading) {
-      return (
-        <div className="h-full flex items-center justify-center">
-          <div className="text-neutral-500">Loading...</div>
-        </div>
-      );
-    }
-  
-    return (
-      <div className="h-full">
-        <pre className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap font-mono h-full overflow-auto p-4">
+  return (
+    <div className="h-full relative">
+      {html && html.trim() ? (
+        <div 
+          className="h-full overflow-auto p-4"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      ) : (
+        <pre className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre font-mono h-full overflow-auto p-4">
           {content}
         </pre>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
+}

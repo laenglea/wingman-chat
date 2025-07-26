@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Code, Eye } from 'lucide-react';
 import { Button } from '@headlessui/react';
-import { TextEditor } from './TextEditor';
+import { CodeEditor } from './CodeEditor';
 
 // Component to display HTML content in iframe
 function HtmlPreview({ blob }: { blob: Blob }) {
@@ -66,7 +66,7 @@ export function HtmlEditor({ blob }: HtmlEditorProps) {
         {viewMode === 'preview' ? (
           <HtmlPreview blob={blob} />
         ) : (
-          <TextEditor blob={blob}/>
+          <CodeEditor blob={blob} language="html" />
         )}
       </div>
     </div>

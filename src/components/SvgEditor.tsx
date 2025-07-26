@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Code, Eye } from 'lucide-react';
 import { Button } from '@headlessui/react';
-import { TextEditor } from './TextEditor';
+import { CodeEditor } from './CodeEditor';
 
 // Component to display SVG content
 function SvgPreview({ blob }: { blob: Blob }) {
@@ -77,7 +77,7 @@ export function SvgEditor({ blob }: SvgEditorProps) {
         {viewMode === 'preview' ? (
           <SvgPreview blob={blob} />
         ) : (
-          <TextEditor blob={blob} />
+          <CodeEditor blob={blob} language="svg" />
         )}
       </div>
     </div>
