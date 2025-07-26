@@ -26,14 +26,14 @@ export function TextEditor({ blob }: TextEditorProps) {
 
   if (loading) {
     return (
-      <div className="bg-neutral-50 dark:bg-neutral-900 h-full flex items-center justify-center">
+      <div className="h-full flex items-center justify-center">
         <div className="text-neutral-500">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-neutral-50 dark:bg-neutral-900 h-full">
+    <div className="h-full">
       <pre className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap font-mono h-full overflow-auto p-4">
         {content}
       </pre>

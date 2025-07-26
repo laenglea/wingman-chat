@@ -3,24 +3,36 @@ import { Code, Eye } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { TextEditor } from './TextEditor';
 
-// Component to display HTML content in iframe
-function HtmlPreview({ blob, filename }: { blob: Blob; filename: string }) {
-  const [htmlContent, setHtmlContent] = useState<string>('');
+// Component to display SVG content
+function SvgPreview({ blob, filename }: { blob: Blob; filename: string }) {
+  const [svgContent, setSvgContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadHtml = async () => {
+    const loadSvg = async () => {
       try {
-        const text = await blob.text();
-        setHtmlContent(text);
+        let text = await blob.text();
+        
+        // Make SVG responsive by removing fixed dimensions and adding responsive styles
+        text = text.replace(/<svg([^>]*)>/i, (_, attributes) => {
+          // Remove width and height attributes but keep viewBox
+          const newAttributes = attributes
+            .replace(/\s*width\s*=\s*"[^"]*"/gi, '')
+            .replace(/\s*height\s*=\s*"[^"]*"/gi, '');
+          
+          // Add responsive styling
+          return `<svg${newAttributes} style="width: 100%; height: 100%; max-width: 100%; max-height: 100%;">`;
+        });
+        
+        setSvgContent(text);
       } catch {
-        setHtmlContent('<p>Error loading HTML content</p>');
+        setSvgContent('<svg style="width: 100%; height: 100%;"><text x="10" y="20" fill="red">Error loading SVG content</text></svg>');
       } finally {
         setLoading(false);
       }
     };
 
-    loadHtml();
+    loadSvg();
   }, [blob]);
 
   if (loading) {
@@ -32,24 +44,23 @@ function HtmlPreview({ blob, filename }: { blob: Blob; filename: string }) {
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 dark:border-neutral-600 h-full overflow-hidden">
-      <iframe
-        srcDoc={htmlContent}
+    <div className="h-full p-4">
+      <div 
         className="w-full h-full"
+        dangerouslySetInnerHTML={{ __html: svgContent }}
         title={`Preview of ${filename}`}
-        sandbox="allow-scripts allow-same-origin"
       />
     </div>
   );
 }
 
-interface HtmlEditorProps {
+interface SvgEditorProps {
   blob: Blob;
   filename: string;
 }
 
-export function HtmlEditor({ blob, filename }: HtmlEditorProps) {
-  const [viewMode, setViewMode] = useState<'code' | 'preview'>('code');
+export function SvgEditor({ blob, filename }: SvgEditorProps) {
+  const [viewMode, setViewMode] = useState<'code' | 'preview'>('preview');
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -66,7 +77,7 @@ export function HtmlEditor({ blob, filename }: HtmlEditorProps) {
       
       <div className="flex-1 overflow-auto p-4">
         {viewMode === 'preview' ? (
-          <HtmlPreview blob={blob} filename={filename} />
+          <SvgPreview blob={blob} filename={filename} />
         ) : (
           <TextEditor blob={blob} filename={filename} />
         )}
