@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, FileText, Code, Edit3, Trash2, File, FolderTree, Folder, FolderOpen, ChevronRight, ChevronDown, Check } from 'lucide-react';
+import { X, FileText, Code, Edit3, Trash2, File, FolderTree, Folder, FolderOpen, ChevronRight, ChevronDown, Check, Download } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { useArtifacts } from '../hooks/useArtifacts';
 
@@ -32,20 +32,96 @@ function getFileIcon(path: string) {
   const ext = path.split('.').pop()?.toLowerCase();
   
   // Code files
-  const codeExtensions = ['js', 'jsx', 'ts', 'tsx', 'go', 'py', 'rs', 'java', 'cpp', 'cc', 'cxx', 'c'];
+  // Popular programming language extensions
+  const codeExtensions = [
+    // Web
+    'js', 'jsx', 'ts', 'tsx', 'mjs', 'cjs',
+    // Python
+    'py',
+    // Go
+    'go',
+    // Rust
+    'rs',
+    // Java
+    'java', 'jar',
+    // C/C++
+    'c', 'cc', 'cpp', 'cxx', 'h', 'hpp', 'hxx', 'hh',
+    // C#
+    'cs',
+    // PHP
+    'php',
+    // Ruby
+    'rb',
+    // Swift
+    'swift',
+    // Kotlin
+    'kt', 'kts',
+    // Scala
+    'scala', 'sc',
+    // Dart
+    'dart',
+    // Objective-C
+    'm', 'mm',
+    // Shell
+    'sh', 'bash', 'zsh', 'ksh',
+    // Perl
+    'pl', 'pm', 't',
+    // R
+    'r',
+    // Julia
+    'jl',
+    // Lua
+    'lua',
+    // Haskell
+    'hs',
+    // Elixir
+    'ex', 'exs',
+    // Erlang
+    'erl', 'hrl',
+    // F#
+    'fs', 'fsi', 'fsx', 'fsscript',
+    // Visual Basic
+    'vb', 'vbs',
+    // Assembly
+    'asm', 's', 'S',
+    // SQL
+    'sql',
+    // TypeScript declaration
+    'd.ts',
+    // Other
+    'groovy', 'gradle', 'coffee', 'nim', 'clj', 'cljs', 'edn', 'lisp', 'scm', 'rkt', 'ml', 'mli', 'ada', 'adb', 'ads', 'pas', 'pp', 'f', 'f90', 'f95', 'for', 'v', 'vh', 'sv', 'vhd', 'vhdl'
+  ];
   if (codeExtensions.includes(ext || '')) {
     return <Code size={16} className="text-blue-600 dark:text-blue-400" />;
   }
   
   // Markup/config files
-  const markupExtensions = ['html', 'css', 'json', 'xml', 'yaml', 'yml'];
+  const markupExtensions = [
+    'html', 'htm', 'xhtml', 'xml', 'svg', // HTML/XML
+    'css', 'scss', 'sass', 'less', 'styl', // CSS preprocessors
+    'json', 'jsonc', 'json5', // JSON
+    'yaml', 'yml', // YAML
+    'toml', 'ini', 'conf', 'cfg', // Config
+    'plist', // Apple property list
+    'csv', 'tsv', // Data
+    'rss', 'atom', // Feeds
+    'vue', 'svelte', // Web component markup
+    'jsx', 'tsx', // React/TSX (often markup-heavy)
+    'md', 'mdx', // Markdown
+    'handlebars', 'hbs', 'mustache', // Templating
+    'ejs', 'pug', 'jade', // Templating
+    'haml', 'slim', // Ruby templating
+    'liquid', // Shopify/Jekyll templating
+    'tex', 'latex', 'bib', // LaTeX
+    'rst', // reStructuredText
+    'asciidoc', 'adoc', // AsciiDoc
+    'properties', // Java properties
+    'dot', 'gv', // Graphviz
+    'gql', 'graphql', // GraphQL
+    'map', // Source maps
+  ];
   if (markupExtensions.includes(ext || '')) {
     return <FileText size={16} className="text-green-600 dark:text-green-400" />;
-  }
-  
-  // Markdown
-  if (ext === 'md') {
-    return <FileText size={16} className="text-orange-600 dark:text-orange-400" />;
   }
   
   // Default file icon
@@ -430,7 +506,8 @@ export function ArtifactsDrawer() {
     setActiveTab,
     deleteFile,
     getFile,
-    createFile
+    createFile,
+    downloadAsZip
   } = useArtifacts();
 
   const [showFileBrowser, setShowFileBrowser] = useState(false);
@@ -779,6 +856,27 @@ export function ArtifactsDrawer() {
                 </div>
                 )}
               </div>
+              
+              {/* Download Button at bottom of file browser */}
+              {allFiles.length > 0 && (
+                <div className="p-2">
+                  <Button
+                    onClick={async () => {
+                      try {
+                        await downloadAsZip();
+                      } catch (error) {
+                        console.error('Failed to download files:', error);
+                        alert('Failed to download files. Please try again.');
+                      }
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-neutral-600 dark:text-neutral-300 rounded-md transition-colors text-sm"
+                    title={`Download all files as zip (${allFiles.length} file${allFiles.length !== 1 ? 's' : ''})`}
+                  >
+                    <Download size={14} />
+                    Download ZIP
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>        {/* Main Content Area */}

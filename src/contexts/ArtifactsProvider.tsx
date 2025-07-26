@@ -1,6 +1,7 @@
 import { useState, useCallback, ReactNode } from 'react';
 import { ArtifactsContext } from './ArtifactsContext';
 import { File, FileSystem } from '../types/file';
+import { downloadFilesystemAsZip } from '../lib/fs';
 
 interface ArtifactsProviderProps {
   children: ReactNode;
@@ -90,6 +91,15 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     setShowArtifactsDrawer(prev => !prev);
   }, []);
 
+  const downloadAsZip = useCallback(async (filename?: string) => {
+    try {
+      await downloadFilesystemAsZip(filesystem, filename);
+    } catch (error) {
+      console.error('Failed to download filesystem as zip:', error);
+      throw error;
+    }
+  }, [filesystem]);
+
   const value = {
     filesystem,
     openTabs,
@@ -104,6 +114,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     getFile,
     setShowArtifactsDrawer,
     toggleArtifactsDrawer,
+    downloadAsZip,
   };
 
   return (
