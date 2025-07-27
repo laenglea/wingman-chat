@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 import { useTheme } from './useTheme';
 import type { Highlighter } from 'shiki';
 
 // Singleton highlighter instance
 let highlighter: Highlighter | null = null;
 let highlighterPromise: Promise<Highlighter> | null = null;
+const highlighterLanguages = new Set<string>();
 
 const getShikiHighlighter = async (): Promise<Highlighter> => {
   if (highlighter) {
@@ -33,30 +34,43 @@ const getShikiHighlighter = async (): Promise<Highlighter> => {
   return highlighterPromise;
 };
 
+// Pre-load a language if not already loaded
+const loadLanguage = async (shiki: Highlighter, language: string): Promise<void> => {
+  if (highlighterLanguages.has(language)) {
+    return;
+  }
+
+  try {
+    const { bundledLanguages } = await import('shiki');
+    if (bundledLanguages[language as keyof typeof bundledLanguages]) {
+      await shiki.loadLanguage(language as keyof typeof bundledLanguages);
+      highlighterLanguages.add(language);
+    }
+  } catch {
+    // Language loading failed, but Shiki might still recognize it as an alias
+    // Mark as loaded to avoid retrying
+    highlighterLanguages.add(language);
+  }
+};
+
 export function useShiki() {
   const { isDark } = useTheme();
+
+  // Memoize the theme to avoid unnecessary re-renders
+  const theme = useMemo(() => isDark ? 'one-dark-pro' : 'one-light', [isDark]);
 
   useEffect(() => {
     // Pre-initialize the highlighter on first use
     getShikiHighlighter().catch(console.error);
   }, []);
 
-  const codeToHtml = async (code: string, language: string) => {
+  const codeToHtml = useCallback(async (code: string, language: string) => {
     try {
       // Get the singleton highlighter instance
       const shiki = await getShikiHighlighter();
       
-      // Try to load the language if it's available
-      try {
-        const { bundledLanguages } = await import('shiki');
-        if (bundledLanguages[language as keyof typeof bundledLanguages]) {
-          await shiki.loadLanguage(language as keyof typeof bundledLanguages);
-        }
-      } catch {
-        // Language loading failed, but Shiki might still recognize it as an alias
-      }
-
-      const theme = isDark ? 'one-dark-pro' : 'one-light';
+      // Pre-load the language if needed
+      await loadLanguage(shiki, language);
 
       return shiki.codeToHtml(code, {
         lang: language,
@@ -70,7 +84,7 @@ export function useShiki() {
       console.error('Code highlighting failed:', error);
       return `<pre><code>${code}</code></pre>`;
     }
-  };
+  }, [theme]); // Use memoized theme instead of isDark
 
   return {
     codeToHtml
