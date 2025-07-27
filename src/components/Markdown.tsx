@@ -12,13 +12,6 @@ import { MediaPlayer } from './MediaPlayer';
 import { isAudioUrl, isVideoUrl } from '../lib/utils';
 
 const components: Partial<Components> = {
-    p: ({ children, ...props }) => {
-        return (
-            <p className="whitespace-pre-wrap" {...props}>
-                {children}
-            </p>
-        );
-    },
     pre: ({ children }) => {
         return <>
             {children}
@@ -33,7 +26,7 @@ const components: Partial<Components> = {
     },
     li: ({ children, ...props }) => {
         return (
-            <li className="py-1 whitespace-pre-wrap" {...props}>
+            <li className="py-1" {...props}>
                 {children}
             </li>
         );
@@ -146,14 +139,14 @@ const components: Partial<Components> = {
         return <tr className="border-b border-neutral-300 dark:border-neutral-700" {...props}>{children}</tr>;
     },
     th: ({ children, ...props }) => {
-        return <th className="p-2 text-left font-semibold border-r last:border-r-0 border-neutral-300 dark:border-neutral-700 whitespace-pre-wrap" {...props}>{children}</th>;
+        return <th className="p-2 text-left font-semibold border-r last:border-r-0 border-neutral-300 dark:border-neutral-700" {...props}>{children}</th>;
     },
     td: ({ children, ...props }) => {
-        return <td className="p-2 border-r last:border-r-0 border-neutral-300 dark:border-neutral-700 whitespace-pre-wrap" {...props}>{children}</td>;
+        return <td className="p-2 border-r last:border-r-0 border-neutral-300 dark:border-neutral-700" {...props}>{children}</td>;
     },
     blockquote: ({ children, ...props }) => {
         return (
-            <blockquote className="border-l-4 border-neutral-400 dark:border-neutral-600 pl-4 py-1 my-2 italic whitespace-pre-wrap" {...props}>
+            <blockquote className="border-l-4 border-neutral-400 dark:border-neutral-600 pl-4 py-1 my-2 italic" {...props}>
                 {children}
             </blockquote>
         );
