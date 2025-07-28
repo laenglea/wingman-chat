@@ -8,6 +8,7 @@ import { MermaidRenderer } from './MermaidRenderer';
 import { CardRenderer } from './CardRenderer';
 import { CodeRenderer } from './CodeRenderer';
 import { HtmlRenderer } from './HtmlRenderer';
+import { CsvRenderer } from './CsvRenderer';
 import { MediaPlayer } from './MediaPlayer';
 import { isAudioUrl, isVideoUrl } from '../lib/utils';
 
@@ -192,6 +193,10 @@ const components: Partial<Components> = {
 
         if (language === "html" || language === "htm") {
             return <HtmlRenderer html={text} language={language} />;
+        }
+
+        if (language === "csv" || language === "tsv") {
+            return <CsvRenderer csv={text} language={language} />;
         }
 
         if (language === "adaptivecard" || language === "adaptive-card") {
