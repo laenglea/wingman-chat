@@ -17,25 +17,25 @@ const components: Partial<Components> = {
             {children}
         </>;
     },
-    ol: ({ children, ...props }) => {
-        return (
-            <ol className="list-decimal list-inside ml-2" {...props}>
-                {children}
-            </ol>
-        );
-    },
     li: ({ children, ...props }) => {
         return (
-            <li className="py-1" {...props}>
+            <li className="py-1 ml-0" {...props}>
                 {children}
             </li>
         );
     },
     ul: ({ children, ...props }) => {
         return (
-            <ul className="list-disc list-inside ml-2" {...props}>
+            <ul className="list-disc list-outside ml-6 pl-0" {...props}>
                 {children}
             </ul>
+        );
+    },
+    ol: ({ children, ...props }) => {
+        return (
+            <ol className="list-decimal list-outside ml-6 pl-0" {...props}>
+                {children}
+            </ol>
         );
     },
     strong: ({ children, ...props }) => {
