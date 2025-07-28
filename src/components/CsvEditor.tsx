@@ -1,11 +1,9 @@
-import { memo, useState, useMemo } from 'react';
-import { Eye, Code } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Code, Eye } from 'lucide-react';
 import { Button } from '@headlessui/react';
-import { CopyButton } from './CopyButton';
 
-interface CsvRendererProps {
-  csv: string;
-  language: string;
+interface CsvEditorProps {
+  blob: Blob;
 }
 
 // Utility function to detect separator (comma, semicolon, or tab)
@@ -43,7 +41,7 @@ const detectSeparator = (csv: string): string => {
 
 // Utility function to parse CSV content
 const parseCSV = (csv: string): string[][] => {
-  if (!csv.trim()) return [];
+  if (!csv.trim()) return []; // Return empty array for empty content
   
   const separator = detectSeparator(csv);
   const lines = csv.trim().split('\n');
@@ -69,7 +67,7 @@ const parseCSV = (csv: string): string[][] => {
         }
       } else if (char === separator && !inQuotes) {
         // End of field
-        row.push(current.trim());
+        row.push(current);
         current = '';
       } else {
         current += char;
@@ -77,89 +75,71 @@ const parseCSV = (csv: string): string[][] => {
     }
     
     // Add the last field
-    row.push(current.trim());
+    row.push(current);
     result.push(row);
   }
   
   return result;
 };
 
-const NonMemoizedCsvRenderer = ({ csv, language }: CsvRendererProps) => {
-  const [showCode, setShowCode] = useState(false);
+export function CsvEditor({ blob }: CsvEditorProps) {
+  const [content, setContent] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'table' | 'code'>('table');
 
-  const parsedData = useMemo(() => parseCSV(csv), [csv]);
-  const headers = parsedData.length > 0 ? parsedData[0] : [];
-  const rows = parsedData.slice(1);
+  const parsedData = useMemo(() => parseCSV(content), [content]);
 
-  const isEmpty = !csv.trim() || parsedData.length === 0;
+  useEffect(() => {
+    const readBlob = async () => {
+      try {
+        const text = await blob.text();
+        setContent(text);
+      } catch {
+        setContent('');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Show loading state until CSV has content
-  if (isEmpty) {
+    readBlob();
+  }, [blob]);
+
+  if (loading) {
     return (
-      <div className="relative my-4">
-        <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
-          <span>{language}</span>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setShowCode(!showCode)}
-              className="text-neutral-300 hover:text-white transition-colors"
-              title={showCode ? 'Show preview' : 'Show code'}
-            >
-              {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
-            </Button>
-            <CopyButton text={csv} />
-          </div>
-        </div>
-        <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
-          {showCode ? (
-            <div className="p-4">
-              <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
-                <code>{csv}</code>
-              </pre>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
-              <div className="flex items-center space-x-3">
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-600 dark:border-neutral-600 dark:border-t-neutral-400"></div>
-                <span>Loading CSV...</span>
-              </div>
-            </div>
-          )}
-        </div>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-neutral-500">Loading CSV...</div>
       </div>
     );
   }
 
+  const headers = parsedData.length > 0 ? parsedData[0] : [];
+  const rows = parsedData.slice(1);
+
   return (
-    <div className="relative my-4">
-      <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
-        <span>
-          {language}
-        </span>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() => setShowCode(!showCode)}
-            className="text-neutral-300 hover:text-white transition-colors"
-            title={showCode ? 'Show table' : 'Show code'}
-          >
-            {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
-          </Button>
-          <CopyButton text={csv} />
-        </div>
+    <div className="flex-1 flex flex-col overflow-hidden relative">
+      {/* Subtle View Mode Toggle - Top Right */}
+      <div className="absolute top-2 right-2 z-10">
+        <Button
+          onClick={() => setViewMode(viewMode === 'table' ? 'code' : 'table')}
+          className="p-1.5 rounded-md transition-colors bg-white/80 dark:bg-neutral-700/80 backdrop-blur-sm border border-neutral-200/50 dark:border-neutral-500/50 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100/80 dark:hover:bg-neutral-600/80"
+          title={viewMode === 'table' ? 'Switch to code view' : 'Switch to table view'}
+        >
+          {viewMode === 'table' ? <Code size={16} /> : <Eye size={16} />}
+        </Button>
       </div>
 
-      <div className="bg-white dark:bg-neutral-900 rounded-b-md border-l border-r border-b border-gray-100 dark:border-neutral-800">
-        {showCode ? (
+      <div className="flex-1 overflow-auto">
+        {viewMode === 'code' ? (
           <div className="p-4">
-            <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto">
-              <code>{csv}</code>
+            <pre className="text-gray-800 dark:text-neutral-300 text-sm whitespace-pre-wrap overflow-x-auto font-mono">
+              <code>{content}</code>
             </pre>
           </div>
         ) : (
           <div className="overflow-x-auto">
             {parsedData.length > 0 ? (
               <table className="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
-                <thead className="bg-white dark:bg-neutral-900">
+                <thead className="bg-gray-50 dark:bg-neutral-800">
                   <tr>
                     {headers.map((header, index) => (
                       <th
@@ -187,8 +167,11 @@ const NonMemoizedCsvRenderer = ({ csv, language }: CsvRendererProps) => {
                 </tbody>
               </table>
             ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-neutral-500">
-                No data to display
+              <div className="flex items-center justify-center h-24 text-gray-500 dark:text-neutral-500">
+                <div className="text-center">
+                  <p>No CSV data to display</p>
+                  <p className="text-xs mt-1">The file appears to be empty or invalid</p>
+                </div>
               </div>
             )}
           </div>
@@ -196,10 +179,4 @@ const NonMemoizedCsvRenderer = ({ csv, language }: CsvRendererProps) => {
       </div>
     </div>
   );
-};
-
-export const CsvRenderer = memo(
-  NonMemoizedCsvRenderer,
-  (prevProps, nextProps) =>
-    prevProps.csv === nextProps.csv && prevProps.language === nextProps.language
-);
+}
