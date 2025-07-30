@@ -1,7 +1,6 @@
 import { memo, useEffect, useRef, useState, useContext } from 'react';
-import { Eye, Code } from 'lucide-react';
-import { Button } from '@headlessui/react';
 import { CopyButton } from './CopyButton';
+import { PreviewButton } from './PreviewButton';
 import { ChatContext } from '../contexts/ChatContext';
 import { Role } from '../types/chat';
 
@@ -166,14 +165,12 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
                 <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
                     <span>adaptivecard</span>
                     <div className="flex items-center gap-2">
-                        <Button
-                            onClick={() => setShowCode(!showCode)}
-                            className="text-neutral-300 hover:text-white transition-colors"
-                            title={showCode ? 'Show preview' : 'Show code'}
-                        >
-                            {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
-                        </Button>
-                        <CopyButton text={cardJson} />
+                        <PreviewButton 
+                            showCode={showCode} 
+                            onToggle={() => setShowCode(!showCode)} 
+                            className="h-4 w-4" 
+                        />
+                        <CopyButton text={cardJson} className="h-4 w-4" />
                     </div>
                 </div>
                 <div className="bg-white dark:bg-neutral-800 rounded-b-md p-4">
@@ -201,14 +198,12 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
                 <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-700 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
                     <span>adaptivecard</span>
                     <div className="flex items-center gap-2">
-                        <Button
-                            onClick={() => setShowCode(!showCode)}
-                            className="text-neutral-300 hover:text-white transition-colors"
-                            title={showCode ? 'Show preview' : 'Show code'}
-                        >
-                            {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
-                        </Button>
-                        <CopyButton text={cardJson} />
+                        <PreviewButton 
+                            showCode={showCode} 
+                            onToggle={() => setShowCode(!showCode)} 
+                            className="h-4 w-4" 
+                        />
+                        <CopyButton text={cardJson} className="h-4 w-4" />
                     </div>
                 </div>
                 <div className="bg-white dark:bg-neutral-800 rounded-b-md p-4">
@@ -228,7 +223,7 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
                     <span>adaptivecard</span>
                     <div className="flex items-center gap-2">
                         <span className="text-xs text-red-500 dark:text-red-400 opacity-70">render failed</span>
-                        <CopyButton text={cardJson} />
+                        <CopyButton text={cardJson} className="h-4 w-4" />
                     </div>
                 </div>
                 <div className="bg-white dark:bg-neutral-800 p-4 rounded-b-md border border-gray-200 dark:border-neutral-700">
@@ -247,15 +242,13 @@ const NonMemoizedCardRenderer = ({ cardJson }: CardRendererProps) => {
                 <div className="flex items-center gap-2">
                     {error && <span className="text-xs text-red-500 opacity-70">{error}</span>}
                     {hasValidCard && (
-                        <Button
-                            onClick={() => setShowCode(!showCode)}
-                            className="text-neutral-300 hover:text-white transition-colors"
-                            title={showCode ? 'Show preview' : 'Show code'}
-                        >
-                            {showCode ? <Eye className="h-4" /> : <Code className="h-4" />}
-                        </Button>
+                        <PreviewButton 
+                            showCode={showCode} 
+                            onToggle={() => setShowCode(!showCode)} 
+                            className="h-4 w-4" 
+                        />
                     )}
-                    <CopyButton text={cardJson} />
+                    <CopyButton text={cardJson} className="h-4 w-4" />
                 </div>
             </div>
             <div className="bg-white dark:bg-neutral-800 rounded-b-md p-4">

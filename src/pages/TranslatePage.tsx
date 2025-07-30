@@ -329,7 +329,7 @@ export function TranslatePage() {
                   {/* Show copy button for text translations and file translations that return text */}
                   {translatedText && (
                     <div className="absolute top-2 right-2">
-                      <CopyButton text={translatedText} />
+                      <CopyButton text={translatedText} className="h-4 w-4" />
                     </div>
                   )}
                 </div>

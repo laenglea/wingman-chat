@@ -50,7 +50,7 @@ const CodeRenderer = memo(({ code, language }: CodeRendererProps) => {
       <div className="flex justify-between items-center bg-gray-100 dark:bg-neutral-800 pl-4 pr-2 py-1.5 rounded-t-md text-xs text-gray-700 dark:text-neutral-300">
         <span>{language}</span>
         <div className="flex items-center space-x-2">
-          <CopyButton text={code} />
+          <CopyButton text={code} className="h-4 w-4" />
         </div>
       </div>
       <div className="bg-white dark:bg-neutral-900 rounded-b-md overflow-hidden border-l border-r border-b border-gray-100 dark:border-neutral-800">
