@@ -21,7 +21,17 @@ export const CopyButton = ({ text, ...props }: CopyButtonProps) => {
     };
 
     const buttonClasses = "text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors opacity-60 hover:opacity-100 p-1";
-    const iconSize = `h-${props.size ?? 3} w-${props.size ?? 3}`;
+    
+    // Simple size mapping
+    const sizeClasses = {
+        2: "h-2 w-2",
+        3: "h-3 w-3", 
+        4: "h-4 w-4",
+        5: "h-5 w-5",
+        6: "h-6 w-6"
+    } as const;
+
+    const iconClasses = sizeClasses[(props.size ?? 4) as keyof typeof sizeClasses] || "h-4 w-4";
 
     return (
         <Button
@@ -30,9 +40,9 @@ export const CopyButton = ({ text, ...props }: CopyButtonProps) => {
             title="Copy message to clipboard"
         >
             {copied ? (
-                <CopyCheckIcon className={iconSize} />
+                <CopyCheckIcon className={iconClasses} />
             ) : (
-                <CopyIcon className={iconSize} />
+                <CopyIcon className={iconClasses} />
             )}
         </Button>
     );
