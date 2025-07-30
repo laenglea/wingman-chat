@@ -87,8 +87,8 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
             props.isLast ? 'chat-message-actions !opacity-100' : 'chat-message-actions opacity-0'
           }`}>
             <div className="flex items-center gap-2">
-              <CopyButton text={message.content} size={4} />
-              {enableTTS && <PlayButton text={message.content} size={4} />}
+              <CopyButton text={message.content} className="h-4 w-4" />
+              {enableTTS && <PlayButton text={message.content} className="h-4 w-4" />}
             </div>
           </div>
         )}
