@@ -1,5 +1,5 @@
 // Artifact kind type
-export type ArtifactKind = 'text' | 'code' | 'svg' | 'html' | 'csv';
+export type ArtifactKind = 'text' | 'code' | 'svg' | 'html' | 'csv' | 'mermaid';
 
 // Helper function to get the language/extension from a file path
 export function artifactLanguage(path: string): string {
@@ -24,6 +24,11 @@ export function artifactKind(filename: string): ArtifactKind {
   // CSV files
   if (ext === 'csv' || ext === 'tsv') {
     return 'csv';
+  }
+  
+  // Mermaid files
+  if (ext === 'mmd' || ext === 'mermaid') {
+    return 'mermaid';
   }
   
   // Code files

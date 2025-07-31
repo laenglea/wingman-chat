@@ -7,6 +7,7 @@ import { SvgEditor } from './SvgEditor';
 import { TextEditor } from './TextEditor';
 import { CodeEditor } from './CodeEditor';
 import { CsvEditor } from './CsvEditor';
+import { MermaidEditor } from './MermaidEditor';
 import { ArtifactsBrowser } from './ArtifactsBrowser';
 import { artifactKind, artifactLanguage } from '../lib/artifacts';
 import { FileIcon } from './FileIcon';
@@ -169,6 +170,8 @@ export function ArtifactsDrawer() {
         return <SvgEditor blob={file.content} />;
       case 'csv':
         return <CsvEditor blob={file.content} />;
+      case 'mermaid':
+        return <MermaidEditor blob={file.content} />;
       case 'code':
         return (
           <CodeEditor 
