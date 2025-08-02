@@ -17,6 +17,7 @@ import { SettingsButton } from "./components/SettingsButton";
 import { RepositoryProvider } from "./contexts/RepositoryProvider";
 import { BridgeProvider } from "./contexts/BridgeProvider";
 import { ProfileProvider } from "./contexts/ProfileProvider";
+import { ScreenCaptureProvider } from "./contexts/ScreenCaptureProvider";
 import { BridgeIndicator } from "./components/BridgeIndicator";
 
 type Page = "chat" | "translate";
@@ -344,31 +345,26 @@ function AppContent() {
   );
 }
 
+// Compose providers to avoid deep nesting
+const providers = [
+  ThemeProvider,
+  LayoutProvider,
+  BackgroundProvider,
+  ProfileProvider,
+  SidebarProvider,
+  NavigationProvider,
+  BridgeProvider,
+  RepositoryProvider,
+  ScreenCaptureProvider,
+  ChatProvider,
+  VoiceProvider,
+  TranslateProvider,
+];
+
 function App() {
-  return (
-    <ThemeProvider>
-      <LayoutProvider>
-        <BackgroundProvider>
-          <ProfileProvider>
-            <SidebarProvider>
-              <NavigationProvider>
-                <BridgeProvider>
-                  <RepositoryProvider>
-                    <ChatProvider>
-                      <VoiceProvider>
-                        <TranslateProvider>
-                          <AppContent />
-                        </TranslateProvider>
-                      </VoiceProvider>
-                    </ChatProvider>
-                  </RepositoryProvider>
-                </BridgeProvider>
-              </NavigationProvider>
-            </SidebarProvider>
-          </ProfileProvider>
-        </BackgroundProvider>
-      </LayoutProvider>
-    </ThemeProvider>
+  return providers.reduceRight(
+    (acc, Provider) => <Provider>{acc}</Provider>,
+    <AppContent />
   );
 }
 
