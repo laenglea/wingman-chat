@@ -345,33 +345,26 @@ function AppContent() {
   );
 }
 
+// Compose providers to avoid deep nesting
+const providers = [
+  ThemeProvider,
+  LayoutProvider,
+  BackgroundProvider,
+  ProfileProvider,
+  SidebarProvider,
+  NavigationProvider,
+  BridgeProvider,
+  RepositoryProvider,
+  ScreenCaptureProvider,
+  ChatProvider,
+  VoiceProvider,
+  TranslateProvider,
+];
+
 function App() {
-  return (
-    <ThemeProvider>
-      <LayoutProvider>
-        <BackgroundProvider>
-          <ProfileProvider>
-            <SidebarProvider>
-              <NavigationProvider>
-                <BridgeProvider>
-                  <RepositoryProvider>
-                    <ScreenCaptureProvider>
-                      <ChatProvider>
-                        <VoiceProvider>
-                          <TranslateProvider>
-                            <AppContent />
-                          </TranslateProvider>
-                        </VoiceProvider>
-                      </ChatProvider>
-                    </ScreenCaptureProvider>
-                  </RepositoryProvider>
-                </BridgeProvider>
-              </NavigationProvider>
-            </SidebarProvider>
-          </ProfileProvider>
-        </BackgroundProvider>
-      </LayoutProvider>
-    </ThemeProvider>
+  return providers.reduceRight(
+    (acc, Provider) => <Provider>{acc}</Provider>,
+    <AppContent />
   );
 }
 
