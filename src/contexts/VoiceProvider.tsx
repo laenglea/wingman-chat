@@ -99,9 +99,9 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const startVoice = useCallback(async () => {
     try {
       // Use profile instructions
-      const finalInstructions = generateInstructions()?.trim() || undefined;
+      const instructions = generateInstructions()?.trim() || undefined;
       
-      await start(undefined, undefined, finalInstructions);
+      await start(undefined, undefined, instructions);
       setIsListening(true);
     } catch (error) {
       console.error('Failed to start voice mode:', error);
