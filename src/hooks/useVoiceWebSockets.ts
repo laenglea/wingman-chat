@@ -18,10 +18,11 @@ export function useVoiceWebSockets(
 
   const isActiveRef = useRef(false);
 
-  const start = async () => {
-    const realtimeModel = "gpt-4o-realtime-preview";
-    const transcribeModel = "gpt-4o-transcribe";
-
+  const start = async (
+    realtimeModel: string = "gpt-4o-realtime-preview",
+    transcribeModel: string = "gpt-4o-transcribe",
+    instructions?: string
+  ) => {
     if (isActiveRef.current) return;
     isActiveRef.current = true;
 
@@ -64,7 +65,9 @@ export function useVoiceWebSockets(
               type: 'semantic_vad',
               create_response: true,
               interrupt_response: true,
-            }
+            },
+
+            ...(instructions && { instructions: instructions })
           }
         };
 
