@@ -4,5 +4,8 @@
     },
     "repository": {
         "enabled": true
+    },
+    "vision": {
+        "enabled": true
     }
 }
