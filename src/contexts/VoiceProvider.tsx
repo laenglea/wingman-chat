@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useVoiceWebSockets } from "../hooks/useVoiceWebSockets";
 import { useChat } from "../hooks/useChat";
+import { useProfile } from "../hooks/useProfile";
 import { getConfig } from "../config";
 import { Role } from "../types/chat";
 import { VoiceContext, VoiceContextType } from './VoiceContext';
@@ -13,6 +14,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const [isListening, setIsListening] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
   const { addMessage, messages } = useChat();
+  const { generateInstructions } = useProfile();
   
   // Check voice availability from config
   useEffect(() => {
@@ -96,7 +98,10 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const startVoice = useCallback(async () => {
     try {
-      await start();
+      // Use profile instructions
+      const finalInstructions = generateInstructions()?.trim() || undefined;
+      
+      await start(undefined, undefined, finalInstructions);
       setIsListening(true);
     } catch (error) {
       console.error('Failed to start voice mode:', error);
@@ -108,7 +113,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [start]);
+  }, [start, generateInstructions]);
 
   const value: VoiceContextType = {
     isAvailable,
