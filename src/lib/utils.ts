@@ -101,7 +101,7 @@ export function supportsScreenshot(): boolean {
   return "mediaDevices" in navigator && "getDisplayMedia" in navigator.mediaDevices;
 }
 
-export async function captureScreenshot(): Promise<string> {
+export async function captureScreenshot(): Promise<Blob> {
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
@@ -127,9 +127,64 @@ export async function captureScreenshot(): Promise<string> {
 
     stream.getTracks().forEach((track) => track.stop());
 
-    return canvas.toDataURL("image/png");
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Failed to create blob from canvas"));
+        }
+      }, "image/png");
+    });
   } catch (err) {
     console.error("Error capturing screenshot:", err);
+    throw err;
+  }
+}
+
+export async function startContinuousScreenCapture(): Promise<MediaStream> {
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({
+      video: true,
+      audio: false,
+    });
+    return stream;
+  } catch (err) {
+    console.error("Error starting continuous screen capture:", err);
+    throw err;
+  }
+}
+
+export async function captureFromStream(stream: MediaStream): Promise<Blob> {
+  try {
+    const video = document.createElement("video");
+    video.srcObject = stream;
+
+    await new Promise((resolve) => {
+      video.onloadedmetadata = () => {
+        video.play();
+        resolve(null);
+      };
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Failed to create blob from canvas"));
+        }
+      }, "image/png");
+    });
+  } catch (err) {
+    console.error("Error capturing from stream:", err);
     throw err;
   }
 }
