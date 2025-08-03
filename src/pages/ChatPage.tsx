@@ -27,7 +27,7 @@ export function ChatPage() {
   
   const { layoutMode } = useLayout();
   const { isAvailable: voiceAvailable, startVoice, stopVoice } = useVoice();
-  const { isAvailable: repositoryAvailable, toggleRepositoryDrawer, showRepositoryDrawer, setShowRepositoryDrawer, setCurrentRepository } = useRepositories();
+  const { isAvailable: repositoryAvailable, toggleRepositoryDrawer, showRepositoryDrawer } = useRepositories();
   
   // Only need backgroundImage to check if background should be shown
   const { backgroundImage } = useBackground();
@@ -57,12 +57,9 @@ export function ChatPage() {
   const startVoiceMode = useCallback(async () => {
     setShowVoicePreviewDialog(false);
     
-    setShowRepositoryDrawer(false);
-    setCurrentRepository(null);
-    
     await startVoice();
     setIsVoiceMode(true);
-  }, [startVoice, setShowRepositoryDrawer, setCurrentRepository]);
+  }, [startVoice]);
   
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent } = useSidebar();

@@ -1,5 +1,8 @@
 {
     "voice": {
         "enabled": true
+    },
+    "repository": {
+        "enabled": true
     }
 }
