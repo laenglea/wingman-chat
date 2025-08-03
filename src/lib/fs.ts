@@ -10,11 +10,12 @@ export class FileSystemManager {
     private onFileDeleted?: (path: string) => void
   ) {}
 
-  createFile(path: string, content: Blob): void {
+  createFile(path: string, content: string, contentType?: string): void {
     const now = new Date();
     const file: File = {
       path,
       content,
+      contentType,
       createdAt: now,
       updatedAt: now,
     };
@@ -28,7 +29,7 @@ export class FileSystemManager {
     this.onFileCreated?.(path);
   }
 
-  updateFile(path: string, content: Blob): boolean {
+  updateFile(path: string, content: string, contentType?: string): boolean {
     const existingFile = this.filesystem[path];
     if (!existingFile) return false;
 
@@ -37,6 +38,7 @@ export class FileSystemManager {
       [path]: {
         ...existingFile,
         content,
+        contentType,
         updatedAt: new Date(),
       }
     };
