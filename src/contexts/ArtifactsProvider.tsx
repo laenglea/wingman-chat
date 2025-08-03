@@ -1,5 +1,6 @@
-import { useState, useCallback, ReactNode, useEffect } from 'react';
+import { useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { ArtifactsContext } from './ArtifactsContext';
+import { FileSystem } from '../types/file';
 import { FileSystemManager } from '../lib/fs';
 import { getConfig } from '../config';
 
@@ -8,11 +9,11 @@ interface ArtifactsProviderProps {
 }
 
 export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
+  const [filesystem, setFilesystem] = useState<FileSystem>({});
   const [openFiles, setOpenFiles] = useState<string[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [showArtifactsDrawer, setShowArtifactsDrawer] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
-  const [fileSystemManager, setFileSystemManager] = useState<FileSystemManager | null>(null);
 
   // Check artifacts availability from config
   useEffect(() => {
@@ -23,6 +24,14 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
       console.warn('Failed to get artifacts config:', error);
       setIsAvailable(false);
     }
+  }, []);
+
+  // Add setFs function to swap entire filesystem
+  const setFs = useCallback((newFilesystem: FileSystem) => {
+    setFilesystem(newFilesystem);
+    // Reset files when filesystem changes
+    setOpenFiles([]);
+    setActiveFile(null);
   }, []);
 
   const openFile = useCallback((path: string) => {
@@ -50,23 +59,30 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     });
   }, [activeFile]);
 
+  // Create FileSystemManager instance
+  const fs = useMemo(() => new FileSystemManager(
+    filesystem,
+    setFilesystem,
+    openFile,  // Auto-open newly created files
+    closeFile, // Auto-close files when files are deleted
+    (oldPath: string, newPath: string) => {
+      // Handle file rename: update open tabs
+      setOpenFiles(prev => prev.map(path => path === oldPath ? newPath : path));
+      // Update active file if it was renamed
+      if (activeFile === oldPath) {
+        setActiveFile(newPath);
+      }
+    }
+  ), [filesystem, openFile, closeFile, activeFile]);
+
   const toggleArtifactsDrawer = useCallback(() => {
     setShowArtifactsDrawer(prev => !prev);
   }, []);
 
-  // Add debugging to setFileSystemManager
-  const debugSetFileSystemManager = useCallback((manager: FileSystemManager | null) => {
-    console.log(`🔧 ArtifactsProvider: Setting FileSystemManager:`, {
-      isNull: manager === null,
-      managerType: manager?.constructor?.name,
-      isAvailable
-    });
-    setFileSystemManager(manager);
-  }, [isAvailable]);
-
   const value = {
     isAvailable,
-    fs: fileSystemManager,
+    fs,
+    setFs,
     openFiles,
     activeFile,
     showArtifactsDrawer,
@@ -74,7 +90,6 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     closeFile,
     setShowArtifactsDrawer,
     toggleArtifactsDrawer,
-    setFileSystemManager: debugSetFileSystemManager,
   };
 
   return (

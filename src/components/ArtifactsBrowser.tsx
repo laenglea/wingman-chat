@@ -1,13 +1,9 @@
 import { useState } from 'react';
-import { Edit3, Trash2, File as FileIcon2, Folder, FolderOpen, ChevronRight, ChevronDown, Check, X, Download } from 'lucide-react';
+import { Edit3, Trash2, File, Folder, FolderOpen, ChevronRight, ChevronDown, Check, X, Download } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { FileIcon } from './FileIcon';
 import { getFileName } from '../lib/utils';
 import { FileSystemManager } from '../lib/fs';
-import type { File } from '../types/file';
-
-// Note: FileSystemManager now handles both files and folders natively,
-// simplifying delete and rename operations throughout this component
 
 // Helper function to build folder tree structure
 interface FileNode {
@@ -15,9 +11,10 @@ interface FileNode {
   path: string;
   type: 'file' | 'folder';
   children?: FileNode[];
+  file?: { path: string; content: string }; // Reference to the actual file object
 }
 
-function buildFileTree(files: File[]): FileNode[] {
+function buildFileTree(files: { path: string; content: string }[]): FileNode[] {
   const tree: FileNode[] = [];
   const folderMap = new Map<string, FileNode>();
 
@@ -61,7 +58,8 @@ function buildFileTree(files: File[]): FileNode[] {
     currentLevel.push({
       name: fileName,
       path: file.path,
-      type: 'file'
+      type: 'file',
+      file: file
     });
 
     // Sort the current level again
@@ -352,7 +350,7 @@ function FileTreeNode({
 }
 
 interface ArtifactsBrowserProps {
-  fs: FileSystemManager | null;
+  fs: FileSystemManager;
   openTabs: string[];
   onFileClick: (path: string) => void;
   onDeleteFile?: (path: string, event: React.MouseEvent) => void;
@@ -371,18 +369,18 @@ export function ArtifactsBrowser({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [renamingFile, setRenamingFile] = useState<string | null>(null);
 
-  // Default handler that uses FileSystemManager directly
+  // Default handlers that use fs directly
   const handleDeleteFile = onDeleteFile || ((path: string, event: React.MouseEvent) => {
     event.stopPropagation();
     if (window.confirm(`Are you sure you want to delete "${getFileName(path)}"?`)) {
-      fs?.deleteFile(path); // FileSystemManager handles file deletion
+      fs.deleteFile(path);
     }
   });
 
-  const handleDownloadAsZip = onDownloadAsZip || (() => fs?.downloadAsZip());
+  const handleDownloadAsZip = onDownloadAsZip || (() => fs.downloadAsZip());
 
   // Get all files from the file system
-  const files = fs ? fs.listFiles() : [];
+  const files = fs.listFiles().map(file => ({ path: file.path, content: file.content }));
 
   // Build the file tree
   const fileTree = buildFileTree(files);
@@ -392,25 +390,37 @@ export function ArtifactsBrowser({
     const affectedFiles = files.filter(file => file.path.startsWith(path + '/'));
     const folderName = getFileName(path);
     
-    // Show appropriate confirmation message
-    const confirmMessage = affectedFiles.length === 0
-      ? `Are you sure you want to delete the empty folder "${folderName}"?`
-      : `Are you sure you want to delete the folder "${folderName}" and all ${affectedFiles.length} file${affectedFiles.length !== 1 ? 's' : ''} inside it?`;
-    
-    if (window.confirm(confirmMessage)) {
-      // FileSystemManager's deleteFile now handles folders automatically
-      const success = fs?.deleteFile(path);
-      
-      if (success) {
-        // Clean up expanded folders state
+    if (affectedFiles.length === 0) {
+      // Empty folder, just confirm deletion
+      if (window.confirm(`Are you sure you want to delete the empty folder "${folderName}"?`)) {
+        // Remove from expanded folders if it was expanded
         const newExpanded = new Set(expandedFolders);
-        // Remove the folder and any nested expanded folders
-        Array.from(newExpanded).forEach(expandedPath => {
-          if (expandedPath === path || expandedPath.startsWith(path + '/')) {
-            newExpanded.delete(expandedPath);
-          }
-        });
+        newExpanded.delete(path);
         setExpandedFolders(newExpanded);
+      }
+    } else {
+      // Folder contains files, show detailed confirmation
+      const fileCount = affectedFiles.length;
+      const fileText = fileCount === 1 ? 'file' : 'files';
+      if (window.confirm(`Are you sure you want to delete the folder "${folderName}" and all ${fileCount} ${fileText} inside it?`)) {
+        // Use the file system's deleteFile method which now handles folders
+        const success = fs.deleteFile(path);
+        
+        if (success) {
+          // Remove from expanded folders
+          const newExpanded = new Set(expandedFolders);
+          newExpanded.delete(path);
+          
+          // Also remove any nested expanded folders
+          const expandedArray = Array.from(newExpanded);
+          for (const expandedPath of expandedArray) {
+            if (expandedPath.startsWith(path + '/')) {
+              newExpanded.delete(expandedPath);
+            }
+          }
+          
+          setExpandedFolders(newExpanded);
+        }
       }
     }
   };
@@ -430,33 +440,43 @@ export function ArtifactsBrowser({
       // Use the provided callback
       onRenameFile(oldPath, newPath);
     } else {
-      // FileSystemManager's renameFile now handles both files and folders automatically
-      const success = fs?.renameFile(oldPath, newPath);
+      // Use the file system's built-in rename method which handles both files and folders
+      const success = fs.renameFile(oldPath, newPath);
       if (!success) {
         console.error(`Failed to rename ${oldPath} to ${newPath}`);
         return;
       }
     }
 
-    // Update expanded folders state if this was a folder rename
-    // Check if any files exist under this path (indicating it's a folder)
-    const isFolder = files.some(file => file.path.startsWith(oldPath + '/'));
-    
+    // Update expanded folders if this was a folder rename
+    const isFolder = fileTree.some(node => {
+      const findNode = (n: FileNode): boolean => {
+        if (n.path === oldPath && n.type === 'folder') return true;
+        if (n.children) {
+          return n.children.some(findNode);
+        }
+        return false;
+      };
+      return findNode(node);
+    });
+
     if (isFolder) {
       const newExpanded = new Set(expandedFolders);
+      if (newExpanded.has(oldPath)) {
+        newExpanded.delete(oldPath);
+        newExpanded.add(newPath);
+      }
       
-      // Update expanded state for renamed folders
-      Array.from(newExpanded).forEach(expandedPath => {
-        if (expandedPath === oldPath) {
-          newExpanded.delete(oldPath);
-          newExpanded.add(newPath);
-        } else if (expandedPath.startsWith(oldPath + '/')) {
+      // Update any nested expanded folders
+      const expandedArray = Array.from(newExpanded);
+      for (const expandedPath of expandedArray) {
+        if (expandedPath.startsWith(oldPath + '/')) {
           const relativePath = expandedPath.substring(oldPath.length);
+          const newExpandedPath = newPath + relativePath;
           newExpanded.delete(expandedPath);
-          newExpanded.add(newPath + relativePath);
+          newExpanded.add(newExpandedPath);
         }
-      });
-      
+      }
       setExpandedFolders(newExpanded);
     }
   };
@@ -474,7 +494,7 @@ export function ArtifactsBrowser({
       <div className="flex-1 overflow-auto">
         {files.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-8 text-center">
-            <FileIcon2 size={32} className="text-neutral-300 dark:text-neutral-600 mb-3" />
+            <File size={32} className="text-neutral-300 dark:text-neutral-600 mb-3" />
             <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
               No files created yet
             </p>

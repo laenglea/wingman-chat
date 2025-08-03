@@ -53,11 +53,6 @@ export function useArtifacts(): ArtifactsHook {
           }
 
           try {
-            if (!fs) {
-              console.error('❌ FileSystemManager is not available');
-              return JSON.stringify({ error: 'FileSystemManager is not available' });
-            }
-            
             fs.createFile(path, content);
             console.log(`✅ File created successfully: ${path}`);
             return JSON.stringify({ 
@@ -88,11 +83,6 @@ export function useArtifacts(): ArtifactsHook {
           const directory = args.directory as string | undefined;
 
           console.log(`📋 Listing files${directory ? ` in directory: ${directory}` : ''}`);
-
-          if (!fs) {
-            console.error('❌ FileSystemManager is not available');
-            return JSON.stringify({ error: 'FileSystemManager is not available' });
-          }
 
           try {
             const allFiles = fs.listFiles();
@@ -140,11 +130,6 @@ export function useArtifacts(): ArtifactsHook {
 
           if (!path) {
             return JSON.stringify({ error: 'Path is required' });
-          }
-
-          if (!fs) {
-            console.error('❌ FileSystemManager is not available');
-            return JSON.stringify({ error: 'FileSystemManager is not available' });
           }
 
           // Check if it's a file or folder
@@ -199,11 +184,6 @@ export function useArtifacts(): ArtifactsHook {
 
           if (!fromPath || !toPath) {
             return JSON.stringify({ error: 'Both fromPath and toPath are required' });
-          }
-
-          if (!fs) {
-            console.error('❌ FileSystemManager is not available');
-            return JSON.stringify({ error: 'FileSystemManager is not available' });
           }
 
           const sourceFile = fs.getFile(fromPath);
@@ -264,11 +244,6 @@ export function useArtifacts(): ArtifactsHook {
 
           if (!path) {
             return JSON.stringify({ error: 'Path is required' });
-          }
-
-          if (!fs) {
-            console.error('❌ FileSystemManager is not available');
-            return JSON.stringify({ error: 'FileSystemManager is not available' });
           }
 
           const file = fs.getFile(path);
@@ -346,11 +321,6 @@ export function useArtifacts(): ArtifactsHook {
                 message: 'No file is currently active',
                 currentFile: null
               });
-            }
-
-            if (!fs) {
-              console.error('❌ FileSystemManager is not available');
-              return JSON.stringify({ error: 'FileSystemManager is not available' });
             }
 
             const file = fs.getFile(activeFile);
