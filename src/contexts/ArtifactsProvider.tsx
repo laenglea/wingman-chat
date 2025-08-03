@@ -64,8 +64,16 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     filesystem,
     setFilesystem,
     openFile,  // Auto-open newly created files
-    closeFile  // Auto-close files when files are deleted
-  ), [filesystem, openFile, closeFile]);
+    closeFile, // Auto-close files when files are deleted
+    (oldPath: string, newPath: string) => {
+      // Handle file rename: update open tabs
+      setOpenFiles(prev => prev.map(path => path === oldPath ? newPath : path));
+      // Update active file if it was renamed
+      if (activeFile === oldPath) {
+        setActiveFile(newPath);
+      }
+    }
+  ), [filesystem, openFile, closeFile, activeFile]);
 
   const toggleArtifactsDrawer = useCallback(() => {
     setShowArtifactsDrawer(prev => !prev);
