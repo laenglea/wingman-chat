@@ -20,7 +20,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const { generateInstructions } = useProfile();
   const { bridgeTools, bridgeInstructions } = useBridge();
   const { currentRepository } = useRepositories();
-  const { queryTools } = useRepository(currentRepository?.id || '');
+  const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
   
   // Check voice availability from config
   useEffect(() => {
@@ -104,43 +104,28 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const startVoice = useCallback(async () => {
     try {
-      // Build comprehensive instructions
       const profileInstructions = generateInstructions();
-      const repositoryTools = currentRepository ? queryTools() : [];
-      const repositoryInstructions = currentRepository?.instructions || '';
       
-      const allTools = [...bridgeTools, ...repositoryTools];
+      const repositoryTools = currentRepository ? queryTools() : [];
+      const repositoryInstructions = queryInstructions();
+      
+      const completionTools = [...bridgeTools, ...repositoryTools];
 
       const instructions: string[] = [];
 
-      if (profileInstructions?.trim()) {
+      if (profileInstructions.trim()) {
         instructions.push(profileInstructions);
+      }
+
+      if (repositoryInstructions.trim()) {
+        instructions.push(repositoryInstructions);
       }
 
       if (bridgeInstructions?.trim()) {
         instructions.push(bridgeInstructions);
       }
       
-      if (repositoryInstructions.trim()) {
-        instructions.push(repositoryInstructions);
-      }
-
-      if (repositoryTools.length > 0) {
-        instructions.push(`Your mission:
-1. For *every* user query, you MUST first invoke the \`query_knowledge_database\` tool with a concise, natural-language query.
-2. Examine the tool's results.
-   - If you get ≥1 relevant documents or facts, answer the user *solely* using those results.
-   - Include source citations (e.g. doc IDs, relevance scores, or text snippets).
-3. Only if the tool returns no relevant information, you may answer from general knowledge—but still note "no document match; using fallback knowledge".
-4. If the tool call fails, report the failure and either retry or ask the user to clarify.
-5. Be concise, accurate, and transparent about sources.
-
-Use GitHub Flavored Markdown to format your responses including tables, code blocks, links, and lists.`);
-      }
-
-      const finalInstructions = instructions.length > 0 ? instructions.join('\n\n') : undefined;
-      
-      await start(undefined, undefined, finalInstructions, messages, allTools);
+      await start(undefined, undefined, instructions.join('\n\n'), messages, completionTools);
       setIsListening(true);
     } catch (error) {
       console.error('Failed to start voice mode:', error);
@@ -152,7 +137,7 @@ Use GitHub Flavored Markdown to format your responses including tables, code blo
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [start, generateInstructions, messages, bridgeTools, bridgeInstructions, queryTools, currentRepository]);
+  }, [generateInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, start, messages]);
 
   const value: VoiceContextType = {
     isAvailable,
