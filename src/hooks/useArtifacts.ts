@@ -100,9 +100,7 @@ export function useArtifacts(): ArtifactsHook {
             const fileList = filteredFiles.map(file => ({
               path: file.path,
               size: file.content.length,
-              contentType: file.contentType,
-              createdAt: file.createdAt.toISOString(),
-              updatedAt: file.updatedAt.toISOString()
+              contentType: file.contentType
             }));
 
             console.log(`✅ Found ${fileList.length} files`);
@@ -275,8 +273,6 @@ export function useArtifacts(): ArtifactsHook {
               size: file.content.length,
               content: file.content,
               contentType: file.contentType,
-              createdAt: file.createdAt.toISOString(),
-              updatedAt: file.updatedAt.toISOString(),
             };
 
             console.log(`✅ File read successfully: ${path} (${file.content.length} chars)`);
@@ -357,8 +353,6 @@ export function useArtifacts(): ArtifactsHook {
               size: file.content.length,
               content: file.content,
               contentType: file.contentType,
-              createdAt: file.createdAt.toISOString(),
-              updatedAt: file.updatedAt.toISOString(),
             };
 
             console.log(`✅ Current file: ${activeFile} (${file.content.length} chars)`);
