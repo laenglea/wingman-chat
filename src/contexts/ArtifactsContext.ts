@@ -6,12 +6,11 @@ export interface ArtifactsContextType {
   isAvailable: boolean;
   fs: FileSystemManager;
   setFs: (filesystem: FileSystem) => void;
-  openTabs: string[];
-  activeTab: string | null;
+  openFiles: string[];
+  activeFile: string | null;
   showArtifactsDrawer: boolean;
-  openTab: (path: string) => void;
-  closeTab: (path: string) => void;
-  setActiveTab: (path: string | null) => void;
+  openFile: (path: string) => void;
+  closeFile: (path: string) => void;
   setShowArtifactsDrawer: (show: boolean) => void;
   toggleArtifactsDrawer: () => void;
 }

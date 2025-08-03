@@ -10,8 +10,8 @@ interface ArtifactsProviderProps {
 
 export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   const [filesystem, setFilesystem] = useState<FileSystem>({});
-  const [openTabs, setOpenTabs] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const [openFiles, setOpenFiles] = useState<string[]>([]);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
   const [showArtifactsDrawer, setShowArtifactsDrawer] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
 
@@ -29,43 +29,43 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   // Add setFs function to swap entire filesystem
   const setFs = useCallback((newFilesystem: FileSystem) => {
     setFilesystem(newFilesystem);
-    // Reset tabs when filesystem changes
-    setOpenTabs([]);
-    setActiveTab(null);
+    // Reset files when filesystem changes
+    setOpenFiles([]);
+    setActiveFile(null);
   }, []);
 
-  const openTab = useCallback((path: string) => {
-    setOpenTabs(prev => {
+  const openFile = useCallback((path: string) => {
+    setOpenFiles(prev => {
       if (prev.includes(path)) return prev;
       return [...prev, path];
     });
-    setActiveTab(path);
+    setActiveFile(path);
   }, []);
 
-  const closeTab = useCallback((path: string) => {
-    setOpenTabs(prev => {
-      const newTabs = prev.filter(tab => tab !== path);
+  const closeFile = useCallback((path: string) => {
+    setOpenFiles(prev => {
+      const newFiles = prev.filter(file => file !== path);
       
-      // If closing the active tab, set a new active tab
-      if (path === activeTab) {
+      // If closing the active file, set a new active file
+      if (path === activeFile) {
         const index = prev.indexOf(path);
-        const newActiveTab = newTabs.length > 0 
-          ? newTabs[Math.min(index, newTabs.length - 1)]
+        const newActiveFile = newFiles.length > 0 
+          ? newFiles[Math.min(index, newFiles.length - 1)]
           : null;
-        setActiveTab(newActiveTab);
+        setActiveFile(newActiveFile);
       }
       
-      return newTabs;
+      return newFiles;
     });
-  }, [activeTab]);
+  }, [activeFile]);
 
   // Create FileSystemManager instance
   const fs = useMemo(() => new FileSystemManager(
     filesystem,
     setFilesystem,
-    openTab,  // Auto-open newly created files
-    closeTab  // Auto-close tabs when files are deleted
-  ), [filesystem, openTab, closeTab]);
+    openFile,  // Auto-open newly created files
+    closeFile  // Auto-close files when files are deleted
+  ), [filesystem, openFile, closeFile]);
 
   const toggleArtifactsDrawer = useCallback(() => {
     setShowArtifactsDrawer(prev => !prev);
@@ -75,12 +75,11 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     isAvailable,
     fs,
     setFs,
-    openTabs,
-    activeTab,
+    openFiles,
+    activeFile,
     showArtifactsDrawer,
-    openTab,
-    closeTab,
-    setActiveTab,
+    openFile,
+    closeFile,
     setShowArtifactsDrawer,
     toggleArtifactsDrawer,
   };

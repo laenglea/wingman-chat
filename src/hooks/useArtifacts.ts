@@ -15,7 +15,7 @@ export function useArtifacts(): ArtifactsHook {
 
   const {
     fs,
-    activeTab,
+    activeFile,
   } = context;
 
   const artifactsTools = useCallback((): Tool[] => {
@@ -277,7 +277,7 @@ export function useArtifacts(): ArtifactsHook {
           console.log(`📍 Getting current file path`);
 
           try {
-            if (!activeTab) {
+            if (!activeFile) {
               return JSON.stringify({ 
                 success: true,
                 message: 'No file is currently active',
@@ -285,10 +285,10 @@ export function useArtifacts(): ArtifactsHook {
               });
             }
 
-            console.log(`✅ Current file path: ${activeTab}`);
+            console.log(`✅ Current file path: ${activeFile}`);
             return JSON.stringify({ 
               success: true, 
-              currentPath: activeTab
+              currentPath: activeFile
             });
           } catch (error) {
             console.error('❌ Failed to get current path:', error);
@@ -308,7 +308,7 @@ export function useArtifacts(): ArtifactsHook {
           console.log(`📋 Getting current file info`);
 
           try {
-            if (!activeTab) {
+            if (!activeFile) {
               return JSON.stringify({ 
                 success: true,
                 message: 'No file is currently active',
@@ -316,10 +316,10 @@ export function useArtifacts(): ArtifactsHook {
               });
             }
 
-            const file = fs.getFile(activeTab);
+            const file = fs.getFile(activeFile);
             if (!file) {
               return JSON.stringify({ 
-                error: `Active file not found: ${activeTab}` 
+                error: `Active file not found: ${activeFile}` 
               });
             }
 
@@ -327,7 +327,7 @@ export function useArtifacts(): ArtifactsHook {
             const textContent = await file.content.text();
 
             const fileInfo = {
-              path: activeTab,
+              path: activeFile,
               size: file.content.size,
               type: file.content.type,
               createdAt: file.createdAt.toISOString(),
@@ -335,7 +335,7 @@ export function useArtifacts(): ArtifactsHook {
               content: textContent
             };
 
-            console.log(`✅ Current file: ${activeTab} (${file.content.size} bytes)`);
+            console.log(`✅ Current file: ${activeFile} (${file.content.size} bytes)`);
             return JSON.stringify({ 
               success: true, 
               currentFile: fileInfo
@@ -347,7 +347,7 @@ export function useArtifacts(): ArtifactsHook {
         }
       }
     ];
-  }, [fs, activeTab]);
+  }, [fs, activeFile]);
   
   return {
     ...context,
