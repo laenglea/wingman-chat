@@ -27,7 +27,7 @@ export function ArtifactsDrawer() {
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get all files sorted by path
-  const files = fs ? fs.listFiles().sort((a, b) => a.path.localeCompare(b.path)) : [];
+  const files = fs.listFiles().sort((a, b) => a.path.localeCompare(b.path));
 
   const selectFile = (path: string) => {
     if (activeFile === path) {
@@ -61,12 +61,10 @@ export function ArtifactsDrawer() {
         const content = await file.text();
         
         // Create the file with string content
-        if (fs) {
-          fs.createFile(path, content, file.type);
-          
-          // Open the file in a tab
-          openFile(path);
-        }
+        fs.createFile(path, content, file.type);
+        
+        // Open the file in a tab
+        openFile(path);
       } catch (error) {
         console.error(`Error processing file ${file.name}:`, error);
       }
@@ -101,13 +99,6 @@ export function ArtifactsDrawer() {
     };
   }, []);
 
-  // Auto-show file browser if there are files but no active file and browser is not already shown
-  useEffect(() => {
-    if (!activeFile && files.length > 0 && !showFileBrowser) {
-      setShowFileBrowser(true);
-    }
-  }, [activeFile, files.length, showFileBrowser]);
-
   // Render the appropriate editor based on file type
   const renderEditor = () => {
     if (!activeFile) {
@@ -120,9 +111,9 @@ export function ArtifactsDrawer() {
           <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
             {files.length === 0 
               ? "Files created by the AI will appear here" 
-              : "Select a file from the browser or tabs above"}
+              : "Select a file from the tabs above or use the file browser"}
           </p>
-          {files.length > 0 && !showFileBrowser && (
+          {files.length > 0 && (
             <Button
               onClick={() => setShowFileBrowser(true)}
               className="px-4 py-2 bg-neutral-800 hover:bg-neutral-900 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-white rounded-lg transition-colors text-sm"
@@ -134,7 +125,7 @@ export function ArtifactsDrawer() {
       );
     }
 
-    const file = fs?.getFile(activeFile);
+    const file = fs.getFile(activeFile);
     if (!file) return null;
 
     switch (artifactKind(activeFile)) {
@@ -205,7 +196,7 @@ export function ArtifactsDrawer() {
           {/* Open File Tabs */}
           <div className="flex overflow-x-auto h-full hide-scrollbar" style={{ minWidth: '100%' }}>
             {openFiles.map((path) => {
-              const file = fs?.getFile(path);
+              const file = fs.getFile(path);
               if (!file) return null;
               
               const filename = getFileName(path);
