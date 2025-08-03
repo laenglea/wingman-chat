@@ -1,15 +1,69 @@
 import JSZip from 'jszip';
 import { FileSystem, File } from '../types/file';
 
+type FileEventType = 'fileCreated' | 'fileDeleted' | 'fileRenamed' | 'fileUpdated';
+
+type FileEventHandler<T extends FileEventType> = T extends 'fileCreated'
+  ? (path: string) => void
+  : T extends 'fileDeleted'
+  ? (path: string) => void
+  : T extends 'fileRenamed'
+  ? (oldPath: string, newPath: string) => void
+  : T extends 'fileUpdated'
+  ? (path: string) => void
+  : never;
+
 // FileSystem extension methods
 export class FileSystemManager {
+  private eventHandlers: Map<FileEventType, Set<(...args: unknown[]) => void>> = new Map();
+  private version: number = 0; // Track filesystem version for React state management
+
   constructor(
     private getFilesystem: () => FileSystem,
-    private setFilesystem: (fs: (current: FileSystem) => FileSystem) => void,
-    private onFileCreated?: (path: string) => void,
-    private onFileDeleted?: (path: string) => void,
-    private onFileRenamed?: (oldPath: string, newPath: string) => void
-  ) {}
+    private setFilesystem: (fs: (current: FileSystem) => FileSystem) => void
+  ) {
+    // Initialize event handler sets
+    this.eventHandlers.set('fileCreated', new Set());
+    this.eventHandlers.set('fileDeleted', new Set());
+    this.eventHandlers.set('fileRenamed', new Set());
+    this.eventHandlers.set('fileUpdated', new Set());
+  }
+
+  // Get current filesystem version for React state tracking
+  get filesystemVersion(): number {
+    return this.version;
+  }
+
+  // Event subscription methods
+  subscribe<T extends FileEventType>(eventType: T, handler: FileEventHandler<T>): () => void {
+    const handlers = this.eventHandlers.get(eventType);
+    if (handlers) {
+      handlers.add(handler as (...args: unknown[]) => void);
+    }
+
+    // Return unsubscribe function
+    return () => this.unsubscribe(eventType, handler);
+  }
+
+  unsubscribe<T extends FileEventType>(eventType: T, handler: FileEventHandler<T>): void {
+    const handlers = this.eventHandlers.get(eventType);
+    if (handlers) {
+      handlers.delete(handler as (...args: unknown[]) => void);
+    }
+  }
+
+  private emit(eventType: FileEventType, ...args: unknown[]): void {
+    const handlers = this.eventHandlers.get(eventType);
+    if (handlers) {
+      handlers.forEach(handler => {
+        try {
+          handler(...args);
+        } catch (error) {
+          console.error(`Error in ${eventType} handler:`, error);
+        }
+      });
+    }
+  }
 
   createFile(path: string, content: string, contentType?: string): void {
     const file: File = {
@@ -23,7 +77,8 @@ export class FileSystemManager {
       ...fs,
       [path]: file
     }));
-    this.onFileCreated?.(path);
+    this.version++; // Increment version after filesystem change
+    this.emit('fileCreated', path);
   }
 
   updateFile(path: string, content: string, contentType?: string): boolean {
@@ -39,6 +94,8 @@ export class FileSystemManager {
         contentType,
       }
     }));
+    this.version++; // Increment version after filesystem change
+    this.emit('fileUpdated', path);
     return true;
   }
 
@@ -54,7 +111,8 @@ export class FileSystemManager {
         delete newFs[path];
         return newFs;
       });
-      this.onFileDeleted?.(path);
+      this.version++; // Increment version after filesystem change
+      this.emit('fileDeleted', path);
       return true;
     }
 
@@ -73,9 +131,10 @@ export class FileSystemManager {
         return newFs;
       });
       
-      // Call the callback for each deleted file
+      this.version++; // Increment version after filesystem change
+      // Call the emit for each deleted file
       for (const file of affectedFiles) {
-        this.onFileDeleted?.(file.path);
+        this.emit('fileDeleted', file.path);
       }
       
       return true;
@@ -112,7 +171,8 @@ export class FileSystemManager {
         return newFs;
       });
       
-      this.onFileRenamed?.(oldPath, newPath);
+      this.version++; // Increment version after filesystem change
+      this.emit('fileRenamed', oldPath, newPath);
       return true;
     } else if (isFolder) {
       // Handle folder rename - rename all files within the folder
@@ -135,11 +195,12 @@ export class FileSystemManager {
         return newFs;
       });
       
-      // Call the callback for each renamed file
+      this.version++; // Increment version after filesystem change
+      // Call the emit for each renamed file
       for (const file of affectedFiles) {
         const relativePath = file.path.substring(oldPath.length);
         const newFilePath = newPath + relativePath;
-        this.onFileRenamed?.(file.path, newFilePath);
+        this.emit('fileRenamed', file.path, newFilePath);
       }
       
       return true;

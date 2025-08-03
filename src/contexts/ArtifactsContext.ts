@@ -7,6 +7,7 @@ export interface ArtifactsContextType {
   openFiles: string[];
   activeFile: string | null;
   showArtifactsDrawer: boolean;
+  filesystemVersion: number; // Track filesystem version for reactive updates
   openFile: (path: string) => void;
   closeFile: (path: string) => void;
   setShowArtifactsDrawer: (show: boolean) => void;

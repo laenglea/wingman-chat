@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Edit3, Trash2, File, Folder, FolderOpen, ChevronRight, ChevronDown, Check, X, Download } from 'lucide-react';
 import { Button } from '@headlessui/react';
 import { FileIcon } from './FileIcon';
@@ -369,6 +369,80 @@ export function ArtifactsBrowser({
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [renamingFile, setRenamingFile] = useState<string | null>(null);
 
+  // Subscribe to filesystem events to handle state updates
+  useEffect(() => {
+    const unsubscribeCreated = fs.subscribe('fileCreated', (path: string) => {
+      // Auto-expand parent folders when new files are created
+      const pathParts = path.split('/').filter(part => part.length > 0);
+      setExpandedFolders(prev => {
+        const newExpanded = new Set(prev);
+        let currentPath = '';
+        
+        // Expand all parent folders up to the file
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          currentPath += '/' + pathParts[i];
+          newExpanded.add(currentPath);
+        }
+        
+        return newExpanded;
+      });
+    });
+
+    const unsubscribeDeleted = fs.subscribe('fileDeleted', (path: string) => {
+      // If a folder is deleted, remove it from expanded folders
+      setExpandedFolders(prev => {
+        const newExpanded = new Set(prev);
+        newExpanded.delete(path);
+        
+        // Also remove any nested expanded folders
+        const expandedArray = Array.from(newExpanded);
+        for (const expandedPath of expandedArray) {
+          if (expandedPath.startsWith(path + '/')) {
+            newExpanded.delete(expandedPath);
+          }
+        }
+        
+        return newExpanded;
+      });
+
+      // If the deleted file was being renamed, cancel rename
+      setRenamingFile(prev => prev === path ? null : prev);
+    });
+
+    const unsubscribeRenamed = fs.subscribe('fileRenamed', (oldPath: string, newPath: string) => {
+      // Update expanded folders if this was a folder rename
+      setExpandedFolders(prev => {
+        const newExpanded = new Set(prev);
+        if (newExpanded.has(oldPath)) {
+          newExpanded.delete(oldPath);
+          newExpanded.add(newPath);
+        }
+        
+        // Update any nested expanded folders
+        const expandedArray = Array.from(newExpanded);
+        for (const expandedPath of expandedArray) {
+          if (expandedPath.startsWith(oldPath + '/')) {
+            const relativePath = expandedPath.substring(oldPath.length);
+            const newExpandedPath = newPath + relativePath;
+            newExpanded.delete(expandedPath);
+            newExpanded.add(newExpandedPath);
+          }
+        }
+        
+        return newExpanded;
+      });
+
+      // Update renaming file if it was renamed
+      setRenamingFile(prev => prev === oldPath ? newPath : prev);
+    });
+
+    return () => {
+      unsubscribeCreated();
+      unsubscribeDeleted();
+      unsubscribeRenamed();
+    };
+  }, [fs]);
+
   // Default handlers that use fs directly
   const handleDeleteFile = onDeleteFile || ((path: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -393,10 +467,8 @@ export function ArtifactsBrowser({
     if (affectedFiles.length === 0) {
       // Empty folder, just confirm deletion
       if (window.confirm(`Are you sure you want to delete the empty folder "${folderName}"?`)) {
-        // Remove from expanded folders if it was expanded
-        const newExpanded = new Set(expandedFolders);
-        newExpanded.delete(path);
-        setExpandedFolders(newExpanded);
+        // The filesystem event handler will take care of updating expanded folders
+        // when the folder is deleted
       }
     } else {
       // Folder contains files, show detailed confirmation
@@ -404,23 +476,8 @@ export function ArtifactsBrowser({
       const fileText = fileCount === 1 ? 'file' : 'files';
       if (window.confirm(`Are you sure you want to delete the folder "${folderName}" and all ${fileCount} ${fileText} inside it?`)) {
         // Use the file system's deleteFile method which now handles folders
-        const success = fs.deleteFile(path);
-        
-        if (success) {
-          // Remove from expanded folders
-          const newExpanded = new Set(expandedFolders);
-          newExpanded.delete(path);
-          
-          // Also remove any nested expanded folders
-          const expandedArray = Array.from(newExpanded);
-          for (const expandedPath of expandedArray) {
-            if (expandedPath.startsWith(path + '/')) {
-              newExpanded.delete(expandedPath);
-            }
-          }
-          
-          setExpandedFolders(newExpanded);
-        }
+        // The filesystem event handler will take care of updating expanded folders
+        fs.deleteFile(path);
       }
     }
   };
@@ -441,43 +498,12 @@ export function ArtifactsBrowser({
       onRenameFile(oldPath, newPath);
     } else {
       // Use the file system's built-in rename method which handles both files and folders
+      // The filesystem event handler will take care of updating expanded folders and rename state
       const success = fs.renameFile(oldPath, newPath);
       if (!success) {
         console.error(`Failed to rename ${oldPath} to ${newPath}`);
         return;
       }
-    }
-
-    // Update expanded folders if this was a folder rename
-    const isFolder = fileTree.some(node => {
-      const findNode = (n: FileNode): boolean => {
-        if (n.path === oldPath && n.type === 'folder') return true;
-        if (n.children) {
-          return n.children.some(findNode);
-        }
-        return false;
-      };
-      return findNode(node);
-    });
-
-    if (isFolder) {
-      const newExpanded = new Set(expandedFolders);
-      if (newExpanded.has(oldPath)) {
-        newExpanded.delete(oldPath);
-        newExpanded.add(newPath);
-      }
-      
-      // Update any nested expanded folders
-      const expandedArray = Array.from(newExpanded);
-      for (const expandedPath of expandedArray) {
-        if (expandedPath.startsWith(oldPath + '/')) {
-          const relativePath = expandedPath.substring(oldPath.length);
-          const newExpandedPath = newPath + relativePath;
-          newExpanded.delete(expandedPath);
-          newExpanded.add(newExpandedPath);
-        }
-      }
-      setExpandedFolders(newExpanded);
     }
   };
 

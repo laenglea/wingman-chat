@@ -57,14 +57,14 @@ export default defineConfig({
           'vendor-ui': [
             '@headlessui/react',
             '@floating-ui/react',
-            '@floating-ui/react-dom'
+            '@floating-ui/react-dom',
+            'lucide-react'
           ],
           'vendor-utils': [
             'zod',
             'p-limit',
             'mime'
           ],
-          'vendor-icons': ['lucide-react'],
           'vendor-shiki': ['shiki'],
           'vendor-mermaid': ['mermaid']
         }

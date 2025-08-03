@@ -78,46 +78,69 @@ export function ChatPage() {
     dependencies: [chat, messages],
   });
 
+  // Ref to get current chat without causing effect dependencies
+  const getCurrentChatRef = useRef<() => Chat | null>(() => null);
+  
+  // Update the ref whenever chat or chats change
+  useEffect(() => {
+    getCurrentChatRef.current = () => {
+      if (!chat?.id) return null;
+      return chats.find(c => c.id === chat.id) || null;
+    };
+  }, [chat?.id, chats]);
+
   // Set up artifacts filesystem integration with chat.files
   useEffect(() => {
-    if (!chat || !artifactsAvailable) {
+    if (!chat?.id || !artifactsAvailable) {
       setFileSystemManager(null);
       return;
     }
+
+    const chatId = chat.id;
 
     // Create FileSystemManager that uses chat.files as persistence
     const manager = new FileSystemManager(
       // getFilesystem: returns current filesystem state from chat.files
       () => {
-        const currentChat = chats.find(c => c.id === chat.id);
+        const currentChat = getCurrentChatRef.current();
         return currentChat?.files || {};
       },
       
       // setFilesystem: updates chat.files through functional updateChat
       (updater: (current: FileSystem) => FileSystem) => {
-        updateChat(chat.id, (currentChat: Chat) => ({
+        updateChat(chatId, (currentChat: Chat) => ({
           files: updater(currentChat.files || {})
         }));
-      },
-      
-      // onFileCreated callback
-      (path: string) => {
-        console.log(`📄 Artifacts: File created: ${path}`);
-      },
-      
-      // onFileDeleted callback
-      (path: string) => {
-        console.log(`🗑️ Artifacts: File deleted: ${path}`);
-      },
-      
-      // onFileRenamed callback
-      (oldPath: string, newPath: string) => {
-        console.log(`📁 Artifacts: File renamed: ${oldPath} → ${newPath}`);
       }
     );
 
+    // Subscribe to file events
+    const unsubscribeCreated = manager.subscribe('fileCreated', (path: string) => {
+      console.log(`📄 Artifacts: File created: ${path}`);
+    });
+
+    const unsubscribeDeleted = manager.subscribe('fileDeleted', (path: string) => {
+      console.log(`🗑️ Artifacts: File deleted: ${path}`);
+    });
+
+    const unsubscribeRenamed = manager.subscribe('fileRenamed', (oldPath: string, newPath: string) => {
+      console.log(`📁 Artifacts: File renamed: ${oldPath} → ${newPath}`);
+    });
+
+    const unsubscribeUpdated = manager.subscribe('fileUpdated', (path: string) => {
+      console.log(`✏️ Artifacts: File updated: ${path}`);
+    });
+
     setFileSystemManager(manager);
-  }, [chat, chats, artifactsAvailable, setFileSystemManager, updateChat]);
+
+    // Cleanup subscriptions when effect runs again or unmounts
+    return () => {
+      unsubscribeCreated();
+      unsubscribeDeleted();
+      unsubscribeRenamed();
+      unsubscribeUpdated();
+    };
+  }, [chat?.id, artifactsAvailable, updateChat, setFileSystemManager]);
 
   // Set up navigation actions (only once on mount)
   useEffect(() => {
