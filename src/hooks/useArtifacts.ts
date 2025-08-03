@@ -112,13 +112,13 @@ export function useArtifacts(): ArtifactsHook {
       },
       {
         name: 'delete_file',
-        description: 'Delete a file from the virtual filesystem.',
+        description: 'Delete a file or folder from the virtual filesystem. When deleting a folder, all files within it will be deleted.',
         parameters: {
           type: 'object',
           properties: {
             path: {
               type: 'string',
-              description: 'The file path to delete (e.g., /src/index.js)'
+              description: 'The file or folder path to delete (e.g., /src/index.js or /src/components)'
             }
           },
           required: ['path']
@@ -126,28 +126,36 @@ export function useArtifacts(): ArtifactsHook {
         function: async (args: Record<string, unknown>): Promise<string> => {
           const path = args.path as string;
 
-          console.log(`🗑️ Deleting file: ${path}`);
+          console.log(`🗑️ Deleting: ${path}`);
 
           if (!path) {
             return JSON.stringify({ error: 'Path is required' });
           }
 
+          // Check if it's a file or folder
           const file = fs.getFile(path);
-          if (!file) {
-            return JSON.stringify({ error: `File not found: ${path}` });
+          const isFolder = fs.listFiles().some(f => f.path.startsWith(path + '/'));
+          
+          if (!file && !isFolder) {
+            return JSON.stringify({ error: `File or folder not found: ${path}` });
           }
 
           try {
-            fs.deleteFile(path);
-            console.log(`✅ File deleted successfully: ${path}`);
-            return JSON.stringify({ 
-              success: true, 
-              message: `File deleted: ${path}`,
-              path 
-            });
+            const success = fs.deleteFile(path);
+            if (success) {
+              const itemType = file ? 'file' : 'folder';
+              console.log(`✅ ${itemType} deleted successfully: ${path}`);
+              return JSON.stringify({ 
+                success: true, 
+                message: `${itemType} deleted: ${path}`,
+                path 
+              });
+            } else {
+              return JSON.stringify({ error: `Failed to delete: ${path}` });
+            }
           } catch (error) {
-            console.error('❌ Failed to delete file:', error);
-            return JSON.stringify({ error: 'Failed to delete file' });
+            console.error('❌ Failed to delete:', error);
+            return JSON.stringify({ error: 'Failed to delete item' });
           }
         }
       },
@@ -194,11 +202,14 @@ export function useArtifacts(): ArtifactsHook {
           }
 
           try {
-            // Create new file at destination
-            fs.createFile(toPath, sourceFile.content, sourceFile.contentType);
+            // Rename the file (this handles both files and folders)
+            const success = fs.renameFile(fromPath, toPath);
             
-            // Delete original file
-            fs.deleteFile(fromPath);
+            if (!success) {
+              return JSON.stringify({ 
+                error: `Failed to move file from ${fromPath} to ${toPath}. Source may not exist or destination already exists.` 
+              });
+            }
 
             console.log(`✅ File moved successfully from ${fromPath} to ${toPath}`);
             return JSON.stringify({ 

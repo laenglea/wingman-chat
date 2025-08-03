@@ -5,9 +5,10 @@ import { FileSystem, File } from '../types/file';
 export class FileSystemManager {
   constructor(
     private filesystem: FileSystem,
-    private setFilesystem: (fs: FileSystem) => void,
+    private setFilesystem: (fs: (current: FileSystem) => FileSystem) => void,
     private onFileCreated?: (path: string) => void,
-    private onFileDeleted?: (path: string) => void
+    private onFileDeleted?: (path: string) => void,
+    private onFileRenamed?: (oldPath: string, newPath: string) => void
   ) {}
 
   createFile(path: string, content: string, contentType?: string): void {
@@ -20,12 +21,11 @@ export class FileSystemManager {
       updatedAt: now,
     };
 
-    const newFs = {
-      ...this.filesystem,
+    // Use functional update to avoid stale closure issues
+    this.setFilesystem((fs: FileSystem) => ({
+      ...fs,
       [path]: file
-    };
-    
-    this.setFilesystem(newFs);
+    }));
     this.onFileCreated?.(path);
   }
 
@@ -33,28 +33,118 @@ export class FileSystemManager {
     const existingFile = this.filesystem[path];
     if (!existingFile) return false;
 
-    const newFs = {
-      ...this.filesystem,
+    this.setFilesystem((fs: FileSystem) => ({
+      ...fs,
       [path]: {
         ...existingFile,
         content,
         contentType,
         updatedAt: new Date(),
       }
-    };
-    
-    this.setFilesystem(newFs);
+    }));
     return true;
   }
 
   deleteFile(path: string): boolean {
-    if (!this.filesystem[path]) return false;
+    // Check if this is a direct file
+    const isFile = this.filesystem[path];
+    
+    if (isFile) {
+      // Handle single file deletion
+      this.setFilesystem((fs: FileSystem) => {
+        delete fs[path];
+        return fs;
+      });
+      this.onFileDeleted?.(path);
+      return true;
+    }
 
-    const newFs = { ...this.filesystem };
-    delete newFs[path];
-    this.setFilesystem(newFs);
-    this.onFileDeleted?.(path);
-    return true;
+    // Check if this is a folder (has files that start with path + '/')
+    const affectedFiles = this.listFiles().filter(file => 
+      file.path.startsWith(path + '/')
+    );
+
+    if (affectedFiles.length > 0) {
+      // Handle folder deletion - delete all files within the folder
+      this.setFilesystem((fs: FileSystem) => {
+        for (const file of affectedFiles) {
+          delete fs[file.path];
+        }
+        return fs;
+      });
+      
+      // Call the callback for each deleted file
+      for (const file of affectedFiles) {
+        this.onFileDeleted?.(file.path);
+      }
+      
+      return true;
+    }
+
+    // Path doesn't exist as file or folder
+    return false;
+  }
+
+  renameFile(oldPath: string, newPath: string): boolean {
+    // Check if the old path exists (either as a file or folder)
+    const isFile = this.filesystem[oldPath];
+    const isFolder = this.listFiles().some(file => file.path.startsWith(oldPath + '/'));
+    
+    if (!isFile && !isFolder) {
+      return false; // Path doesn't exist
+    }
+
+    if (this.filesystem[newPath]) {
+      return false; // New path already exists
+    }
+
+    if (isFile) {
+      // Handle file rename
+      const file = this.filesystem[oldPath];
+      this.setFilesystem((fs: FileSystem) => {
+        fs[newPath] = {
+          ...file,
+          path: newPath,
+          updatedAt: new Date(),
+        };
+        delete fs[oldPath];
+        return fs;
+      });
+      
+      this.onFileRenamed?.(oldPath, newPath);
+      return true;
+    } else if (isFolder) {
+      // Handle folder rename - rename all files within the folder
+      const affectedFiles = this.listFiles().filter(file => 
+        file.path.startsWith(oldPath + '/')
+      );
+
+      this.setFilesystem((fs: FileSystem) => {
+        for (const file of affectedFiles) {
+          const relativePath = file.path.substring(oldPath.length);
+          const newFilePath = newPath + relativePath;
+          
+          fs[newFilePath] = {
+            ...file,
+            path: newFilePath,
+            updatedAt: new Date(),
+          };
+          delete fs[file.path];
+        }
+        return fs;
+      });
+      
+      // Call the callback for each renamed file
+      for (const file of affectedFiles) {
+        const relativePath = file.path.substring(oldPath.length);
+        const newFilePath = newPath + relativePath;
+        this.onFileRenamed?.(file.path, newFilePath);
+      }
+      
+      return true;
+    }
+
+    return false;
   }
 
   getFile(path: string): File | undefined {

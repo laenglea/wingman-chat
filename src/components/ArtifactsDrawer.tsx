@@ -36,33 +36,8 @@ export function ArtifactsDrawer() {
     openFile(path);
   };
 
-  const handleDeleteFile = (path: string, event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete "${getFileName(path)}"?`)) {
-      fs.deleteFile(path);
-    }
-  };
-
-  const handleBulkDeleteFiles = (paths: string[]) => {
-    if (window.confirm(`Are you sure you want to delete ${paths.length} files?`)) {
-      paths.forEach(path => {
-        fs.deleteFile(path);
-      });
-    }
-  };
-
   const handleOpenFileFromBrowser = (path: string) => {
     openFile(path);
-  };
-
-  const handleRenameFile = (oldPath: string, newPath: string) => {
-    const file = fs.getFile(oldPath);
-    if (file) {
-      fs.createFile(newPath, file.content);
-      closeFile(oldPath);
-      fs.deleteFile(oldPath);
-      openFile(newPath);
-    }
   };
 
   // Drag and drop handlers
@@ -82,8 +57,11 @@ export function ArtifactsDrawer() {
       try {
         const path = `/${file.name}`;
         
-        // Create the file using the original file as a Blob (preserves content and type)
-        fs.createFile(path, file);
+        // Read the file content as text
+        const content = await file.text();
+        
+        // Create the file with string content
+        fs.createFile(path, content, file.type);
         
         // Open the file in a tab
         openFile(path);
@@ -152,23 +130,23 @@ export function ArtifactsDrawer() {
 
     switch (artifactKind(activeFile)) {
       case 'html':
-        return <HtmlEditor blob={file.content} />;
+        return <HtmlEditor content={file.content} />;
       case 'svg':
-        return <SvgEditor blob={file.content} />;
+        return <SvgEditor content={file.content} />;
       case 'csv':
-        return <CsvEditor blob={file.content} />;
+        return <CsvEditor content={file.content} />;
       case 'mermaid':
-        return <MermaidEditor blob={file.content} />;
+        return <MermaidEditor content={file.content} />;
       case 'code':
         return (
           <CodeEditor 
-            blob={file.content} 
+            content={file.content} 
             language={artifactLanguage(file.path)} 
           />
         );
       case 'text':
       default:
-        return <TextEditor blob={file.content} />;
+        return <TextEditor content={file.content} />;
     }
   };
 
@@ -263,13 +241,9 @@ export function ArtifactsDrawer() {
         } flex-shrink-0 overflow-hidden ${showFileBrowser ? 'border-r border-neutral-200 dark:border-neutral-600' : ''}`}>
           {showFileBrowser && (
             <ArtifactsBrowser
-              files={files}
+              fs={fs}
               openTabs={openFiles}
               onFileClick={handleOpenFileFromBrowser}
-              onDeleteFile={handleDeleteFile}
-              onBulkDeleteFiles={handleBulkDeleteFiles}
-              onRenameFile={handleRenameFile}
-              onDownloadAsZip={fs.downloadAsZip}
             />
           )}
         </div>
