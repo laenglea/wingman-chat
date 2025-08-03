@@ -14,9 +14,7 @@ export function useArtifacts(): ArtifactsHook {
   }
 
   const {
-    filesystem,
-    createFile,
-    deleteFile,
+    fs,
     activeTab,
   } = context;
 
@@ -57,7 +55,7 @@ export function useArtifacts(): ArtifactsHook {
           try {
             // Convert string content to Blob
             const blob = new Blob([content], { type: 'text/plain' });
-            createFile(path, blob);
+            fs.createFile(path, blob);
             console.log(`✅ File created successfully: ${path}`);
             return JSON.stringify({ 
               success: true, 
@@ -89,20 +87,17 @@ export function useArtifacts(): ArtifactsHook {
           console.log(`📋 Listing files${directory ? ` in directory: ${directory}` : ''}`);
 
           try {
-            const allFiles = Object.keys(filesystem);
+            const allFiles = fs.listFiles();
             const filteredFiles = directory 
-              ? allFiles.filter(path => path.startsWith(directory))
+              ? allFiles.filter(file => file.path.startsWith(directory))
               : allFiles;
 
-            const fileList = filteredFiles.map(path => {
-              const file = filesystem[path];
-              return {
-                path,
-                size: file.content.size,
-                createdAt: file.createdAt.toISOString(),
-                updatedAt: file.updatedAt.toISOString()
-              };
-            });
+            const fileList = filteredFiles.map(file => ({
+              path: file.path,
+              size: file.content.size,
+              createdAt: file.createdAt.toISOString(),
+              updatedAt: file.updatedAt.toISOString()
+            }));
 
             console.log(`✅ Found ${fileList.length} files`);
             return JSON.stringify({ 
@@ -138,12 +133,13 @@ export function useArtifacts(): ArtifactsHook {
             return JSON.stringify({ error: 'Path is required' });
           }
 
-          if (!filesystem[path]) {
+          const file = fs.getFile(path);
+          if (!file) {
             return JSON.stringify({ error: `File not found: ${path}` });
           }
 
           try {
-            deleteFile(path);
+            fs.deleteFile(path);
             console.log(`✅ File deleted successfully: ${path}`);
             return JSON.stringify({ 
               success: true, 
@@ -183,11 +179,13 @@ export function useArtifacts(): ArtifactsHook {
             return JSON.stringify({ error: 'Both fromPath and toPath are required' });
           }
 
-          if (!filesystem[fromPath]) {
+          const sourceFile = fs.getFile(fromPath);
+          if (!sourceFile) {
             return JSON.stringify({ error: `Source file not found: ${fromPath}` });
           }
 
-          if (filesystem[toPath]) {
+          const destFile = fs.getFile(toPath);
+          if (destFile) {
             return JSON.stringify({ error: `Destination file already exists: ${toPath}` });
           }
 
@@ -197,13 +195,11 @@ export function useArtifacts(): ArtifactsHook {
           }
 
           try {
-            const file = filesystem[fromPath];
-            
             // Create new file at destination
-            createFile(toPath, file.content);
+            fs.createFile(toPath, sourceFile.content);
             
             // Delete original file
-            deleteFile(fromPath);
+            fs.deleteFile(fromPath);
 
             console.log(`✅ File moved successfully from ${fromPath} to ${toPath}`);
             return JSON.stringify({ 
@@ -240,7 +236,7 @@ export function useArtifacts(): ArtifactsHook {
             return JSON.stringify({ error: 'Path is required' });
           }
 
-          const file = filesystem[path];
+          const file = fs.getFile(path);
           if (!file) {
             return JSON.stringify({ error: `File not found: ${path}` });
           }
@@ -320,7 +316,7 @@ export function useArtifacts(): ArtifactsHook {
               });
             }
 
-            const file = filesystem[activeTab];
+            const file = fs.getFile(activeTab);
             if (!file) {
               return JSON.stringify({ 
                 error: `Active file not found: ${activeTab}` 
@@ -351,7 +347,7 @@ export function useArtifacts(): ArtifactsHook {
         }
       }
     ];
-  }, [filesystem, createFile, deleteFile, activeTab]);
+  }, [fs, activeTab]);
   
   return {
     ...context,

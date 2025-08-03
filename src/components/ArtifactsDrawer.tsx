@@ -15,16 +15,12 @@ import { getFileName } from '../lib/utils';
 
 export function ArtifactsDrawer() {
   const { 
-    filesystem, 
+    fs,
     openTabs, 
     activeTab, 
     openTab, 
     closeTab, 
-    setActiveTab,
-    deleteFile,
-    getFile,
-    createFile,
-    downloadAsZip
+    setActiveTab
   } = useArtifacts();
 
   const [showFileBrowser, setShowFileBrowser] = useState(false);
@@ -32,7 +28,7 @@ export function ArtifactsDrawer() {
   const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get all files sorted by path
-  const allFiles = Object.values(filesystem).sort((a, b) => a.path.localeCompare(b.path));
+  const files = fs.listFiles().sort((a, b) => a.path.localeCompare(b.path));
 
   const handleTabClick = (path: string) => {
     if (activeTab === path) {
@@ -44,37 +40,27 @@ export function ArtifactsDrawer() {
   const handleDeleteFile = (path: string, event: React.MouseEvent) => {
     event.stopPropagation();
     if (window.confirm(`Are you sure you want to delete "${getFileName(path)}"?`)) {
-      deleteFile(path);
+      fs.deleteFile(path);
     }
   };
 
   const handleBulkDeleteFiles = (paths: string[]) => {
-    // Delete all files without individual confirmations
-    paths.forEach(path => {
-      deleteFile(path);
-    });
-  };
-
-  const handleOpenFileFromBrowser = (path: string) => {
+    if (window.confirm(`Are you sure you want to delete ${paths.length} files?`)) {
+      paths.forEach(path => {
+        fs.deleteFile(path);
+      });
+    }
+  };  const handleOpenFileFromBrowser = (path: string) => {
     openTab(path);
   };
 
-  const handleRenameFile = (oldPath: string, newPath: string) => {
-    const file = getFile(oldPath);
+    const handleRenameFile = (oldPath: string, newPath: string) => {
+    const file = fs.getFile(oldPath);
     if (file) {
-      // Create new file with new path
-      createFile(newPath, file.content);
-      // Delete old file
-      deleteFile(oldPath);
-      // Update active tab if this file was active
-      if (activeTab === oldPath) {
-        setActiveTab(newPath);
-      }
-      // Update open tabs
-      if (openTabs.includes(oldPath)) {
-        closeTab(oldPath);
-        openTab(newPath);
-      }
+      fs.createFile(newPath, file.content);
+      closeTab(oldPath);
+      fs.deleteFile(oldPath);
+      openTab(newPath);
     }
   };
 
@@ -96,7 +82,7 @@ export function ArtifactsDrawer() {
         const path = `/${file.name}`;
         
         // Create the file using the original file as a Blob (preserves content and type)
-        createFile(path, file);
+        fs.createFile(path, file);
         
         // Open the file in a tab
         openTab(path);
@@ -144,11 +130,11 @@ export function ArtifactsDrawer() {
             No File Selected
           </h3>
           <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
-            {allFiles.length === 0 
+            {files.length === 0 
               ? "Files created by the AI will appear here" 
               : "Select a file from the tabs above or use the file browser"}
           </p>
-          {allFiles.length > 0 && (
+          {files.length > 0 && (
             <Button
               onClick={() => setShowFileBrowser(true)}
               className="px-4 py-2 bg-neutral-800 hover:bg-neutral-900 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-white rounded-lg transition-colors text-sm"
@@ -160,7 +146,7 @@ export function ArtifactsDrawer() {
       );
     }
 
-    const file = getFile(activeTab);
+    const file = fs.getFile(activeTab);
     if (!file) return null;
 
     switch (artifactKind(activeTab)) {
@@ -231,7 +217,7 @@ export function ArtifactsDrawer() {
           {/* Open File Tabs */}
           <div className="flex overflow-x-auto h-full hide-scrollbar" style={{ minWidth: '100%' }}>
             {openTabs.map((path) => {
-              const file = getFile(path);
+              const file = fs.getFile(path);
               if (!file) return null;
               
               const filename = getFileName(path);
@@ -276,13 +262,13 @@ export function ArtifactsDrawer() {
         } flex-shrink-0 overflow-hidden ${showFileBrowser ? 'border-r border-neutral-200 dark:border-neutral-600' : ''}`}>
           {showFileBrowser && (
             <ArtifactsBrowser
-              files={allFiles}
+              files={files}
               openTabs={openTabs}
               onFileClick={handleOpenFileFromBrowser}
               onDeleteFile={handleDeleteFile}
               onBulkDeleteFiles={handleBulkDeleteFiles}
               onRenameFile={handleRenameFile}
-              onDownloadAsZip={downloadAsZip}
+              onDownloadAsZip={fs.downloadAsZip}
             />
           )}
         </div>
