@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { WavStreamPlayer, WavRecorder } from 'wavtools';
-import { Message, Tool } from '../types/chat';
+import { Message, Tool, AttachmentType } from '../types/chat';
 
 /**
  * Hook to manage OpenAI Realtime voice streaming via WebSockets with PCM16.
@@ -86,17 +86,37 @@ export function useVoiceWebSockets(
           console.log(`Adding ${messages.length} messages to conversation history`);
 
           messages.forEach((message) => {
+            const content: Array<{
+              type: 'input_text' | 'text';
+              text: string;
+            }> = [];
+            
+            // Add main message content
+            if (message.content) {
+              content.push({
+                type: message.role === 'user' ? 'input_text' : 'text',
+                text: message.content
+              });
+            }
+            
+            // Add text attachments
+            if (message.attachments) {
+              message.attachments
+                .filter(a => a.type === AttachmentType.Text)
+                .forEach(attachment => {
+                  content.push({
+                    type: message.role === 'user' ? 'input_text' : 'text',
+                    text: `// ${attachment.name}\n${attachment.data}`
+                  });
+                });
+            }
+
             const conversationItem = {
               type: 'conversation.item.create',
               item: {
                 type: 'message',
                 role: message.role,
-                content: [
-                  {
-                    type: message.role === 'user' ? 'input_text' : 'text',
-                    text: message.content ?? ''
-                  }
-                ]
+                content: content
               }
             };
 
