@@ -12,13 +12,10 @@ export class FileSystemManager {
   ) {}
 
   createFile(path: string, content: string, contentType?: string): void {
-    const now = new Date();
     const file: File = {
       path,
       content,
       contentType,
-      createdAt: now,
-      updatedAt: now,
     };
 
     // Use functional update to avoid stale closure issues
@@ -40,7 +37,6 @@ export class FileSystemManager {
         ...existingFile,
         content,
         contentType,
-        updatedAt: new Date(),
       }
     }));
     return true;
@@ -111,7 +107,6 @@ export class FileSystemManager {
         newFs[newPath] = {
           ...file,
           path: newPath,
-          updatedAt: new Date(),
         };
         delete newFs[oldPath];
         return newFs;
@@ -134,7 +129,6 @@ export class FileSystemManager {
           newFs[newFilePath] = {
             ...file,
             path: newFilePath,
-            updatedAt: new Date(),
           };
           delete newFs[file.path];
         }
