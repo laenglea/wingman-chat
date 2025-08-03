@@ -99,6 +99,13 @@ export function ArtifactsDrawer() {
     };
   }, []);
 
+  // Auto-show file browser if there are files but no active file and browser is not already shown
+  useEffect(() => {
+    if (!activeFile && files.length > 0 && !showFileBrowser) {
+      setShowFileBrowser(true);
+    }
+  }, [activeFile, files.length, showFileBrowser]);
+
   // Render the appropriate editor based on file type
   const renderEditor = () => {
     if (!activeFile) {
@@ -111,9 +118,9 @@ export function ArtifactsDrawer() {
           <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">
             {files.length === 0 
               ? "Files created by the AI will appear here" 
-              : "Select a file from the tabs above or use the file browser"}
+              : "Select a file from the browser or tabs above"}
           </p>
-          {files.length > 0 && (
+          {files.length > 0 && !showFileBrowser && (
             <Button
               onClick={() => setShowFileBrowser(true)}
               className="px-4 py-2 bg-neutral-800 hover:bg-neutral-900 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-white rounded-lg transition-colors text-sm"
