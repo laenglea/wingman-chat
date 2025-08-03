@@ -53,9 +53,7 @@ export function useArtifacts(): ArtifactsHook {
           }
 
           try {
-            // Convert string content to Blob
-            const blob = new Blob([content], { type: 'text/plain' });
-            fs.createFile(path, blob);
+            fs.createFile(path, content);
             console.log(`✅ File created successfully: ${path}`);
             return JSON.stringify({ 
               success: true, 
@@ -94,7 +92,8 @@ export function useArtifacts(): ArtifactsHook {
 
             const fileList = filteredFiles.map(file => ({
               path: file.path,
-              size: file.content.size,
+              size: file.content.length,
+              contentType: file.contentType,
               createdAt: file.createdAt.toISOString(),
               updatedAt: file.updatedAt.toISOString()
             }));
@@ -196,7 +195,7 @@ export function useArtifacts(): ArtifactsHook {
 
           try {
             // Create new file at destination
-            fs.createFile(toPath, sourceFile.content);
+            fs.createFile(toPath, sourceFile.content, sourceFile.contentType);
             
             // Delete original file
             fs.deleteFile(fromPath);
@@ -242,19 +241,16 @@ export function useArtifacts(): ArtifactsHook {
           }
 
           try {
-            // Read the blob content as text
-            const textContent = await file.content.text();
-
             const fileInfo = {
               path,
-              size: file.content.size,
-              type: file.content.type,
+              size: file.content.length,
+              content: file.content,
+              contentType: file.contentType,
               createdAt: file.createdAt.toISOString(),
               updatedAt: file.updatedAt.toISOString(),
-              content: textContent
             };
 
-            console.log(`✅ File read successfully: ${path} (${file.content.size} bytes)`);
+            console.log(`✅ File read successfully: ${path} (${file.content.length} chars)`);
             return JSON.stringify({ 
               success: true, 
               file: fileInfo
@@ -323,19 +319,16 @@ export function useArtifacts(): ArtifactsHook {
               });
             }
 
-            // Read the blob content as text
-            const textContent = await file.content.text();
-
             const fileInfo = {
-              path: activeFile,
-              size: file.content.size,
-              type: file.content.type,
+              path: file.path,
+              size: file.content.length,
+              content: file.content,
+              contentType: file.contentType,
               createdAt: file.createdAt.toISOString(),
               updatedAt: file.updatedAt.toISOString(),
-              content: textContent
             };
 
-            console.log(`✅ Current file: ${activeFile} (${file.content.size} bytes)`);
+            console.log(`✅ Current file: ${activeFile} (${file.content.length} chars)`);
             return JSON.stringify({ 
               success: true, 
               currentFile: fileInfo
