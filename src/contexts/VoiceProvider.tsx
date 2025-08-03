@@ -2,6 +2,9 @@ import { useState, useCallback, useEffect } from "react";
 import { useVoiceWebSockets } from "../hooks/useVoiceWebSockets";
 import { useChat } from "../hooks/useChat";
 import { useProfile } from "../hooks/useProfile";
+import { useBridge } from "../hooks/useBridge";
+import { useRepository } from "../hooks/useRepository";
+import { useRepositories } from "../hooks/useRepositories";
 import { getConfig } from "../config";
 import { Role } from "../types/chat";
 import { VoiceContext, VoiceContextType } from './VoiceContext';
@@ -15,6 +18,9 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const [isAvailable, setIsAvailable] = useState(false);
   const { addMessage, messages } = useChat();
   const { generateInstructions } = useProfile();
+  const { bridgeTools, bridgeInstructions } = useBridge();
+  const { currentRepository } = useRepositories();
+  const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
   
   // Check voice availability from config
   useEffect(() => {
@@ -89,7 +95,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
     }
   }, [addMessage]);
 
-  const { start, stop } = useVoiceWebSockets(onUserTranscript, onAssistantTranscript, messages);
+  const { start, stop } = useVoiceWebSockets(onUserTranscript, onAssistantTranscript);
 
   const stopVoice = useCallback(async () => {
     await stop();
@@ -98,10 +104,28 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const startVoice = useCallback(async () => {
     try {
-      // Use profile instructions
-      const instructions = generateInstructions()?.trim() || undefined;
+      const profileInstructions = generateInstructions();
       
-      await start(undefined, undefined, instructions);
+      const repositoryTools = currentRepository ? queryTools() : [];
+      const repositoryInstructions = queryInstructions();
+      
+      const completionTools = [...bridgeTools, ...repositoryTools];
+
+      const instructions: string[] = [];
+
+      if (profileInstructions.trim()) {
+        instructions.push(profileInstructions);
+      }
+
+      if (repositoryInstructions.trim()) {
+        instructions.push(repositoryInstructions);
+      }
+
+      if (bridgeInstructions?.trim()) {
+        instructions.push(bridgeInstructions);
+      }
+      
+      await start(undefined, undefined, instructions.join('\n\n'), messages, completionTools);
       setIsListening(true);
     } catch (error) {
       console.error('Failed to start voice mode:', error);
@@ -113,7 +137,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [start, generateInstructions]);
+  }, [generateInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, start, messages]);
 
   const value: VoiceContextType = {
     isAvailable,
