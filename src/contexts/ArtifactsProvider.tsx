@@ -1,7 +1,7 @@
-import { useState, useCallback, ReactNode, useEffect } from 'react';
+import { useState, useCallback, ReactNode, useEffect, useMemo } from 'react';
 import { ArtifactsContext } from './ArtifactsContext';
-import { File, FileSystem } from '../types/file';
-import { downloadFilesystemAsZip } from '../lib/fs';
+import { FileSystem } from '../types/file';
+import { FileSystemManager } from '../lib/fs';
 import { getConfig } from '../config';
 
 interface ArtifactsProviderProps {
@@ -24,6 +24,14 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
       console.warn('Failed to get artifacts config:', error);
       setIsAvailable(false);
     }
+  }, []);
+
+  // Add setFs function to swap entire filesystem
+  const setFs = useCallback((newFilesystem: FileSystem) => {
+    setFilesystem(newFilesystem);
+    // Reset tabs when filesystem changes
+    setOpenTabs([]);
+    setActiveTab(null);
   }, []);
 
   const openTab = useCallback((path: string) => {
@@ -51,84 +59,30 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     });
   }, [activeTab]);
 
-  const createFile = useCallback((path: string, content: Blob) => {
-    const now = new Date();
-    const file: File = {
-      path,
-      content,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setFilesystem(prev => ({
-      ...prev,
-      [path]: file
-    }));
-
-    // Auto-open the newly created file
-    openTab(path);
-  }, [openTab]);
-
-  const updateFile = useCallback((path: string, content: Blob) => {
-    setFilesystem(prev => {
-      const existingFile = prev[path];
-      if (!existingFile) return prev;
-
-      return {
-        ...prev,
-        [path]: {
-          ...existingFile,
-          content,
-          updatedAt: new Date(),
-        }
-      };
-    });
-  }, []);
-
-  const deleteFile = useCallback((path: string) => {
-    setFilesystem(prev => {
-      const newFs = { ...prev };
-      delete newFs[path];
-      return newFs;
-    });
-
-    // Close tab if it's open
-    closeTab(path);
-  }, [closeTab]);
-
-  const getFile = useCallback((path: string): File | undefined => {
-    return filesystem[path];
-  }, [filesystem]);
+  // Create FileSystemManager instance
+  const fs = useMemo(() => new FileSystemManager(
+    filesystem,
+    setFilesystem,
+    openTab,  // Auto-open newly created files
+    closeTab  // Auto-close tabs when files are deleted
+  ), [filesystem, openTab, closeTab]);
 
   const toggleArtifactsDrawer = useCallback(() => {
     setShowArtifactsDrawer(prev => !prev);
   }, []);
 
-  const downloadAsZip = useCallback(async (filename?: string) => {
-    try {
-      await downloadFilesystemAsZip(filesystem, filename);
-    } catch (error) {
-      console.error('Failed to download filesystem as zip:', error);
-      throw error;
-    }
-  }, [filesystem]);
-
   const value = {
     isAvailable,
-    filesystem,
+    fs,
+    setFs,
     openTabs,
     activeTab,
     showArtifactsDrawer,
-    createFile,
-    updateFile,
-    deleteFile,
     openTab,
     closeTab,
     setActiveTab,
-    getFile,
     setShowArtifactsDrawer,
     toggleArtifactsDrawer,
-    downloadAsZip,
   };
 
   return (

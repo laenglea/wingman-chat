@@ -1,5 +1,80 @@
 import JSZip from 'jszip';
-import { FileSystem } from '../types/file';
+import { FileSystem, File } from '../types/file';
+
+// FileSystem extension methods
+export class FileSystemManager {
+  constructor(
+    private filesystem: FileSystem,
+    private setFilesystem: (fs: FileSystem) => void,
+    private onFileCreated?: (path: string) => void,
+    private onFileDeleted?: (path: string) => void
+  ) {}
+
+  createFile(path: string, content: Blob): void {
+    const now = new Date();
+    const file: File = {
+      path,
+      content,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const newFs = {
+      ...this.filesystem,
+      [path]: file
+    };
+    
+    this.setFilesystem(newFs);
+    this.onFileCreated?.(path);
+  }
+
+  updateFile(path: string, content: Blob): boolean {
+    const existingFile = this.filesystem[path];
+    if (!existingFile) return false;
+
+    const newFs = {
+      ...this.filesystem,
+      [path]: {
+        ...existingFile,
+        content,
+        updatedAt: new Date(),
+      }
+    };
+    
+    this.setFilesystem(newFs);
+    return true;
+  }
+
+  deleteFile(path: string): boolean {
+    if (!this.filesystem[path]) return false;
+
+    const newFs = { ...this.filesystem };
+    delete newFs[path];
+    this.setFilesystem(newFs);
+    this.onFileDeleted?.(path);
+    return true;
+  }
+
+  getFile(path: string): File | undefined {
+    return this.filesystem[path];
+  }
+
+  listFiles(): File[] {
+    return Object.values(this.filesystem);
+  }
+
+  fileExists(path: string): boolean {
+    return path in this.filesystem;
+  }
+
+  getFileCount(): number {
+    return Object.keys(this.filesystem).length;
+  }
+
+  async downloadAsZip(filename?: string): Promise<void> {
+    return downloadFilesystemAsZip(this.filesystem, filename);
+  }
+}
 
 export async function downloadFilesystemAsZip(
   filesystem: FileSystem, 
