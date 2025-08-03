@@ -19,7 +19,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const [isAvailable, setIsAvailable] = useState(false);
   const { addMessage, messages } = useChat();
   const { generateInstructions } = useProfile();
-  const { artifactsTools } = useArtifacts();
+  const { artifactsTools, isEnabled: isArtifactsEnabled } = useArtifacts();
   const { bridgeTools, bridgeInstructions } = useBridge();
   const { currentRepository } = useRepositories();
   const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
@@ -107,11 +107,13 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const startVoice = useCallback(async () => {
     try {
       const profileInstructions = generateInstructions();
+
+      const filesTools = isArtifactsEnabled ? artifactsTools() : [];
       
       const repositoryTools = currentRepository ? queryTools() : [];
       const repositoryInstructions = queryInstructions();
       
-      const completionTools = [...bridgeTools, ...repositoryTools, ...artifactsTools()];
+      const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools];
 
       const instructions: string[] = [];
 
@@ -139,7 +141,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [generateInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, artifactsTools, bridgeInstructions, start, messages]);
+  }, [generateInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, artifactsTools, bridgeInstructions, start, messages, isArtifactsEnabled]);
 
   const value: VoiceContextType = {
     isAvailable,
