@@ -5,7 +5,6 @@ import remarkBreaks from 'remark-breaks';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import { MermaidRenderer } from './MermaidRenderer';
-import { CardRenderer } from './CardRenderer';
 import { CodeRenderer } from './CodeRenderer';
 import { HtmlRenderer } from './HtmlRenderer';
 import { CsvRenderer } from './CsvRenderer';
@@ -202,19 +201,6 @@ const components: Partial<Components> = {
 
         if (language === "csv" || language === "tsv") {
             return <CsvRenderer csv={text} language={language} />;
-        }
-
-        if (language === "adaptivecard" || language === "adaptive-card") {
-            return <CardRenderer cardJson={text} />;
-        }
-
-        // Auto-detect Adaptive Cards in JSON blocks using regex for faster detection
-        if (language === "json") {
-            // Fast regex check for Adaptive Card schema without full JSON parsing
-            const adaptiveCardRegex = /['"]\$schema['"]\s*:\s*['"].*adaptivecards\.io.*['"]|['"]type['"]\s*:\s*['"]AdaptiveCard['"]/;
-            if (adaptiveCardRegex.test(text)) {
-                return <CardRenderer cardJson={text} />;
-            }
         }
 
         // Use CodeRenderer for all other code blocks
