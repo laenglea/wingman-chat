@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { flushSync } from "react-dom";
 import { Plus as PlusIcon, Mic, MicOff, Package, PackageOpen, AlertTriangle, Info, BookText, BookOpenText } from "lucide-react";
 import { Button, Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { getConfig } from "../config";
@@ -39,23 +38,97 @@ export function ChatPage() {
   // Only need backgroundImage to check if background should be shown
   const { backgroundImage } = useBackground();
   
-  // Master filesystem state - managed here in ChatPage
-  const [filesystem, setFilesystem] = useState<FileSystem>({});
-  
-  // Create FileSystemManager with current chat's filesystem
+  // Get chatId for stable reference
+  const chatId = chat?.id;
+
+  // Create a ref to access latest chats without causing re-renders
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
+
+  // Create FileSystemManager that directly uses chat.files as single source of truth
   const fileSystemManager = useMemo(() => {
-    const getFs = () => filesystem;
-    const setFs = (newFs: FileSystem) => {
-      flushSync(() => {
-        setFilesystem(newFs);
-      });
+    console.log(`🔧 Creating FileSystemManager:`, {
+      chatId,
+      artifactsAvailable,
+      hasChats: chatsRef.current.length > 0,
+      currentChat: chatsRef.current.find(c => c.id === chatId)
+    });
+    
+    if (!artifactsAvailable) {
+      console.log(`🚫 Not creating FileSystemManager: artifactsAvailable=${artifactsAvailable}`);
+      return null;
+    }
+    
+    // If no chatId yet, create a temporary FileSystemManager for initial file creation
+    if (!chatId) {
+      console.log(`🔄 Creating temporary FileSystemManager for initial state`);
       
-      // Update the chat with new files when filesystem changes
-      if (chat) {
-        updateChat(chat.id, { files: newFs });
-      }
+      // Temporary filesystem storage
+      let tempFs: FileSystem = {};
+      
+      const getFs = () => tempFs;
+      
+      const setFs = (newFs: FileSystem) => {
+        console.log(`🔧 Temporary setFs called:`, {
+          newFsFiles: Object.keys(newFs).length,
+          currentFiles: Object.keys(tempFs).length,
+          newFsPaths: Object.keys(newFs),
+          currentPaths: Object.keys(tempFs)
+        });
+        
+        // Merge into temporary filesystem
+        tempFs = { ...tempFs, ...newFs };
+        
+        console.log(`🔧 Temporary filesystem updated:`, {
+          totalFiles: Object.keys(tempFs).length,
+          filePaths: Object.keys(tempFs)
+        });
+        
+        // If no chat yet, transfer temporary files into a newly created chat
+        if (!chatId) {
+          console.log(`🔄 No chat yet, creating chat for temporary files`);
+          const newChat = createChat();
+          updateChat(newChat.id, { files: tempFs });
+        }
+      };
+
+      return new FileSystemManager(
+        getFs, 
+        setFs,
+        openFile,   // Auto-open newly created files
+        closeFile,  // Auto-close deleted files
+        undefined   // File rename handling
+      );
+    }
+    
+    const getFs = () => {
+      // Always get fresh data from the current chat using ref
+      const currentChat = chatsRef.current.find(c => c.id === chatId);
+      return currentChat?.files || {};
     };
     
+    const setFs = (newFs: FileSystem) => {
+      // Get the latest chat data and merge filesystem using ref
+      const currentChat = chatsRef.current.find(c => c.id === chatId);
+      const currentFiles = currentChat?.files || {};
+      
+      console.log(`🔧 setFs called:`, {
+        newFsFiles: Object.keys(newFs).length,
+        currentFiles: Object.keys(currentFiles).length,
+        newFsPaths: Object.keys(newFs),
+        currentPaths: Object.keys(currentFiles)
+      });
+      
+      const mergedFs = { ...currentFiles, ...newFs };
+      console.log(`🔧 Merged filesystem:`, {
+        mergedFiles: Object.keys(mergedFs).length,
+        mergedPaths: Object.keys(mergedFs)
+      });
+      
+      updateChat(chatId, { files: mergedFs });
+    };
+
+    console.log(`✅ Creating FileSystemManager for chat ${chatId}`);
     return new FileSystemManager(
       getFs, 
       setFs,
@@ -63,32 +136,16 @@ export function ChatPage() {
       closeFile,  // Auto-close deleted files
       undefined   // File rename handling - let ArtifactsProvider handle this internally
     );
-  }, [filesystem, chat, updateChat, openFile, closeFile]);
+  }, [chatId, createChat, updateChat, openFile, closeFile, artifactsAvailable]);
 
   // Set the filesystem manager in context
   useEffect(() => {
-    if (artifactsAvailable) {
-      setFileSystemManager(fileSystemManager);
-    } else {
-      setFileSystemManager(null);
-    }
+    setFileSystemManager(fileSystemManager);
     
     return () => {
       setFileSystemManager(null);
     };
-  }, [artifactsAvailable, fileSystemManager, setFileSystemManager]);
-  
-  // Sync filesystem with current chat files
-  useEffect(() => {
-    if (!artifactsAvailable || !chat) {
-      setFilesystem({});
-      return;
-    }
-
-    // Load chat files into filesystem state
-    const chatFiles = chat.files || {};
-    setFilesystem(chatFiles);
-  }, [chat, artifactsAvailable]);
+  }, [fileSystemManager, setFileSystemManager]);
   
   // Local state for voice mode (UI state)
   const [isVoiceMode, setIsVoiceMode] = useState(false);

@@ -3,7 +3,7 @@ import { FileSystemManager } from '../lib/fs';
 
 export interface ArtifactsContextType {
   isAvailable: boolean;
-  fs: FileSystemManager;
+  fs: FileSystemManager | null;
   openFiles: string[];
   activeFile: string | null;
   showArtifactsDrawer: boolean;
