@@ -3,15 +3,18 @@ import { FileSystem, File } from '../types/file';
 
 // FileSystem extension methods
 export class FileSystemManager {
+
   constructor(
-    private filesystem: FileSystem,
-    private setFilesystem: (fs: FileSystem) => void,
+    private getFilesystem: () => FileSystem,
+    private setFilesystem: (fs: FileSystem) => void | Promise<void>,
     private onFileCreated?: (path: string) => void,
     private onFileDeleted?: (path: string) => void,
     private onFileRenamed?: (oldPath: string, newPath: string) => void
   ) {}
 
   createFile(path: string, content: string, contentType?: string): void {
+    const fs = this.getFilesystem();
+    
     const now = new Date();
     const file: File = {
       path,
@@ -22,20 +25,22 @@ export class FileSystemManager {
     };
 
     const newFs = {
-      ...this.filesystem,
+      ...fs,
       [path]: file
     };
     
-    this.setFilesystem(newFs);
+    this.setFilesystem(newFs);  // This now uses flushSync internally
     this.onFileCreated?.(path);
   }
 
   updateFile(path: string, content: string, contentType?: string): boolean {
-    const existingFile = this.filesystem[path];
+    const fs = this.getFilesystem();
+
+    const existingFile = fs[path];
     if (!existingFile) return false;
 
     const newFs = {
-      ...this.filesystem,
+      ...fs,
       [path]: {
         ...existingFile,
         content,
@@ -49,12 +54,14 @@ export class FileSystemManager {
   }
 
   deleteFile(path: string): boolean {
+    const fs = this.getFilesystem();
+
     // Check if this is a direct file
-    const isFile = this.filesystem[path];
+    const isFile = fs[path];
     
     if (isFile) {
       // Handle single file deletion
-      const newFs = { ...this.filesystem };
+      const newFs = { ...fs };
       delete newFs[path];
       this.setFilesystem(newFs);
       this.onFileDeleted?.(path);
@@ -68,7 +75,7 @@ export class FileSystemManager {
 
     if (affectedFiles.length > 0) {
       // Handle folder deletion - delete all files within the folder
-      const newFs = { ...this.filesystem };
+      const newFs = { ...fs };
       
       for (const file of affectedFiles) {
         delete newFs[file.path];
@@ -89,23 +96,25 @@ export class FileSystemManager {
   }
 
   renameFile(oldPath: string, newPath: string): boolean {
+    const fs = this.getFilesystem();
+    
     // Check if the old path exists (either as a file or folder)
-    const isFile = this.filesystem[oldPath];
+    const isFile = fs[oldPath];
     const isFolder = this.listFiles().some(file => file.path.startsWith(oldPath + '/'));
     
     if (!isFile && !isFolder) {
       return false; // Path doesn't exist
     }
 
-    if (this.filesystem[newPath]) {
+    if (fs[newPath]) {
       return false; // New path already exists
     }
 
-    const newFs = { ...this.filesystem };
+    const newFs = { ...fs };
 
     if (isFile) {
       // Handle file rename
-      const file = this.filesystem[oldPath];
+      const file = fs[oldPath];
       newFs[newPath] = {
         ...file,
         path: newPath,
@@ -150,23 +159,23 @@ export class FileSystemManager {
   }
 
   getFile(path: string): File | undefined {
-    return this.filesystem[path];
+    return this.getFilesystem()[path];
   }
 
   listFiles(): File[] {
-    return Object.values(this.filesystem);
+    return Object.values(this.getFilesystem());
   }
 
   fileExists(path: string): boolean {
-    return path in this.filesystem;
+    return path in this.getFilesystem();
   }
 
   getFileCount(): number {
-    return Object.keys(this.filesystem).length;
+    return Object.keys(this.getFilesystem()).length;
   }
 
   async downloadAsZip(filename?: string): Promise<void> {
-    return downloadFilesystemAsZip(this.filesystem, filename);
+    return downloadFilesystemAsZip(this.getFilesystem(), filename);
   }
 }
 

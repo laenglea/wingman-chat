@@ -86,6 +86,7 @@ export function useChats() {
       updated: new Date(),
       model: null,
       messages: [],
+      files: {},
     };
 
     setChats((prev) => [chat, ...prev]);

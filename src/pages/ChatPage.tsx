@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { flushSync } from "react-dom";
 import { Plus as PlusIcon, Mic, MicOff, Package, PackageOpen, AlertTriangle, Info, BookText, BookOpenText } from "lucide-react";
 import { Button, Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import { getConfig } from "../config";
@@ -18,22 +19,76 @@ import { useRepositories } from "../hooks/useRepositories";
 import { useArtifacts } from "../hooks/useArtifacts";
 import { RepositoryDrawer } from "../components/RepositoryDrawer";
 import { ArtifactsDrawer } from "../components/ArtifactsDrawer";
+import { FileSystemManager } from "../lib/fs";
+import { FileSystem } from "../types/file";
 
 export function ChatPage() {
   const {
     chat,
     messages,
     createChat,
-    chats
+    chats,
+    updateChat
   } = useChat();
   
   const { layoutMode } = useLayout();
   const { isAvailable: voiceAvailable, startVoice, stopVoice } = useVoice();
-  const { isAvailable: artifactsAvailable, showArtifactsDrawer, toggleArtifactsDrawer } = useArtifacts();
+  const { isAvailable: artifactsAvailable, showArtifactsDrawer, toggleArtifactsDrawer, openFile, closeFile, setFileSystemManager } = useArtifacts();
   const { isAvailable: repositoryAvailable, toggleRepositoryDrawer, showRepositoryDrawer } = useRepositories();
   
   // Only need backgroundImage to check if background should be shown
   const { backgroundImage } = useBackground();
+  
+  // Master filesystem state - managed here in ChatPage
+  const [filesystem, setFilesystem] = useState<FileSystem>({});
+  
+  // Create FileSystemManager with current chat's filesystem
+  const fileSystemManager = useMemo(() => {
+    const getFs = () => filesystem;
+    const setFs = (newFs: FileSystem) => {
+      flushSync(() => {
+        setFilesystem(newFs);
+      });
+      
+      // Update the chat with new files when filesystem changes
+      if (chat) {
+        updateChat(chat.id, { files: newFs });
+      }
+    };
+    
+    return new FileSystemManager(
+      getFs, 
+      setFs,
+      openFile,   // Auto-open newly created files
+      closeFile,  // Auto-close deleted files
+      undefined   // File rename handling - let ArtifactsProvider handle this internally
+    );
+  }, [filesystem, chat, updateChat, openFile, closeFile]);
+
+  // Set the filesystem manager in context
+  useEffect(() => {
+    if (artifactsAvailable) {
+      setFileSystemManager(fileSystemManager);
+    } else {
+      setFileSystemManager(null);
+    }
+    
+    return () => {
+      setFileSystemManager(null);
+    };
+  }, [artifactsAvailable, fileSystemManager, setFileSystemManager]);
+  
+  // Sync filesystem with current chat files
+  useEffect(() => {
+    if (!artifactsAvailable || !chat) {
+      setFilesystem({});
+      return;
+    }
+
+    // Load chat files into filesystem state
+    const chatFiles = chat.files || {};
+    setFilesystem(chatFiles);
+  }, [chat, artifactsAvailable]);
   
   // Local state for voice mode (UI state)
   const [isVoiceMode, setIsVoiceMode] = useState(false);
