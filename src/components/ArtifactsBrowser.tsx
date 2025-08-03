@@ -352,7 +352,7 @@ function FileTreeNode({
 }
 
 interface ArtifactsBrowserProps {
-  fs: FileSystemManager;
+  fs: FileSystemManager | null;
   openTabs: string[];
   onFileClick: (path: string) => void;
   onDeleteFile?: (path: string, event: React.MouseEvent) => void;
@@ -375,14 +375,14 @@ export function ArtifactsBrowser({
   const handleDeleteFile = onDeleteFile || ((path: string, event: React.MouseEvent) => {
     event.stopPropagation();
     if (window.confirm(`Are you sure you want to delete "${getFileName(path)}"?`)) {
-      fs.deleteFile(path); // FileSystemManager handles file deletion
+      fs?.deleteFile(path); // FileSystemManager handles file deletion
     }
   });
 
-  const handleDownloadAsZip = onDownloadAsZip || (() => fs.downloadAsZip());
+  const handleDownloadAsZip = onDownloadAsZip || (() => fs?.downloadAsZip());
 
   // Get all files from the file system
-  const files = fs.listFiles();
+  const files = fs ? fs.listFiles() : [];
 
   // Build the file tree
   const fileTree = buildFileTree(files);
@@ -399,7 +399,7 @@ export function ArtifactsBrowser({
     
     if (window.confirm(confirmMessage)) {
       // FileSystemManager's deleteFile now handles folders automatically
-      const success = fs.deleteFile(path);
+      const success = fs?.deleteFile(path);
       
       if (success) {
         // Clean up expanded folders state
@@ -431,7 +431,7 @@ export function ArtifactsBrowser({
       onRenameFile(oldPath, newPath);
     } else {
       // FileSystemManager's renameFile now handles both files and folders automatically
-      const success = fs.renameFile(oldPath, newPath);
+      const success = fs?.renameFile(oldPath, newPath);
       if (!success) {
         console.error(`Failed to rename ${oldPath} to ${newPath}`);
         return;

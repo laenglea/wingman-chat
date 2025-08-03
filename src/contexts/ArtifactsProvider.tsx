@@ -54,9 +54,19 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     setShowArtifactsDrawer(prev => !prev);
   }, []);
 
+  // Add debugging to setFileSystemManager
+  const debugSetFileSystemManager = useCallback((manager: FileSystemManager | null) => {
+    console.log(`🔧 ArtifactsProvider: Setting FileSystemManager:`, {
+      isNull: manager === null,
+      managerType: manager?.constructor?.name,
+      isAvailable
+    });
+    setFileSystemManager(manager);
+  }, [isAvailable]);
+
   const value = {
     isAvailable,
-    fs: fileSystemManager!,
+    fs: fileSystemManager,
     openFiles,
     activeFile,
     showArtifactsDrawer,
@@ -64,7 +74,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     closeFile,
     setShowArtifactsDrawer,
     toggleArtifactsDrawer,
-    setFileSystemManager,
+    setFileSystemManager: debugSetFileSystemManager,
   };
 
   return (

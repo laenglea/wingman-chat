@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { flushSync } from 'react-dom';
 import { FileSystem, File } from '../types/file';
 
 // FileSystem extension methods
@@ -13,24 +14,41 @@ export class FileSystemManager {
   ) {}
 
   createFile(path: string, content: string, contentType?: string): void {
-    const fs = this.getFilesystem();
-    
-    const now = new Date();
-    const file: File = {
-      path,
-      content,
-      contentType,
-      createdAt: now,
-      updatedAt: now,
+    // Use a callback approach to ensure we're always working with the latest state
+    const createFileWithLatestState = () => {
+      const fs = this.getFilesystem();
+      console.log(`🔍 Creating ${path}, current fs has ${Object.keys(fs).length} files:`, Object.keys(fs));
+      
+      const now = new Date();
+      const file: File = {
+        path,
+        content,
+        contentType,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const newFs = {
+        ...fs,
+        [path]: file
+      };
+      
+      console.log(`📦 New fs will have ${Object.keys(newFs).length} files:`, Object.keys(newFs));
+      console.log(`📦 About to call setFilesystem with:`, newFs);
+      
+      this.setFilesystem(newFs);
+      
+      // Verify the filesystem was updated
+      setTimeout(() => {
+        const verifyFs = this.getFilesystem();
+        console.log(`✅ After update, fs has ${Object.keys(verifyFs).length} files:`, Object.keys(verifyFs));
+      }, 10); // Increased timeout to 10ms
+      
+      this.onFileCreated?.(path);
     };
 
-    const newFs = {
-      ...fs,
-      [path]: file
-    };
-    
-    this.setFilesystem(newFs);  // This now uses flushSync internally
-    this.onFileCreated?.(path);
+    // Use flushSync to ensure immediate execution
+    flushSync(createFileWithLatestState);
   }
 
   updateFile(path: string, content: string, contentType?: string): boolean {
@@ -49,7 +67,9 @@ export class FileSystemManager {
       }
     };
     
-    this.setFilesystem(newFs);
+    flushSync(() => {
+      this.setFilesystem(newFs);
+    });
     return true;
   }
 
@@ -63,7 +83,9 @@ export class FileSystemManager {
       // Handle single file deletion
       const newFs = { ...fs };
       delete newFs[path];
-      this.setFilesystem(newFs);
+      flushSync(() => {
+        this.setFilesystem(newFs);
+      });
       this.onFileDeleted?.(path);
       return true;
     }
@@ -81,7 +103,9 @@ export class FileSystemManager {
         delete newFs[file.path];
       }
       
-      this.setFilesystem(newFs);
+      flushSync(() => {
+        this.setFilesystem(newFs);
+      });
       
       // Call the callback for each deleted file
       for (const file of affectedFiles) {
@@ -122,7 +146,9 @@ export class FileSystemManager {
       };
       delete newFs[oldPath];
       
-      this.setFilesystem(newFs);
+      flushSync(() => {
+        this.setFilesystem(newFs);
+      });
       this.onFileRenamed?.(oldPath, newPath);
       return true;
     } else if (isFolder) {
@@ -143,7 +169,9 @@ export class FileSystemManager {
         delete newFs[file.path];
       }
 
-      this.setFilesystem(newFs);
+      flushSync(() => {
+        this.setFilesystem(newFs);
+      });
       
       // Call the callback for each renamed file
       for (const file of affectedFiles) {

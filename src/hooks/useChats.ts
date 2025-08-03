@@ -94,11 +94,15 @@ export function useChats() {
     return chat;
   }
 
-  function updateChat(chatId: string, updates: Partial<Chat>) {
+  function updateChat(chatId: string, updates: Partial<Chat> | ((chat: Chat) => Partial<Chat>)): void {
     setChats((prev) =>
-      prev.map((chat) =>
-        chat.id === chatId ? { ...chat, ...updates, updated: new Date() } : chat
-      )
+      prev.map((chat) => {
+        if (chat.id === chatId) {
+          const updatedData = typeof updates === 'function' ? updates(chat) : updates;
+          return { ...chat, ...updatedData, updated: new Date() };
+        }
+        return chat;
+      })
     );
   }
 
