@@ -63,13 +63,20 @@ export function useVoiceWebSockets(
             },
 
             turn_detection: {
-              type: 'semantic_vad',
+              type: 'server_vad',
+              threshold: 0.7,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 700,
               create_response: true,
               interrupt_response: true,
             },
 
+            input_audio_noise_reduction: {
+              type: "near_field"
+            },
+
             ...(instructions && { instructions: instructions }),
-            ...(tools && tools.length > 0 && { 
+            ...(tools && tools.length > 0 && {
               tools: tools.map(tool => ({
                 type: 'function',
                 name: tool.name,
@@ -90,7 +97,7 @@ export function useVoiceWebSockets(
               type: 'input_text' | 'text';
               text: string;
             }> = [];
-            
+
             // Add main message content
             if (message.content) {
               content.push({
@@ -98,7 +105,7 @@ export function useVoiceWebSockets(
                 text: message.content
               });
             }
-            
+
             // Add text attachments
             if (message.attachments) {
               message.attachments
@@ -202,15 +209,15 @@ export function useVoiceWebSockets(
 
           case 'response.output_item.done':
             console.log('Response output item done:', msg.item);
-            
+
             // Handle function calls
             if (msg.item?.type === 'function_call' && tools) {
               const tool = tools.find(t => t.name === msg.item.name);
               if (tool && msg.item.arguments) {
                 console.log(`Executing tool: ${tool.name} with arguments:`, msg.item.arguments);
-                
+
                 let output: string;
-                
+
                 try {
                   const args = JSON.parse(msg.item.arguments);
                   const result = await tool.function(args);
@@ -221,7 +228,7 @@ export function useVoiceWebSockets(
                   const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
                   output = JSON.stringify({ error: errorMessage });
                 }
-                
+
                 // Send the function result back to the conversation
                 const functionOutput = {
                   type: 'conversation.item.create',
@@ -231,12 +238,12 @@ export function useVoiceWebSockets(
                     output: output
                   }
                 };
-                
+
                 // Best effort - try to send without checking state
                 try {
                   eventWs.send(JSON.stringify(functionOutput));
                   console.log('Function output sent:', output);
-                  
+
                   // Trigger response generation after sending function result
                   eventWs.send(JSON.stringify({
                     type: 'response.create'
