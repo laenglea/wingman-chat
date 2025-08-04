@@ -95,32 +95,43 @@ export function ProfileProvider({ children }: ProfileProviderProps) {
   };
 
   const generateInstructionsFromSettings = (settings: ProfileSettings): string => {
-    const parts: string[] = [];
+    const instructions: string[] = [];
     
     if (settings.name || settings.role || settings.profile) {
-      parts.push('This is the profile of the user you are chatting with:');
-      parts.push('```text');
+      instructions.push('````text');
       
       if (settings.name) {
-        parts.push(`My name is ${settings.name}.`);
+        instructions.push(`My name is ${settings.name.trim()}.`);
       }
       
       if (settings.role) {
-        parts.push(`I am a ${settings.role}.`);
+        instructions.push(`I am a ${settings.role.trim()}.`);
       }
       
       if (settings.profile) {
-        parts.push(`About me: ${settings.profile}`);
+        instructions.push(`About me: ${settings.profile.trim()}`);
       }
       
-      parts.push('```');
+      instructions.push('````');
+      instructions.push('');
     }
     
     if (settings.traits && settings.traits.length > 0) {
-      parts.push(`Please be ${settings.traits.join(', ')} when responding to the user.`);
+      instructions.push(`Please be ${settings.traits.join(', ')} when responding to the user.`);
     }
     
-    return parts.join('\n');
+    // Return empty string if no instructions
+    if (instructions.length === 0) {
+      return '';
+    }
+    
+   return `
+## User Profile
+
+This is the profile of the user you are chatting with:
+
+${instructions.join('\n')}
+`.trim();
   };
 
   return (
