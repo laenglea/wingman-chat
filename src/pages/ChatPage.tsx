@@ -103,13 +103,13 @@ export function ChatPage() {
       // getFilesystem: returns current filesystem state from chat.files
       () => {
         const currentChat = getCurrentChatRef.current();
-        return currentChat?.files || {};
+        return currentChat?.artifacts || {};
       },
       
       // setFilesystem: updates chat.files through functional updateChat
       (updater: (current: FileSystem) => FileSystem) => {
         updateChat(chatId, (currentChat: Chat) => ({
-          files: updater(currentChat.files || {})
+          artifacts: updater(currentChat.artifacts || {})
         }));
       }
     );
