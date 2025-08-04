@@ -19,11 +19,11 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const [isAvailable, setIsAvailable] = useState(false);
   const { addMessage, messages } = useChat();
   const { generateInstructions } = useProfile();
-  const { artifactsTools, isEnabled: isArtifactsEnabled } = useArtifacts();
+  const { artifactsTools, artifactsInstructions, isEnabled: isArtifactsEnabled } = useArtifacts();
   const { bridgeTools, bridgeInstructions } = useBridge();
   const { currentRepository } = useRepositories();
   const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
-  
+
   // Check voice availability from config
   useEffect(() => {
     try {
@@ -34,10 +34,10 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       setIsAvailable(false);
     }
   }, []);
-  
+
   const onUserTranscript = useCallback((text: string) => {
     let content = text;
-    
+
     // Handle case where text might be a JSON string or object
     try {
       // First, check if it's already a string that looks like JSON
@@ -53,14 +53,14 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       // If parsing fails, use the original text
       content = text;
     }
-    
+
     // Additional check: if content is still an object, try to extract text
     if (typeof content === 'object' && content !== null && 'text' in content) {
       content = (content as { text: string }).text;
     }
-    
+
     console.log('User transcript:', { original: text, processed: content });
-    
+
     if (content.trim()) {
       addMessage({ role: Role.User, content });
     }
@@ -68,7 +68,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const onAssistantTranscript = useCallback((text: string) => {
     let content = text;
-    
+
     // Handle case where text might be a JSON string or object
     try {
       // First, check if it's already a string that looks like JSON
@@ -84,14 +84,14 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       // If parsing fails, use the original text
       content = text;
     }
-    
+
     // Additional check: if content is still an object, try to extract text
     if (typeof content === 'object' && content !== null && 'text' in content) {
       content = (content as { text: string }).text;
     }
-    
+
     console.log('Assistant transcript:', { original: text, processed: content });
-    
+
     if (content.trim()) {
       addMessage({ role: Role.Assistant, content });
     }
@@ -109,10 +109,11 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       const profileInstructions = generateInstructions();
 
       const filesTools = isArtifactsEnabled ? artifactsTools() : [];
-      
+      const filesInstructions = isArtifactsEnabled ? artifactsInstructions() : '';
+
       const repositoryTools = currentRepository ? queryTools() : [];
-      const repositoryInstructions = queryInstructions();
-      
+      const repositoryInstructions = currentRepository ? queryInstructions() : '';
+
       const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools];
 
       const instructions: string[] = [];
@@ -121,14 +122,18 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         instructions.push(profileInstructions);
       }
 
+      if (filesInstructions.trim()) {
+        instructions.push(filesInstructions);
+      }
+
       if (repositoryInstructions.trim()) {
         instructions.push(repositoryInstructions);
       }
 
-      if (bridgeInstructions?.trim()) {
+      if (bridgeTools.length > 0 && bridgeInstructions?.trim()) {
         instructions.push(bridgeInstructions);
       }
-      
+
       await start(undefined, undefined, instructions.join('\n\n'), messages, completionTools);
       setIsListening(true);
     } catch (error) {
@@ -141,7 +146,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [generateInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, artifactsTools, bridgeInstructions, start, messages, isArtifactsEnabled]);
+  }, [generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, start, messages]);
 
   const value: VoiceContextType = {
     isAvailable,

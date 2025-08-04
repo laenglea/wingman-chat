@@ -21,7 +21,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { models, selectedModel, setSelectedModel } = useModels();
   const { chats, createChat: createChatHook, updateChat, deleteChat: deleteChatHook } = useChats();
   const { currentRepository } = useRepositories();
-  const { artifactsTools, isEnabled: isArtifactsEnabled } = useArtifacts();
+  const { artifactsTools, artifactsInstructions, isEnabled: isArtifactsEnabled } = useArtifacts();
   const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
   const { bridgeTools, bridgeInstructions } = useBridge();
   const { generateInstructions } = useProfile();
@@ -113,11 +113,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
       try {
         const profileInstructions = generateInstructions();
-
+        
         const filesTools = isArtifactsEnabled ? artifactsTools() : [];
+        const filesInstructions = isArtifactsEnabled ? artifactsInstructions() : '';
         
         const repositoryTools = currentRepository ? queryTools() : [];
-        const repositoryInstructions = queryInstructions();
+        const repositoryInstructions = currentRepository ? queryInstructions() : '';
 
         const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...(tools || [])];
 
@@ -127,11 +128,15 @@ export function ChatProvider({ children }: ChatProviderProps) {
           instructions.push(profileInstructions);
         }
 
+        if ( filesInstructions.trim()) {
+          instructions.push(filesInstructions);
+        }
+
         if (repositoryInstructions.trim()) {
           instructions.push(repositoryInstructions);
         }
 
-        if (bridgeInstructions?.trim()) {
+        if (bridgeTools.length > 0 && bridgeInstructions?.trim()) {
           instructions.push(bridgeInstructions);
         }
         
@@ -158,7 +163,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
         updateChat(id, () => ({ messages: [...conversation, errorMessage] }));
       }
-    }, [getOrCreateChat, chats, updateChat, generateInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, artifactsTools, bridgeInstructions, client, model, isArtifactsEnabled]);
+    }, [getOrCreateChat, chats, updateChat, generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, client, model]);
 
   const value: ChatContextType = {
     // Models

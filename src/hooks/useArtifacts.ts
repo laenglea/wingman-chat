@@ -4,6 +4,7 @@ import { Tool } from '../types/chat';
 
 export interface ArtifactsHook extends ArtifactsContextType {
   artifactsTools: () => Tool[];
+  artifactsInstructions: () => string;
   isEnabled: boolean;
 }
 
@@ -369,11 +370,45 @@ export function useArtifacts(): ArtifactsHook {
     ];
   }, [fs, activeFile]);
 
+  const artifactsInstructions = useCallback((): string => {
+    return `
+## Artifacts File System Instructions
+
+You have access to a virtual file system through the artifacts tools. Use these tools to create, manage, and organize files for the user.
+
+### Available Tools:
+- **create_file**: Create new files with specified content
+- **list_files**: List all files or files in a specific directory
+- **read_file**: Read the content of a specific file
+- **delete_file**: Delete files or entire folders
+- **move_file**: Move or rename files
+- **current_path**: Get the currently active file path
+- **current_file**: Get information about the currently active file
+
+### Best Practices:
+1. **File Paths**: Always use absolute paths starting with "/" (e.g., /src/index.js)
+2. **Organization**: Create logical directory structures (e.g., /src, /components, /utils)
+3. **File Types**: The system supports various file types including code files, text, JSON, XML, etc.
+4. **Safety**: Use list_files before creating to avoid overwriting existing files
+5. **Current Context**: Use current_file to understand what the user is currently viewing
+6. **Read Before Edit**: Don't try to edit an existing file without reading it first, so you can make changes properly
+
+### Common Workflows:
+- Create a new project: Start with create_file for main files like /index.html or /src/main.js
+- Explore existing files: Use list_files to see the structure, then read_file for specific content
+- Refactor: Use move_file to reorganize, delete_file to clean up
+- Debugging: Use current_file to see what the user is currently focused on
+
+The user can view and interact with these files through the artifacts drawer interface.
+`.trim();
+  }, []);
+
   const isEnabled = context.isAvailable && (context.showArtifactsDrawer || (fs !== null && fs.listFiles().length > 0));
   
   return {
     ...context,
     artifactsTools,
+    artifactsInstructions,
     isEnabled,
   };
 }
