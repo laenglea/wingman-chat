@@ -346,7 +346,7 @@ export function ChatPage() {
 
         {/* Full-width waves during voice mode */}
         {isVoiceMode && (
-          <div className={`fixed bottom-0 left-0 h-32 z-20 pointer-events-none bg-gradient-to-t from-white via-white/80 to-transparent dark:from-neutral-900 dark:via-neutral-900/80 dark:to-transparent transition-all duration-300 ease-out ${
+          <div className={`fixed bottom-0 left-0 h-32 z-20 pointer-events-none transition-all duration-300 ease-out ${
             showArtifactsDrawer ? 'right-0 md:right-[calc(70vw+0.75rem)]' :
             showRepositoryDrawer ? 'right-0 md:right-[calc(20rem+0.75rem)]' : 'right-0'
           }`}>
