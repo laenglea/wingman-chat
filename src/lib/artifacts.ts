@@ -4,12 +4,35 @@ export type ArtifactKind = 'text' | 'code' | 'svg' | 'html' | 'csv' | 'mermaid' 
 // Helper function to get the language/extension from a file path
 export function artifactLanguage(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() || '';
+  const basename = path.split('/').pop()?.toLowerCase() || '';
+  
+  // Handle Dockerfile files
+  if (basename === 'dockerfile' || basename.startsWith('dockerfile.')) {
+    return 'dockerfile';
+  }
+  
+  // Handle Makefile files
+  if (basename === 'makefile' || basename.startsWith('makefile.')) {
+    return 'makefile';
+  }
+  
   return ext;
 }
 
 // Helper function to determine the kind of artifact based on file extension
-export function artifactKind(filename: string): ArtifactKind {
-  const ext = filename.split('.').pop()?.toLowerCase();
+export function artifactKind(path: string): ArtifactKind {
+  const ext = path.split('.').pop()?.toLowerCase() || '';
+  const basename = path.split('/').pop()?.toLowerCase() || '';
+  
+  // Dockerfile files (check for exact names)
+  if (basename === 'dockerfile' || basename.startsWith('dockerfile.')) {
+    return 'code';
+  }
+  
+  // Makefile files (check for exact names)
+  if (basename === 'makefile' || basename.startsWith('makefile.')) {
+    return 'code';
+  }
   
   // HTML files
   if (ext === 'html' || ext === 'htm') {
