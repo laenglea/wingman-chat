@@ -33,6 +33,8 @@ interface modelConfig {
   name: string;
 
   description?: string;
+
+  prompts?: string[];
 }
 
 interface ttsConfig {
@@ -122,6 +124,8 @@ export const loadConfig = async (): Promise<Config | undefined> => {
 
           name: model.name,
           description: model.description,
+
+          prompts: model.prompts,
         };
       }) ?? [],
 

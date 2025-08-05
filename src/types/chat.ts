@@ -5,6 +5,8 @@ export type Model = {
     name: string;
     
     description?: string;
+    
+    prompts?: string[];
 }
 
 export type Message = {

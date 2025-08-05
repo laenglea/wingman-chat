@@ -146,8 +146,12 @@ export function ChatInput() {
       let suggestions: string[];
       
       if (messages.length === 0) {
-        // For new chats, get common/popular prompts
-        suggestions = await client.relatedPrompts(model.id, "");
+        // For new chats, use model prompts if available, otherwise get related prompts
+        if (model.prompts && model.prompts.length > 0) {
+          suggestions = model.prompts;
+        } else {
+          suggestions = await client.relatedPrompts(model.id, "");
+        }
       } else {
         // Get the last few messages for context
         const contextMessages = messages.slice(-6);
