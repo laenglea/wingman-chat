@@ -78,6 +78,9 @@ export function ChatPage() {
     dependencies: [chat, messages],
   });
 
+  // Ref to track chat input height for dynamic padding
+  const [chatInputHeight, setChatInputHeight] = useState(112); // Default to pb-28 (7rem = 112px)
+
   // Ref to get current chat without causing effect dependencies
   const getCurrentChatRef = useRef<() => Chat | null>(() => null);
   
@@ -254,6 +257,59 @@ export function ChatPage() {
     prevMessagesLengthRef.current = messages.length;
   }, [messages.length, enableAutoScroll]);
 
+  // Observer for chat input height changes to adjust message container padding
+  useEffect(() => {
+    const observeHeight = () => {
+      // Find the chat input container by looking for the form element in the footer
+      const footerElement = document.querySelector('footer form');
+      if (footerElement) {
+        // Get the actual height of the chat input container
+        const height = footerElement.getBoundingClientRect().height;
+        // Add some extra padding (16px) for breathing room
+        setChatInputHeight(height + 16);
+      }
+    };
+
+    // Initial measurement after a short delay to ensure DOM is ready
+    const timer = setTimeout(observeHeight, 100);
+
+    // Create a MutationObserver to watch for changes in the footer area
+    const mutationObserver = new MutationObserver(() => {
+      observeHeight();
+    });
+
+    // Use ResizeObserver to watch for height changes
+    const resizeObserver = new ResizeObserver(observeHeight);
+
+    // Start observing once the footer element exists
+    const startObserving = () => {
+      const footerElement = document.querySelector('footer form');
+      if (footerElement) {
+        resizeObserver.observe(footerElement);
+        mutationObserver.observe(footerElement, { 
+          childList: true, 
+          subtree: true, 
+          characterData: true 
+        });
+      } else {
+        // If footer doesn't exist yet, try again after a short delay
+        setTimeout(startObserving, 50);
+      }
+    };
+
+    startObserving();
+
+    // Also listen for window resize as a fallback
+    window.addEventListener('resize', observeHeight);
+
+    return () => {
+      clearTimeout(timer);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener('resize', observeHeight);
+    };
+  }, []);
+
   return (
     <div className="h-full w-full flex overflow-hidden relative">
       <BackgroundImage opacity={messages.length === 0 ? 80 : 0} />
@@ -292,11 +348,11 @@ export function ChatPage() {
               ref={containerRef}
               onScroll={handleScroll}
             >
-              <div className={`px-3 pt-18 pb-28 ${
+              <div className={`px-3 pt-18 transition-all duration-150 ease-out ${
                 layoutMode === 'wide'
                   ? 'max-w-full md:max-w-[80vw] mx-auto' 
                   : 'max-content-width'
-              }`}>
+              }`} style={{ paddingBottom: `${chatInputHeight}px` }}>
                 {(() => {
                   try {
                     const config = getConfig();
