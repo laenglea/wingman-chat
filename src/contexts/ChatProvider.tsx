@@ -7,7 +7,6 @@ import { useRepository } from "../hooks/useRepository";
 import { useArtifacts } from "../hooks/useArtifacts";
 import { useBridge } from "../hooks/useBridge";
 import { useProfile } from "../hooks/useProfile";
-import { useCommonTools } from "../hooks/useCommonTools";
 import { getConfig } from "../config";
 import { ChatContext, ChatContextType } from './ChatContext';
 
@@ -26,7 +25,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
   const { bridgeTools, bridgeInstructions } = useBridge();
   const { generateInstructions } = useProfile();
-  const { commonTools } = useCommonTools();
   const [chatId, setChatId] = useState<string | null>(null);
   const messagesRef = useRef<Message[]>([]);
 
@@ -122,7 +120,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const repositoryTools = currentRepository ? queryTools() : [];
         const repositoryInstructions = currentRepository ? queryInstructions() : '';
 
-        const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...commonTools(), ...(tools || [])];
+        const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...(tools || [])];
 
         const instructions: string[] = [];
 
@@ -165,7 +163,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
         updateChat(id, () => ({ messages: [...conversation, errorMessage] }));
       }
-    }, [getOrCreateChat, chats, updateChat, generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, commonTools, client, model]);
+    }, [getOrCreateChat, chats, updateChat, generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, client, model]);
 
   const value: ChatContextType = {
     // Models

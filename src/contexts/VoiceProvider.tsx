@@ -5,7 +5,6 @@ import { useProfile } from "../hooks/useProfile";
 import { useBridge } from "../hooks/useBridge";
 import { useRepository } from "../hooks/useRepository";
 import { useRepositories } from "../hooks/useRepositories";
-import { useCommonTools } from "../hooks/useCommonTools";
 import { getConfig } from "../config";
 import { Role } from "../types/chat";
 import { VoiceContext, VoiceContextType } from './VoiceContext';
@@ -24,7 +23,6 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const { bridgeTools, bridgeInstructions } = useBridge();
   const { currentRepository } = useRepositories();
   const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
-  const { commonTools } = useCommonTools();
 
   // Check voice availability from config
   useEffect(() => {
@@ -116,7 +114,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       const repositoryTools = currentRepository ? queryTools() : [];
       const repositoryInstructions = currentRepository ? queryInstructions() : '';
 
-      const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...commonTools()];
+      const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools];
 
       const instructions: string[] = [];
 
@@ -148,7 +146,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, commonTools, start, messages]);
+  }, [generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, start, messages]);
 
   const value: VoiceContextType = {
     isAvailable,
