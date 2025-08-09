@@ -149,62 +149,10 @@ const NonMemoizedHtmlRenderer = ({ html, language }: HtmlRendererProps) => {
     </script>`;
 
     const defaultStyles = `<style>
+      /* Absolute minimal reset - only remove browser defaults, no color overrides */
       html, body {
         margin: 0;
         padding: 0;
-        font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-        line-height: 1.6;
-      }
-      
-      body {
-        padding: 1rem;
-      }
-      
-      /* Default light mode styles */
-      body {
-        color: #374151;
-        background-color: #ffffff;
-      }
-      
-      /* Dark mode styles */
-      .dark body {
-        color: #d1d5db;
-        background-color: #171717;
-      }
-      
-      /* Only apply defaults if no explicit colors are set */
-      body:not([style*="color"]):not([class*="text-"]) {
-        color: #374151;
-      }
-      
-      .dark body:not([style*="color"]):not([class*="text-"]) {
-        color: #d1d5db;
-      }
-      
-      body:not([style*="background"]):not([class*="bg-"]) {
-        background-color: #ffffff;
-      }
-      
-      .dark body:not([style*="background"]):not([class*="bg-"]) {
-        background-color: #171717;
-      }
-      
-      /* Default styling for common elements */
-      h1, h2, h3, h4, h5, h6 {
-        color: inherit;
-      }
-      
-      p, div, span {
-        color: inherit;
-      }
-      
-      /* Links */
-      a {
-        color: #3b82f6;
-      }
-      
-      .dark a {
-        color: #60a5fa;
       }
     </style>`;
 
