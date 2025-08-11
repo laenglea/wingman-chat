@@ -100,6 +100,11 @@ export class Client {
 
     while (completion.choices[0].message?.tool_calls?.length ?? 0 > 0) {
       for (const toolCall of completion.choices[0].message.tool_calls ?? []) {
+        // Type guard to ensure we're working with a function tool call
+        if (toolCall.type !== 'function') {
+          continue;
+        }
+
         const tool = tools.find((t) => t.name === toolCall.function.name);
 
         if (!tool) {

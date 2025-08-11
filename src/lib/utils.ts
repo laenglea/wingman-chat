@@ -145,6 +145,7 @@ export const documentTypes = [
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".msg",
 ];
 
 export const supportedTypes = [...textTypes, ...imageTypes, ...documentTypes];
