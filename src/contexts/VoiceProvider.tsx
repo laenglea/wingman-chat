@@ -3,6 +3,7 @@ import { useVoiceWebSockets } from "../hooks/useVoiceWebSockets";
 import { useChat } from "../hooks/useChat";
 import { useProfile } from "../hooks/useProfile";
 import { useBridge } from "../hooks/useBridge";
+import { useSearch } from "../hooks/useSearch";
 import { useRepository } from "../hooks/useRepository";
 import { useRepositories } from "../hooks/useRepositories";
 import { getConfig } from "../config";
@@ -21,6 +22,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const { generateInstructions } = useProfile();
   const { artifactsTools, artifactsInstructions, isEnabled: isArtifactsEnabled } = useArtifacts();
   const { bridgeTools, bridgeInstructions } = useBridge();
+  const { searchTools, searchInstructions } = useSearch();
   const { currentRepository } = useRepositories();
   const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
 
@@ -114,7 +116,10 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       const repositoryTools = currentRepository ? queryTools() : [];
       const repositoryInstructions = currentRepository ? queryInstructions() : '';
 
-      const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools];
+      const webSearchTools = searchTools();
+      const webSearchInstructions = searchInstructions();
+
+      const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...webSearchTools];
 
       const instructions: string[] = [];
 
@@ -134,6 +139,10 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         instructions.push(bridgeInstructions);
       }
 
+      if (webSearchTools.length > 0 && webSearchInstructions?.trim()) {
+        instructions.push(webSearchInstructions);
+      }
+
       await start(undefined, undefined, instructions.join('\n\n'), messages, completionTools);
       setIsListening(true);
     } catch (error) {
@@ -146,7 +155,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, start, messages]);
+  }, [generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, searchTools, searchInstructions, start, messages]);
 
   const value: VoiceContextType = {
     isAvailable,
