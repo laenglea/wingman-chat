@@ -33,6 +33,10 @@ func main() {
 	voice := os.Getenv("VOICE_ENABLED") == "true"
 	vision := os.Getenv("VISION_ENABLED") == "true"
 
+	internet := os.Getenv("INTERNET_ENABLED") == "true"
+	internetIndex := os.Getenv("INTERNET_INDEX")
+	internetExtractor := os.Getenv("INTERNET_EXTRACTOR")
+
 	artifacts := os.Getenv("ARTIFACTS_ENABLED") == "true"
 
 	repository := os.Getenv("REPOSITORY_ENABLED") == "true"
@@ -78,6 +82,12 @@ func main() {
 			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 		}
 
+		type internetType struct {
+			Enabled   bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+			Index     string `json:"index,omitempty" yaml:"index,omitempty"`
+			Extractor string `json:"extractor,omitempty" yaml:"extractor,omitempty"`
+		}
+
 		type repositoryType struct {
 			Enabled   bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 			Embedder  string `json:"embedder,omitempty" yaml:"embedder,omitempty"`
@@ -106,6 +116,7 @@ func main() {
 			Vision *visionType `json:"vision,omitempty" yaml:"vision,omitempty"`
 
 			Bridge     *bridgeType     `json:"bridge,omitempty" yaml:"bridge,omitempty"`
+			Internet   *internetType   `json:"internet,omitempty" yaml:"internet,omitempty"`
 			Artifacts  *artifactsType  `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
 			Repository *repositoryType `json:"repository,omitempty" yaml:"repository,omitempty"`
 			Translator *translatorType `json:"translator,omitempty" yaml:"translator,omitempty"`
@@ -164,6 +175,14 @@ func main() {
 		if artifacts {
 			config.Artifacts = &artifactsType{
 				Enabled: true,
+			}
+		}
+
+		if internet {
+			config.Internet = &internetType{
+				Enabled:   true,
+				Index:     internetIndex,
+				Extractor: internetExtractor,
 			}
 		}
 

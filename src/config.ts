@@ -23,9 +23,9 @@ interface config {
   vision?: visionConfig;
   
   bridge?: bridgeConfig;
+  internet?: internetConfig;
   artifacts?: artifactsConfig;
-  repository?: repositoryConfig;
-  search?: searchConfig;
+  repository?: repositoryConfig;  
   translator?: translatorConfig;
 }
 
@@ -58,6 +58,12 @@ interface bridgeConfig {
   url: string;
 }
 
+interface internetConfig {
+  enabled: boolean;
+  index?: string;
+  extractor?: string;
+}
+
 interface repositoryConfig {
   enabled: boolean;
   embedder?: string;
@@ -66,11 +72,6 @@ interface repositoryConfig {
 
 interface artifactsConfig {
   enabled: boolean;
-}
-
-interface searchConfig {
-  enabled: boolean;
-  index?: string;
 }
 
 interface translatorConfig {
@@ -94,9 +95,9 @@ interface Config {
   
   bridge: Bridge;
 
+  internet: internetConfig;
   artifacts: artifactsConfig;
-  repository: repositoryConfig;
-  search: searchConfig;
+  repository: repositoryConfig;  
   translator: translatorConfig; 
 
   backgrounds: backgroundPackConfig;
@@ -144,19 +145,19 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       
       bridge: bridge,
 
-      artifacts: cfg.artifacts ?? {
-        enabled: false
+      internet: cfg.internet ?? {
+        enabled: false,
+        index: "exa"
       },
 
       repository: cfg.repository ?? {
         enabled: false
       },
 
-      search: cfg.search ?? {
-        enabled: false,
-        index: "exa"
+      artifacts: cfg.artifacts ?? {
+        enabled: false
       },
-
+      
       translator: cfg.translator ?? {
         enabled: true,
 
