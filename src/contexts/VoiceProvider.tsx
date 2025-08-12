@@ -1,15 +1,10 @@
 import { useState, useCallback, useEffect } from "react";
 import { useVoiceWebSockets } from "../hooks/useVoiceWebSockets";
 import { useChat } from "../hooks/useChat";
-import { useProfile } from "../hooks/useProfile";
-import { useBridge } from "../hooks/useBridge";
-import { useSearch } from "../hooks/useSearch";
-import { useRepository } from "../hooks/useRepository";
-import { useRepositories } from "../hooks/useRepositories";
+import { useChatContext } from "../hooks/useChatContext";
 import { getConfig } from "../config";
 import { Role } from "../types/chat";
 import { VoiceContext, VoiceContextType } from './VoiceContext';
-import { useArtifacts } from "../hooks/useArtifacts";
 
 interface VoiceProviderProps {
   children: React.ReactNode;
@@ -19,12 +14,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const [isListening, setIsListening] = useState(false);
   const [isAvailable, setIsAvailable] = useState(false);
   const { addMessage, messages } = useChat();
-  const { generateInstructions } = useProfile();
-  const { artifactsTools, artifactsInstructions, isEnabled: isArtifactsEnabled } = useArtifacts();
-  const { bridgeTools, bridgeInstructions } = useBridge();
-  const { searchTools, searchInstructions } = useSearch();
-  const { currentRepository } = useRepositories();
-  const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
+  const { tools: chatTools, instructions: chatInstructions } = useChatContext();
 
   // Check voice availability from config
   useEffect(() => {
@@ -108,42 +98,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const startVoice = useCallback(async () => {
     try {
-      const profileInstructions = generateInstructions();
-
-      const filesTools = isArtifactsEnabled ? artifactsTools() : [];
-      const filesInstructions = isArtifactsEnabled ? artifactsInstructions() : '';
-
-      const repositoryTools = currentRepository ? queryTools() : [];
-      const repositoryInstructions = currentRepository ? queryInstructions() : '';
-
-      const webSearchTools = searchTools();
-      const webSearchInstructions = searchInstructions();
-
-      const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...webSearchTools];
-
-      const instructions: string[] = [];
-
-      if (profileInstructions.trim()) {
-        instructions.push(profileInstructions);
-      }
-
-      if (filesInstructions.trim()) {
-        instructions.push(filesInstructions);
-      }
-
-      if (repositoryInstructions.trim()) {
-        instructions.push(repositoryInstructions);
-      }
-
-      if (bridgeTools.length > 0 && bridgeInstructions?.trim()) {
-        instructions.push(bridgeInstructions);
-      }
-
-      if (webSearchTools.length > 0 && webSearchInstructions?.trim()) {
-        instructions.push(webSearchInstructions);
-      }
-
-      await start(undefined, undefined, instructions.join('\n\n'), messages, completionTools);
+      await start(undefined, undefined, chatInstructions, messages, chatTools);
       setIsListening(true);
     } catch (error) {
       console.error('Failed to start voice mode:', error);
@@ -155,7 +110,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, searchTools, searchInstructions, start, messages]);
+  }, [chatInstructions, chatTools, start, messages]);
 
   const value: VoiceContextType = {
     isAvailable,

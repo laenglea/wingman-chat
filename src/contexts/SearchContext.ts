@@ -2,8 +2,9 @@ import { createContext } from "react";
 import { Tool } from "../types/chat";
 
 export interface SearchContextType {
-  isSearchEnabled: boolean;
-  setSearchEnabled: (enabled: boolean) => void;
+  isEnabled: boolean;
+  setEnabled: (enabled: boolean) => void;
+  isAvailable: boolean;
   searchTools: () => Tool[];
   searchInstructions: () => string;
 }

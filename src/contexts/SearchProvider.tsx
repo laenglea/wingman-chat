@@ -1,4 +1,4 @@
-import { useState, ReactNode, useCallback } from "react";
+import { useState, ReactNode, useCallback, useEffect } from "react";
 import { SearchContext, SearchContextType } from "./SearchContext";
 import { Tool } from "../types/chat";
 import { getConfig } from "../config";
@@ -8,12 +8,24 @@ interface SearchProviderProps {
 }
 
 export function SearchProvider({ children }: SearchProviderProps) {
-  const [isSearchEnabled, setSearchEnabled] = useState(false);
+  const [isEnabled, setEnabled] = useState(false);
+  const [isAvailable, setIsAvailable] = useState(false);
   const config = getConfig();
   const client = config.client;
 
+  // Check search availability from config
+  useEffect(() => {
+    try {
+      const config = getConfig();
+      setIsAvailable(config.search.enabled);
+    } catch (error) {
+      console.warn('Failed to get search config:', error);
+      setIsAvailable(false);
+    }
+  }, []);
+
   const searchTools = useCallback((): Tool[] => {
-    if (!isSearchEnabled) {
+    if (!isEnabled) {
       return [];
     }
 
@@ -61,19 +73,20 @@ export function SearchProvider({ children }: SearchProviderProps) {
         }
       }
     ];
-  }, [isSearchEnabled, client]);
+  }, [isEnabled, client]);
 
   const searchInstructions = useCallback((): string => {
-    if (!isSearchEnabled) {
+    if (!isEnabled) {
       return "";
     }
 
     return "You have access to web search functionality. Use the web_search tool when you need current information, recent events, or specific facts that may not be in your training data. Always search when the user asks for recent information, current events, or specific factual data.";
-  }, [isSearchEnabled]);
+  }, [isEnabled]);
 
   const contextValue: SearchContextType = {
-    isSearchEnabled,
-    setSearchEnabled,
+    isEnabled,
+    setEnabled,
+    isAvailable,
     searchTools,
     searchInstructions,
   };

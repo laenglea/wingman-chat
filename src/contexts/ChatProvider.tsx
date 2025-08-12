@@ -1,13 +1,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { Message, Model, Tool, Role } from "../types/chat";
+import { Message, Model, Role } from "../types/chat";
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
-import { useRepositories } from "../hooks/useRepositories";
-import { useRepository } from "../hooks/useRepository";
-import { useArtifacts } from "../hooks/useArtifacts";
-import { useBridge } from "../hooks/useBridge";
-import { useSearch } from "../hooks/useSearch";
-import { useProfile } from "../hooks/useProfile";
+import { useChatContext } from "../hooks/useChatContext";
 import { getConfig } from "../config";
 import { ChatContext, ChatContextType } from './ChatContext';
 
@@ -21,12 +16,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   const { models, selectedModel, setSelectedModel } = useModels();
   const { chats, createChat: createChatHook, updateChat, deleteChat: deleteChatHook } = useChats();
-  const { currentRepository } = useRepositories();
-  const { artifactsTools, artifactsInstructions, isEnabled: isArtifactsEnabled } = useArtifacts();
-  const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
-  const { bridgeTools, bridgeInstructions } = useBridge();
-  const { searchTools, searchInstructions } = useSearch();
-  const { generateInstructions } = useProfile();
+  const { tools: chatTools, instructions: chatInstructions } = useChatContext();
   const [chatId, setChatId] = useState<string | null>(null);
   const messagesRef = useRef<Message[]>([]);
 
@@ -105,7 +95,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   );
 
   const sendMessage = useCallback(
-    async (message: Message, tools?: Tool[]) => {
+    async (message: Message) => {
       const { id, chat: chatObj } = getOrCreateChat();
 
       const existingMessages = chats.find(c => c.id === id)?.messages || [];
@@ -114,46 +104,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
       updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: '' }] }));
 
       try {
-        const profileInstructions = generateInstructions();
-        
-        const filesTools = isArtifactsEnabled ? artifactsTools() : [];
-        const filesInstructions = isArtifactsEnabled ? artifactsInstructions() : '';
-        
-        const repositoryTools = currentRepository ? queryTools() : [];
-        const repositoryInstructions = currentRepository ? queryInstructions() : '';
-
-        const webSearchTools = searchTools();
-        const webSearchInstructions = searchInstructions();
-
-        const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...webSearchTools, ...(tools || [])];
-
-        const instructions: string[] = [];
-
-        if (profileInstructions.trim()) {
-          instructions.push(profileInstructions);
-        }
-
-        if ( filesInstructions.trim()) {
-          instructions.push(filesInstructions);
-        }
-
-        if (repositoryInstructions.trim()) {
-          instructions.push(repositoryInstructions);
-        }
-
-        if (bridgeTools.length > 0 && bridgeInstructions?.trim()) {
-          instructions.push(bridgeInstructions);
-        }
-
-        if (webSearchTools.length > 0 && webSearchInstructions?.trim()) {
-          instructions.push(webSearchInstructions);
-        }
-        
         const completion = await client.complete(
           model!.id,
-          instructions.join('\n\n'),
+          chatInstructions,
           conversation,
-          completionTools,
+          chatTools,
           (_, snapshot) => updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: snapshot }] }))
         );
 
@@ -172,7 +127,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
         updateChat(id, () => ({ messages: [...conversation, errorMessage] }));
       }
-    }, [getOrCreateChat, chats, updateChat, generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, searchTools, searchInstructions, client, model]);
+    }, [getOrCreateChat, chats, updateChat, chatTools, chatInstructions, client, model]);
 
   const value: ChatContextType = {
     // Models
