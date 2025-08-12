@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect, useMemo } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check, Search } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check, Globe } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../types/chat";
 import {
@@ -608,12 +608,12 @@ export function ChatInput() {
                     : 'text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
                 }`}
                 onClick={() => setSearchEnabled(!isSearchEnabled)}
-                title={isSearchEnabled ? 'Disable web search' : 'Enable web search'}
+                title={isSearchEnabled ? 'Disable internet access' : 'Enable internet access'}
               >
-                <Search size={14} />
+                <Globe size={14} />
                 {isSearchEnabled && (
                   <span className="hidden sm:inline">
-                    Search
+                    Internet
                   </span>
                 )}
               </Button>
