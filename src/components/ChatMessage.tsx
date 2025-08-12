@@ -1,10 +1,12 @@
 import { Markdown } from './Markdown';
 import { CopyButton } from './CopyButton';
+import { ShareButton } from './ShareButton';
 import { PlayButton } from './PlayButton';
 import { File } from "lucide-react";
 
 import { AttachmentType, Message, Role } from "../types/chat";
 import { getConfig } from "../config";
+import { canShare } from "../lib/share";
 
 type ChatMessageProps = {
   message: Message;
@@ -16,6 +18,8 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
   
   const config = getConfig();
   const enableTTS = config.tts;
+  
+  const canShareMessage = canShare("Shared Message", message.content?.replace(/'/g, "'") || "");
 
   if (!isUser && !message.content) {
     return (
@@ -87,6 +91,7 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
             props.isLast ? 'chat-message-actions !opacity-100' : 'chat-message-actions opacity-0'
           }`}>
             <div className="flex items-center gap-2">
+              {canShareMessage && <ShareButton text={message.content} className="h-4 w-4" />}
               <CopyButton text={message.content} className="h-4 w-4" />
               {enableTTS && <PlayButton text={message.content} className="h-4 w-4" />}
             </div>
