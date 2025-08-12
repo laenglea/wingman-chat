@@ -17,7 +17,7 @@ export function SearchProvider({ children }: SearchProviderProps) {
   useEffect(() => {
     try {
       const config = getConfig();
-      setIsAvailable(config.search.enabled);
+      setIsAvailable(config.internet.enabled);
     } catch (error) {
       console.warn('Failed to get search config:', error);
       setIsAvailable(false);
@@ -46,8 +46,12 @@ export function SearchProvider({ children }: SearchProviderProps) {
         function: async (args: Record<string, unknown>) => {
           const { query } = args;
           
+          console.log("[web_search] Starting search", { query, index: config.internet.index });
+          
           try {
-            const results = await client.search(config.search.index || "", { text: query as string });
+            const results = await client.search(config.internet.index || "", { text: query as string });
+            
+            console.log("[web_search] Search completed successfully", { query, resultsCount: results.length });
             
             if (results.length === 0) {
               return "No search results found for the given query.";
@@ -55,20 +59,61 @@ export function SearchProvider({ children }: SearchProviderProps) {
 
             return JSON.stringify(results, null, 2);
           } catch (error) {
-            console.error("Web search failed:", error);
+            console.error("[web_search] Search failed", { query, error: error instanceof Error ? error.message : error });
             return `Web search failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          }
+        }
+      },
+      {
+        name: "web_scraper",
+        description: "Scrape and extract text content from a specific webpage URL",
+        parameters: {
+          type: "object",
+          properties: {
+            url: {
+              type: "string",
+              description: "The URL of the webpage to scrape and extract text content from"
+            }
+          },
+          required: ["url"]
+        },
+        function: async (args: Record<string, unknown>) => {
+          const { url } = args;
+          
+          console.log("[web_scraper] Starting scrape", { url });
+          
+          try {
+            const content = await client.fetchText(url as string);
+            
+            console.log("[web_scraper] Scrape completed successfully", { url, contentLength: content.length });
+            
+            if (!content.trim()) {
+              return "No text content could be extracted from the provided URL.";
+            }
+
+            return content;
+          } catch (error) {
+            console.error("[web_scraper] Scrape failed", { url, error: error instanceof Error ? error.message : error });
+            return `Web scraping failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
           }
         }
       }
     ];
-  }, [isEnabled, client, config.search.index]);
+  }, [isEnabled, client, config.internet.index]);
 
   const searchInstructions = useCallback((): string => {
     if (!isEnabled) {
       return "";
     }
 
-    return "You have access to web search functionality. Use the web_search tool when you need current information, recent events, or specific facts that may not be in your training data. Always search when the user asks for recent information, current events, or specific factual data.";
+    return `
+      You have access to web search and web scraping functionality.
+      
+      - Use the web_search tool when you need current information, recent events, or specific facts that may not be in your training data.      
+      - Use the web_scraper tool when you need to extract the full text content from a specific webpage URL.
+      
+      Always search when the user asks for recent information, current events, or specific factual data.
+    `.trim();
   }, [isEnabled]);
 
   const contextValue: SearchContextType = {

@@ -242,6 +242,23 @@ Return only the prompts themselves, without numbering or bullet points.`,
     return resp.text();
   }
 
+  async fetchText(url: string): Promise<string> {
+    const data = new FormData();
+    data.append("url", url);
+    data.append("format", "text");
+
+    const resp = await fetch(new URL("/api/v1/extract", window.location.origin), {
+      method: "POST",
+      body: data,
+    });
+
+    if (!resp.ok) {
+      throw new Error(`Fetch request failed with status ${resp.status}`);
+    }
+
+    return resp.text();
+  }
+
   async segmentText(blob: Blob): Promise<string[]> {
     const data = new FormData();
     data.append("file", blob);
