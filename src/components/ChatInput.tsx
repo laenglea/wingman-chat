@@ -31,7 +31,7 @@ export function ChatInput() {
   const { currentRepository, setCurrentRepository } = useRepositories();
   const { profile } = useSettings();
   const { isAvailable: isScreenCaptureAvailable, isActive: isContinuousCaptureActive, startCapture, stopCapture, captureFrame } = useScreenCapture();
-  const { isEnabled: isSearchEnabled, setEnabled: setSearchEnabled } = useSearch();
+  const { isAvailable: isSearchAvailable, isEnabled: isSearchEnabled, setEnabled: setSearchEnabled } = useSearch();
 
   const [content, setContent] = useState("");
   const [transcribingContent, setTranscribingContent] = useState(false);
@@ -599,23 +599,25 @@ export function ChatInput() {
           </div>
 
           <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              className={`p-1.5 flex items-center gap-1.5 text-xs font-medium transition-all duration-300 ${
-                isSearchEnabled 
-                  ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 bg-blue-100/80 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-lg' 
-                  : 'text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
-              }`}
-              onClick={() => setSearchEnabled(!isSearchEnabled)}
-              title={isSearchEnabled ? 'Disable web search' : 'Enable web search'}
-            >
-              <Search size={14} />
-              {isSearchEnabled && (
-                <span className="hidden sm:inline">
-                  Search
-                </span>
-              )}
-            </Button>
+            {isSearchAvailable && (
+              <Button
+                type="button"
+                className={`p-1.5 flex items-center gap-1.5 text-xs font-medium transition-all duration-300 ${
+                  isSearchEnabled 
+                    ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 bg-blue-100/80 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-lg' 
+                    : 'text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
+                }`}
+                onClick={() => setSearchEnabled(!isSearchEnabled)}
+                title={isSearchEnabled ? 'Disable web search' : 'Enable web search'}
+              >
+                <Search size={14} />
+                {isSearchEnabled && (
+                  <span className="hidden sm:inline">
+                    Search
+                  </span>
+                )}
+              </Button>
+            )}
 
             {isScreenCaptureAvailable && (
               <Button

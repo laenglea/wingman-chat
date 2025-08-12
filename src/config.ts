@@ -25,6 +25,7 @@ interface config {
   bridge?: bridgeConfig;
   artifacts?: artifactsConfig;
   repository?: repositoryConfig;
+  search?: searchConfig;
   translator?: translatorConfig;
 }
 
@@ -67,6 +68,11 @@ interface artifactsConfig {
   enabled: boolean;
 }
 
+interface searchConfig {
+  enabled: boolean;
+  index?: string;
+}
+
 interface translatorConfig {
   enabled: boolean;
   files: string[];
@@ -90,6 +96,7 @@ interface Config {
 
   artifacts: artifactsConfig;
   repository: repositoryConfig;
+  search: searchConfig;
   translator: translatorConfig; 
 
   backgrounds: backgroundPackConfig;
@@ -143,6 +150,11 @@ export const loadConfig = async (): Promise<Config | undefined> => {
 
       repository: cfg.repository ?? {
         enabled: false
+      },
+
+      search: cfg.search ?? {
+        enabled: false,
+        index: "exa"
       },
 
       translator: cfg.translator ?? {

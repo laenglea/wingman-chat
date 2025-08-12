@@ -47,25 +47,13 @@ export function SearchProvider({ children }: SearchProviderProps) {
           const { query } = args;
           
           try {
-            const results = await client.search("web", { text: query as string });
+            const results = await client.search(config.search.index || "", { text: query as string });
             
             if (results.length === 0) {
               return "No search results found for the given query.";
             }
 
-            // Format results for the assistant
-            const formattedResults = results.slice(0, 5).map((result, index) => {
-              let formatted = `${index + 1}. ${result.content}`;
-              if (result.title) {
-                formatted = `${index + 1}. **${result.title}**\n${result.content}`;
-              }
-              if (result.source) {
-                formatted += `\n*Source: ${result.source}*`;
-              }
-              return formatted;
-            }).join('\n\n');
-
-            return `Web search results for "${query}":\n\n${formattedResults}`;
+            return JSON.stringify(results, null, 2);
           } catch (error) {
             console.error("Web search failed:", error);
             return `Web search failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -73,7 +61,7 @@ export function SearchProvider({ children }: SearchProviderProps) {
         }
       }
     ];
-  }, [isEnabled, client]);
+  }, [isEnabled, client, config.search.index]);
 
   const searchInstructions = useCallback((): string => {
     if (!isEnabled) {
