@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect, useMemo } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check, Search } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../types/chat";
 import {
@@ -21,6 +21,7 @@ import { useTranscription } from "../hooks/useTranscription";
 import { useDropZone } from "../hooks/useDropZone";
 import { useSettings } from "../hooks/useSettings";
 import { useScreenCapture } from "../hooks/useScreenCapture";
+import { useSearch } from "../hooks/useSearch";
 
 export function ChatInput() {
   const config = getConfig();
@@ -30,6 +31,7 @@ export function ChatInput() {
   const { currentRepository, setCurrentRepository } = useRepositories();
   const { profile } = useSettings();
   const { isAvailable: isScreenCaptureAvailable, isActive: isContinuousCaptureActive, startCapture, stopCapture, captureFrame } = useScreenCapture();
+  const { isSearchEnabled, setSearchEnabled } = useSearch();
 
   const [content, setContent] = useState("");
   const [transcribingContent, setTranscribingContent] = useState(false);
@@ -593,9 +595,28 @@ export function ChatInput() {
                 </Button>
               </div>
             )}
+
           </div>
 
           <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              className={`p-1.5 flex items-center gap-1.5 text-xs font-medium transition-all duration-300 ${
+                isSearchEnabled 
+                  ? 'text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200 bg-blue-100/80 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded-lg' 
+                  : 'text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200'
+              }`}
+              onClick={() => setSearchEnabled(!isSearchEnabled)}
+              title={isSearchEnabled ? 'Disable web search' : 'Enable web search'}
+            >
+              <Search size={14} />
+              {isSearchEnabled && (
+                <span className="hidden sm:inline">
+                  Search
+                </span>
+              )}
+            </Button>
+
             {isScreenCaptureAvailable && (
               <Button
                 type="button"

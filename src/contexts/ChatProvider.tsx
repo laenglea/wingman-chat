@@ -6,6 +6,7 @@ import { useRepositories } from "../hooks/useRepositories";
 import { useRepository } from "../hooks/useRepository";
 import { useArtifacts } from "../hooks/useArtifacts";
 import { useBridge } from "../hooks/useBridge";
+import { useSearch } from "../hooks/useSearch";
 import { useProfile } from "../hooks/useProfile";
 import { getConfig } from "../config";
 import { ChatContext, ChatContextType } from './ChatContext';
@@ -24,6 +25,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { artifactsTools, artifactsInstructions, isEnabled: isArtifactsEnabled } = useArtifacts();
   const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '');
   const { bridgeTools, bridgeInstructions } = useBridge();
+  const { searchTools, searchInstructions } = useSearch();
   const { generateInstructions } = useProfile();
   const [chatId, setChatId] = useState<string | null>(null);
   const messagesRef = useRef<Message[]>([]);
@@ -120,7 +122,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const repositoryTools = currentRepository ? queryTools() : [];
         const repositoryInstructions = currentRepository ? queryInstructions() : '';
 
-        const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...(tools || [])];
+        const webSearchTools = searchTools();
+        const webSearchInstructions = searchInstructions();
+
+        const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...webSearchTools, ...(tools || [])];
 
         const instructions: string[] = [];
 
@@ -138,6 +143,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
         if (bridgeTools.length > 0 && bridgeInstructions?.trim()) {
           instructions.push(bridgeInstructions);
+        }
+
+        if (webSearchTools.length > 0 && webSearchInstructions?.trim()) {
+          instructions.push(webSearchInstructions);
         }
         
         const completion = await client.complete(
@@ -163,7 +172,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
         updateChat(id, () => ({ messages: [...conversation, errorMessage] }));
       }
-    }, [getOrCreateChat, chats, updateChat, generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, client, model]);
+    }, [getOrCreateChat, chats, updateChat, generateInstructions, isArtifactsEnabled, artifactsTools, artifactsInstructions, currentRepository, queryTools, queryInstructions, bridgeTools, bridgeInstructions, searchTools, searchInstructions, client, model]);
 
   const value: ChatContextType = {
     // Models
