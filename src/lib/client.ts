@@ -4,6 +4,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 
 import { Tool } from "../types/chat";
 import { Message, Model, Role, AttachmentType } from "../types/chat";
+import { SearchQuery, SearchResult } from "../types/search";
 
 export class Client {
   private oai: OpenAI;
@@ -363,6 +364,32 @@ Return only the prompts themselves, without numbering or bullet points.`,
 
     const result = await response.json();
     return result.text || '';
+  }
+
+  async search(index: string, query: SearchQuery): Promise<SearchResult[]> {
+    const response = await fetch(new URL(`/api/v1/index/${index}/query`, window.location.origin), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(query),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Search request failed with status ${response.status}`);
+    }
+
+    const results = await response.json();
+    
+    if (!Array.isArray(results)) {
+      return [];
+    }
+
+    return results.map((result: { title?: string; source?: string; content: string }) => ({
+      title: result.title || undefined,
+      source: result.source || undefined,
+      content: result.content || '',
+    }));
   }
 
   private toTools(tools: Tool[]): OpenAI.Chat.Completions.ChatCompletionTool[] | undefined {
