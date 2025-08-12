@@ -5,6 +5,12 @@
     "voice": {
         "enabled": true
     },
+    "stt": {
+        "enabled": true
+    },
+    "tts": {
+        "enabled": true
+    },
     "repository": {
         "enabled": true
     },
