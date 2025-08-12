@@ -3,6 +3,7 @@ import { Message, Model, Role } from "../types/chat";
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
 import { useChatContext } from "../hooks/useChatContext";
+import { useSearch } from "../hooks/useSearch";
 import { getConfig } from "../config";
 import { ChatContext, ChatContextType } from './ChatContext';
 
@@ -17,6 +18,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { models, selectedModel, setSelectedModel } = useModels();
   const { chats, createChat: createChatHook, updateChat, deleteChat: deleteChatHook } = useChats();
   const { tools: chatTools, instructions: chatInstructions } = useChatContext();
+  const { setEnabled: setSearchEnabled } = useSearch();
   const [chatId, setChatId] = useState<string | null>(null);
   const messagesRef = useRef<Message[]>([]);
 
@@ -35,12 +37,16 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const createChat = useCallback(() => {
     const newChat = createChatHook();
     setChatId(newChat.id);
+    // Disable search when creating a new chat to prevent accidental usage
+    setSearchEnabled(false);
     return newChat;
-  }, [createChatHook]);
+  }, [createChatHook, setSearchEnabled]);
 
   const selectChat = useCallback((chatId: string) => {
     setChatId(chatId);
-  }, []);
+    // Disable search when switching chats to prevent accidental usage
+    setSearchEnabled(false);
+  }, [setSearchEnabled]);
 
   const deleteChat = useCallback(
     (id: string) => {
