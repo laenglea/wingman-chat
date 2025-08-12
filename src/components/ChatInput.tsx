@@ -31,7 +31,7 @@ export function ChatInput() {
   const { currentRepository, setCurrentRepository } = useRepositories();
   const { profile } = useSettings();
   const { isAvailable: isScreenCaptureAvailable, isActive: isContinuousCaptureActive, startCapture, stopCapture, captureFrame } = useScreenCapture();
-  const { isSearchEnabled, setSearchEnabled } = useSearch();
+  const { isEnabled: isSearchEnabled, setEnabled: setSearchEnabled } = useSearch();
 
   const [content, setContent] = useState("");
   const [transcribingContent, setTranscribingContent] = useState(false);
