@@ -327,7 +327,7 @@ export function ChatPage() {
                 {!backgroundImage && (
                   <div className="mb-8">
                     <img 
-                      src="/logo.svg" 
+                      src="/logo_light.svg" 
                       alt="Wingman Chat" 
                       className="h-24 w-24 opacity-70 dark:hidden"
                     />

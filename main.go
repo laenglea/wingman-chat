@@ -209,13 +209,13 @@ func main() {
 			"orientation":      "portrait",
 			"icons": []map[string]any{
 				{
-					"src":     "/icon.png",
+					"src":     "/icon_light.png",
 					"sizes":   "512x512",
 					"type":    "image/png",
 					"purpose": "any maskable",
 				},
 				{
-					"src":   "/logo.svg",
+					"src":   "/icon_light.svg",
 					"sizes": "any",
 					"type":  "image/svg+xml",
 				},
