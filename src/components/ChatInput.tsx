@@ -1,7 +1,7 @@
 import { ChangeEvent, useState, FormEvent, useRef, useEffect, useMemo } from "react";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 
-import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check, Globe } from "lucide-react";
+import { Send, Paperclip, ScreenShare, Image, X, Brain, File, Loader2, FileText, Lightbulb, Mic, Square, Package, Check, Globe, LoaderCircle } from "lucide-react";
 
 import { Attachment, AttachmentType, Message, Role } from "../types/chat";
 import {
@@ -27,7 +27,7 @@ export function ChatInput() {
   const config = getConfig();
   const client = config.client;
 
-  const { sendMessage, models, model, setModel: onModelChange, messages } = useChat();
+  const { sendMessage, models, model, setModel: onModelChange, messages, isResponding } = useChat();
   const { currentRepository, setCurrentRepository } = useRepositories();
   const { profile } = useSettings();
   const { isAvailable: isScreenCaptureAvailable, isActive: isContinuousCaptureActive, startCapture, stopCapture, captureFrame } = useScreenCapture();
@@ -258,6 +258,11 @@ export function ChatInput() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    // Prevent submission while responding
+    if (isResponding) {
+      return;
+    }
 
     if (content.trim()) {
       let finalAttachments = [...attachments];
@@ -647,8 +652,17 @@ export function ChatInput() {
               <Paperclip size={16} />
             </Button>
 
-            {/* Dynamic Send/Mic Button */}
-            {content.trim() ? (
+            {/* Dynamic Send/Mic/Loading Button */}
+            {isResponding ? (
+              <Button
+                type="button"
+                className="p-1.5 text-neutral-600 dark:text-neutral-400"
+                disabled
+                title="Generating response..."
+              >
+                <LoaderCircle size={16} className="animate-spin" />
+              </Button>
+            ) : content.trim() ? (
               <Button
                 className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
                 type="submit"
@@ -675,6 +689,7 @@ export function ChatInput() {
                   }`}
                   onClick={handleTranscriptionClick}
                   title={isTranscribing ? 'Stop recording' : 'Start recording'}
+                  disabled={isResponding}
                 >
                   {isTranscribing ? <Square size={16} /> : <Mic size={16} />}
                 </Button>
@@ -683,6 +698,7 @@ export function ChatInput() {
               <Button
                 className="p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
                 type="submit"
+                disabled={isResponding}
               >
                 <Send size={16} />
               </Button>
