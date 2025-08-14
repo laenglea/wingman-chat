@@ -11,9 +11,10 @@ import { canShare } from "../lib/share";
 type ChatMessageProps = {
   message: Message;
   isLast?: boolean;
+  isResponding?: boolean;
 };
 
-export function ChatMessage({ message, ...props }: ChatMessageProps) {
+export function ChatMessage({ message, isResponding, ...props }: ChatMessageProps) {
   const isUser = message.role === Role.User;
   
   const config = getConfig();
@@ -39,7 +40,7 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
 
   return (
     <div
-      className={`flex chat-bubble ${isUser ? "justify-end" : "justify-start"} mb-4 group`}
+      className={`flex chat-bubble ${isUser ? "justify-end" : "justify-start"} mb-4 ${!isUser && isResponding && props.isLast ? '' : 'group'}`}
     >
       <div
         className={`${
@@ -88,7 +89,7 @@ export function ChatMessage({ message, ...props }: ChatMessageProps) {
         
         {!isUser && (
           <div className={`flex justify-between items-center mt-2 ${
-            props.isLast ? 'chat-message-actions !opacity-100' : 'chat-message-actions opacity-0'
+            props.isLast && !isResponding ? 'chat-message-actions !opacity-100' : 'chat-message-actions opacity-0'
           }`}>
             <div className="flex items-center gap-2">
               {canShareMessage && <ShareButton text={message.content} className="h-4 w-4" />}
