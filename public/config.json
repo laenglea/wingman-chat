@@ -14,6 +14,10 @@
     "repository": {
         "enabled": true
     },
+    "internet": {
+        "enabled": true,
+        "index": "exa"
+    },
     "vision": {
         "enabled": true
     },
