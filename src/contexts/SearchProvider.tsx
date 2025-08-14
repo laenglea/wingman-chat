@@ -46,10 +46,10 @@ export function SearchProvider({ children }: SearchProviderProps) {
         function: async (args: Record<string, unknown>) => {
           const { query } = args;
           
-          console.log("[web_search] Starting search", { query, index: config.internet.index });
+          console.log("[web_search] Starting search", { query });
           
           try {
-            const results = await client.search(config.internet.index || "", { text: query as string });
+            const results = await client.search(query as string);
             
             console.log("[web_search] Search completed successfully", { query, resultsCount: results.length });
             
@@ -99,7 +99,7 @@ export function SearchProvider({ children }: SearchProviderProps) {
         }
       }
     ];
-  }, [isEnabled, client, config.internet.index]);
+  }, [isEnabled, client]);
 
   const searchInstructions = useCallback((): string => {
     if (!isEnabled) {

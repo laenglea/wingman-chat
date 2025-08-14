@@ -4,7 +4,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 
 import { Tool } from "../types/chat";
 import { Message, Model, Role, AttachmentType } from "../types/chat";
-import { SearchQuery, SearchResult } from "../types/search";
+import { SearchResult } from "../types/search";
 
 export class Client {
   private oai: OpenAI;
@@ -383,13 +383,13 @@ Return only the prompts themselves, without numbering or bullet points.`,
     return result.text || '';
   }
 
-  async search(index: string, query: SearchQuery): Promise<SearchResult[]> {
-    const response = await fetch(new URL(`/api/v1/index/${index}/query`, window.location.origin), {
+  async search(query: string): Promise<SearchResult[]> {
+    const data = new FormData();
+    data.append('query', query);
+
+    const response = await fetch(new URL(`/api/v1/retrieve`, window.location.origin), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(query),
+      body: data,
     });
 
     if (!response.ok) {

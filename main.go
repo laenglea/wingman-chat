@@ -34,8 +34,6 @@ func main() {
 	vision := os.Getenv("VISION_ENABLED") == "true"
 
 	internet := os.Getenv("INTERNET_ENABLED") == "true"
-	internetIndex := os.Getenv("INTERNET_INDEX")
-	internetExtractor := os.Getenv("INTERNET_EXTRACTOR")
 
 	artifacts := os.Getenv("ARTIFACTS_ENABLED") == "true"
 
@@ -83,9 +81,7 @@ func main() {
 		}
 
 		type internetType struct {
-			Enabled   bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-			Index     string `json:"index,omitempty" yaml:"index,omitempty"`
-			Extractor string `json:"extractor,omitempty" yaml:"extractor,omitempty"`
+			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 		}
 
 		type repositoryType struct {
@@ -180,9 +176,7 @@ func main() {
 
 		if internet {
 			config.Internet = &internetType{
-				Enabled:   true,
-				Index:     internetIndex,
-				Extractor: internetExtractor,
+				Enabled: true,
 			}
 		}
 
