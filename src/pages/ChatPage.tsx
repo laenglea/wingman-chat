@@ -28,7 +28,8 @@ export function ChatPage() {
     messages,
     createChat,
     chats,
-    updateChat
+    updateChat,
+    isResponding
   } = useChat();
   
   const { layoutMode } = useLayout();
@@ -376,7 +377,7 @@ export function ChatPage() {
                 })()}
                 
                 {messages.map((message, idx) => (
-                  <ChatMessage key={idx} message={message} isLast={idx === messages.length - 1} />
+                  <ChatMessage key={idx} message={message} isLast={idx === messages.length - 1} isResponding={isResponding} />
                 ))}
                 
                 {/* sentinel for scrollIntoView */}

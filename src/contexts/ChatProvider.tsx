@@ -20,6 +20,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { tools: chatTools, instructions: chatInstructions } = useChatContext();
   const { setEnabled: setSearchEnabled } = useSearch();
   const [chatId, setChatId] = useState<string | null>(null);
+  const [isResponding, setIsResponding] = useState<boolean>(false);
   const messagesRef = useRef<Message[]>([]);
 
   const chat = chats.find(c => c.id === chatId) ?? null;
@@ -108,6 +109,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const conversation = [...existingMessages, message];
 
       updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: '' }] }));
+      setIsResponding(true);
 
       try {
         const completion = await client.complete(
@@ -119,6 +121,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         );
 
         updateChat(id, () => ({ messages: [...conversation, completion] }));
+        setIsResponding(false);
 
         if (!chatObj.title || conversation.length % 3 === 0) {
           client
@@ -127,13 +130,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
         }
       } catch (error) {
         console.error(error);
+        setIsResponding(false);
 
         if (error?.toString().includes('missing finish_reason')) return;
 
         const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
         updateChat(id, () => ({ messages: [...conversation, errorMessage] }));
       }
-    }, [getOrCreateChat, chats, updateChat, chatTools, chatInstructions, client, model]);
+    }, [getOrCreateChat, chats, updateChat, chatTools, chatInstructions, client, model, setIsResponding]);
 
   const value: ChatContextType = {
     // Models
@@ -145,6 +149,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     chats,
     chat,
     messages,
+    isResponding,
 
     // Chat actions
     createChat,

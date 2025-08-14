@@ -11,9 +11,10 @@ import { canShare } from "../lib/share";
 type ChatMessageProps = {
   message: Message;
   isLast?: boolean;
+  isResponding?: boolean;
 };
 
-export function ChatMessage({ message, ...props }: ChatMessageProps) {
+export function ChatMessage({ message, isResponding, ...props }: ChatMessageProps) {
   const isUser = message.role === Role.User;
   
   const config = getConfig();
