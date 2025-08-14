@@ -60,8 +60,6 @@ interface bridgeConfig {
 
 interface internetConfig {
   enabled: boolean;
-  index?: string;
-  extractor?: string;
 }
 
 interface repositoryConfig {
@@ -147,7 +145,6 @@ export const loadConfig = async (): Promise<Config | undefined> => {
 
       internet: cfg.internet ?? {
         enabled: false,
-        index: "exa"
       },
 
       repository: cfg.repository ?? {
