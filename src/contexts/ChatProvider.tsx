@@ -108,21 +108,103 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const { id, chat: chatObj } = getOrCreateChat();
 
       const existingMessages = chats.find(c => c.id === id)?.messages || [];
-      const conversation = [...existingMessages, message];
+      let conversation = [...existingMessages, message];
 
-      updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: '' }] }));
+      updateChat(id, () => ({ messages: conversation }));
       setIsResponding(true);
 
       try {
-        const completion = await client.complete(
-          model!.id,
-          chatInstructions,
-          conversation,
-          chatTools,
-          (_, snapshot) => updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: snapshot }] }))
-        );
+        // Main completion loop to handle tool calls
+        while (true) {
+          // Create empty assistant message for this completion iteration
+          updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: '' }] }));
+          
+          const assistantMessage = await client.complete(
+            model!.id,
+            chatInstructions,
+            conversation,
+            chatTools,
+            (_, snapshot) => {
+              // Use the conversation state instead of fetching from chats to avoid stale closure
+              updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: snapshot }] }))
+            }
+          );
+          
+          // Add the assistant message to conversation
+          conversation = [...conversation, {
+            role: Role.Assistant,
+            content: assistantMessage.content ?? "",
+            refusal: assistantMessage.refusal ?? "",
+            toolCalls: assistantMessage.toolCalls,
+          }];
 
-        updateChat(id, () => ({ messages: [...conversation, completion] }));
+          // Update UI with the assistant message
+          updateChat(id, () => ({ messages: conversation }));
+
+          // Check if there are tool calls to handle
+          const toolCalls = assistantMessage.toolCalls;
+          if (!toolCalls || toolCalls.length === 0) {
+            // No tool calls, we're done
+            break;
+          }
+
+          // Handle each tool call
+          for (const toolCall of toolCalls) {
+            const tool = chatTools.find((t) => t.name === toolCall.name);
+
+            if (!tool) {
+              // Tool not found - add error message
+              conversation = [...conversation, {
+                role: Role.Tool,
+                content: `Error: Tool "${toolCall.name}" not found or not executable.`,
+                toolResult: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  arguments: toolCall.arguments,
+                  data: `Error: Tool "${toolCall.name}" not found or not executable.`
+                },
+              }];
+
+              continue;
+            }
+
+            try {
+              const args = JSON.parse(toolCall.arguments || "{}");
+              const result = await tool.function(args);
+
+              // Add tool result to conversation
+              conversation = [...conversation, {
+                role: Role.Tool,
+                content: result ?? "No result returned",
+                toolResult: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  arguments: toolCall.arguments,
+                  data: result ?? "No result returned"
+                },
+              }];
+            }
+            catch (error) {
+              console.error("Tool failed", error);
+
+              // Add tool error to conversation
+              conversation = [...conversation, {
+                role: Role.Tool,
+                content: "error: tool execution failed.",
+                toolResult: {
+                  id: toolCall.id,
+                  name: toolCall.name,
+                  arguments: toolCall.arguments,
+                  data: "error: tool execution failed."
+                },
+              }];
+            }
+          }
+
+          // Update conversation with tool results before next iteration
+          updateChat(id, () => ({ messages: conversation }));
+        }
+
         setIsResponding(false);
 
         if (!chatObj.title || conversation.length % 3 === 0) {
