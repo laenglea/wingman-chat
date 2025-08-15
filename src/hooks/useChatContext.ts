@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Tool } from "../types/chat";
+import type { Tool } from "../types/chat";
 import { useProfile } from "./useProfile";
 import { useArtifacts } from "./useArtifacts";
 import { useRepository } from "./useRepository";

@@ -19,8 +19,8 @@ import { useArtifacts } from "../hooks/useArtifacts";
 import { RepositoryDrawer } from "../components/RepositoryDrawer";
 import { ArtifactsDrawer } from "../components/ArtifactsDrawer";
 import { FileSystemManager } from "../lib/fs";
-import { FileSystem } from "../types/file";
-import { Chat } from "../types/chat";
+import type { FileSystem } from "../types/file";
+import type { Chat } from "../types/chat";
 
 export function ChatPage() {
   const {

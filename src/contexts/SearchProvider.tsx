@@ -1,6 +1,8 @@
-import { useState, ReactNode, useCallback, useEffect } from "react";
-import { SearchContext, SearchContextType } from "./SearchContext";
-import { Tool } from "../types/chat";
+import { useState, useCallback, useEffect } from "react";
+import type { ReactNode } from "react";
+import { SearchContext } from "./SearchContext";
+import type { SearchContextType } from "./SearchContext";
+import type { Tool } from "../types/chat";
 import { getConfig } from "../config";
 
 interface SearchProviderProps {
