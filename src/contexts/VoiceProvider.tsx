@@ -4,7 +4,8 @@ import { useChat } from "../hooks/useChat";
 import { useChatContext } from "../hooks/useChatContext";
 import { getConfig } from "../config";
 import { Role } from "../types/chat";
-import { VoiceContext, VoiceContextType } from './VoiceContext';
+import { VoiceContext } from './VoiceContext';
+import type { VoiceContextType } from './VoiceContext';
 
 interface VoiceProviderProps {
   children: React.ReactNode;

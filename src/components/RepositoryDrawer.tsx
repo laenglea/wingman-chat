@@ -4,7 +4,7 @@ import { Dialog, Transition, Button } from '@headlessui/react';
 import { Fragment } from 'react';
 import { useRepositories } from '../hooks/useRepositories';
 import { useRepository } from '../hooks/useRepository';
-import { Repository, RepositoryFile } from '../types/repository';
+import type { Repository, RepositoryFile } from '../types/repository';
 
 interface RepositoryDetailsProps {
   repository: Repository;

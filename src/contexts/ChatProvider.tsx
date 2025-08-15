@@ -1,11 +1,13 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
-import { Message, Model, Role } from "../types/chat";
+import { Role } from "../types/chat";
+import type { Message, Model } from "../types/chat";
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
 import { useChatContext } from "../hooks/useChatContext";
 import { useSearch } from "../hooks/useSearch";
 import { getConfig } from "../config";
-import { ChatContext, ChatContextType } from './ChatContext';
+import { ChatContext } from './ChatContext';
+import type { ChatContextType } from './ChatContext';
 
 interface ChatProviderProps {
   children: React.ReactNode;

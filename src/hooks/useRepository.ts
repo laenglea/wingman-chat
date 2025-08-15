@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import pLimit from 'p-limit';
 import { Client } from '../lib/client';
-import { VectorDB, Document } from '../lib/vectordb';
-import { Tool } from '../types/chat';
-import { RepositoryFile } from '../types/repository';
+import { VectorDB } from '../lib/vectordb';
+import type { Document } from '../lib/vectordb';
+import type { Tool } from '../types/chat';
+import type { RepositoryFile } from '../types/repository';
 import { useRepositories } from './useRepositories';
 
 export interface FileChunk {
