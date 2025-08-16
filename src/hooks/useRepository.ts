@@ -129,9 +129,6 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
   const processFile = useCallback(async (file: File, fileId: string) => {
     const currentRepoId = currentRepositoryIdRef.current;
 
-    // Convert File to Blob for storage
-    const content = new Blob([file], { type: file.type });
-
     // Extract text
     const text = await client.extractText(file);
     // Check if repository changed or file was removed during processing
@@ -144,7 +141,6 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
     upsertFile(repositoryId, {
       id: fileId,
       name: file.name,
-      content,
       status: 'processing',
       progress: 10,
       text,
@@ -163,7 +159,6 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
     upsertFile(repositoryId, {
       id: fileId,
       name: file.name,
-      content,
       status: 'processing',
       progress: 20,
       text,
@@ -193,7 +188,6 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
           upsertFile(repositoryId, {
             id: fileId,
             name: file.name,
-            content,
             status: 'processing',
             progress: Math.round(progress),
             text,
@@ -227,7 +221,6 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
     upsertFile(repositoryId, {
       id: fileId,
       name: file.name,
-      content,
       status: 'completed',
       progress: 100,
       text,
@@ -240,14 +233,10 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
     const fileId = crypto.randomUUID();
     const currentRepoId = currentRepositoryIdRef.current;
 
-    // Convert File to Blob for storage
-    const content = new Blob([file], { type: file.type });
-
     // Add file to repository as processing
     upsertFile(repositoryId, {
       id: fileId,
       name: file.name,
-      content,
       status: 'processing',
       progress: 0,
       uploadedAt: new Date(),
@@ -261,7 +250,6 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
         upsertFile(repositoryId, {
           id: fileId,
           name: file.name,
-          content,
           status: 'error',
           progress: 0,
           error: error instanceof Error ? error.message : 'Processing failed',

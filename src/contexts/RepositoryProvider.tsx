@@ -90,7 +90,7 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
     }
   }, [currentRepository, isLoaded]);
 
-  const createRepository = useCallback((name: string, instructions?: string) => {
+  const createRepository = useCallback((name: string, instructions?: string): Repository => {
     const config = getConfig();
 
     const newRepository: Repository = {
@@ -106,6 +106,8 @@ export function RepositoryProvider({ children }: { children: ReactNode }) {
     
     setRepositories(prev => [...prev, newRepository]);
     setCurrentRepository(newRepository);
+    
+    return newRepository;
   }, []);
 
   const updateRepository = useCallback((id: string, updates: Partial<Omit<Repository, 'id' | 'createdAt'>>) => {
