@@ -405,6 +405,21 @@ Please provide alternative ways to rewrite this text. For each alternative, incl
   }
 
   async translate(lang: string, input: string | Blob): Promise<string | Blob> {
+    // Input validation
+    if (input instanceof Blob) {
+      // Check file size limit (10MB)
+      const maxFileSize = 10 * 1024 * 1024; // 10MB in bytes
+      if (input.size > maxFileSize) {
+        throw new Error(`File size ${(input.size / 1024 / 1024).toFixed(1)}MB exceeds the maximum limit of 10MB`);
+      }
+    } else {
+      // Check text length limit (50,000 characters)
+      const maxTextLength = 50000;
+      if (input.length > maxTextLength) {
+        throw new Error(`Text length ${input.length.toLocaleString()} characters exceeds the maximum limit of ${maxTextLength.toLocaleString()} characters`);
+      }
+    }
+
     const data = new FormData();
     data.append("lang", lang);
     
