@@ -17,8 +17,8 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [targetLang, setTargetLang] = useState("en");
-  const [tone, setTone] = useState("default");
-  const [style, setStyle] = useState("default");
+  const [tone, setTone] = useState("");
+  const [style, setStyle] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [translatedFileUrl, setTranslatedFileUrl] = useState<string | null>(null);
@@ -109,8 +109,8 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     try {
       const result = await client.translate(langToUse, textToUse);
       if (typeof result === 'string') {
-        // Apply tone/style rewriting if either is not default
-        if (toneValue !== 'default' || styleValue !== 'default') {
+        // Apply tone/style rewriting if either is not empty
+        if (toneValue || styleValue) {
           const rewrittenResult = await client.rewriteText(config.translator.model || '', result, langToUse, toneValue, styleValue);
           setTranslatedText(rewrittenResult);
         } else {
