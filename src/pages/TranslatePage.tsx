@@ -9,6 +9,7 @@ import { CopyButton } from "../components/CopyButton";
 import { PlayButton } from "../components/PlayButton";
 import { RewritePopover } from "../components/RewritePopover";
 import { InteractiveText } from "../components/InteractiveText";
+import { downloadFromUrl } from "../lib/utils";
 import { getConfig } from "../config";
 
 export function TranslatePage() {
@@ -117,12 +118,7 @@ export function TranslatePage() {
 
   const handleDownload = () => {
     if (translatedFileUrl && translatedFileName) {
-      const link = document.createElement('a');
-      link.href = translatedFileUrl;
-      link.download = translatedFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadFromUrl(translatedFileUrl, translatedFileName);
     }
   };
 

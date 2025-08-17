@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { getConfig } from "../config";
+import { downloadFromUrl } from "../lib/utils";
 import { TranslateContext, supportedLanguages, supportedFiles, toneOptions, styleOptions } from './TranslateContext';
 import type { TranslateContextType } from './TranslateContext';
 
@@ -82,12 +83,7 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
           setTranslatedText("");
           
           // Auto-download the file
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = translatedFileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          downloadFromUrl(url, translatedFileName);
         }
       } catch (err) {
         console.error('File translation failed:', err);

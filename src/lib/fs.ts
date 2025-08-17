@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import { downloadBlob } from './utils';
 import type { FileSystem, File } from '../types/file';
 
 type FileEventType = 'fileCreated' | 'fileDeleted' | 'fileRenamed' | 'fileUpdated';
@@ -253,17 +254,8 @@ export async function downloadFilesystemAsZip(
     // Generate the zip file as a blob
     const zipBlob = await zip.generateAsync({ type: 'blob' });
 
-    // Create download link and trigger download
-    const url = URL.createObjectURL(zipBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    
-    // Cleanup
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // Download the zip file
+    downloadBlob(zipBlob, filename);
   } catch (error) {
     throw new Error(`Failed to create zip file: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }

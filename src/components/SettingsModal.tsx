@@ -5,7 +5,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useChat } from '../hooks/useChat';
 import { useRepositories } from '../hooks/useRepositories';
 import { getStorageUsage } from '../lib/db';
-import { formatBytes } from '../lib/utils';
+import { formatBytes, downloadBlob } from '../lib/utils';
 import { getConfig } from '../config';
 import type { Theme, LayoutMode, BackgroundPack } from '../types/settings';
 import type { RepositoryFile } from '../types/repository';
@@ -232,14 +232,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       
       // Create and download JSON file
       const jsonBlob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(jsonBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `wingman-repositories-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const filename = `wingman-repositories-${new Date().toISOString().split('T')[0]}.json`;
+      downloadBlob(jsonBlob, filename);
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export repositories. Please try again.');
@@ -324,14 +318,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       
       // Create and download JSON file
       const jsonBlob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(jsonBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `wingman-chats-${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const filename = `wingman-chats-${new Date().toISOString().split('T')[0]}.json`;
+      downloadBlob(jsonBlob, filename);
     } catch (error) {
       console.error('Failed to export chats:', error);
       alert('Failed to export chats. Please try again.');
