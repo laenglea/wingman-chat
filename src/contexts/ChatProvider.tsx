@@ -134,7 +134,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
           conversation = [...conversation, {
             role: Role.Assistant,
             content: assistantMessage.content ?? "",
-            refusal: assistantMessage.refusal ?? "",
             toolCalls: assistantMessage.toolCalls,
           }];
 
@@ -156,7 +155,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
               // Tool not found - add error message
               conversation = [...conversation, {
                 role: Role.Tool,
-                content: `Error: Tool "${toolCall.name}" not found or not executable.`,
+                content: '',
+                error: {
+                  code: 'TOOL_NOT_FOUND',
+                  message: `Tool "${toolCall.name}" is not available or not executable.`
+                },
                 toolResult: {
                   id: toolCall.id,
                   name: toolCall.name,
@@ -190,7 +193,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
               // Add tool error to conversation
               conversation = [...conversation, {
                 role: Role.Tool,
-                content: "error: tool execution failed.",
+                content: '',
+                error: {
+                  code: 'TOOL_EXECUTION_ERROR',
+                  message: 'The tool could not complete the requested action. Please try again or use a different approach.'
+                },
                 toolResult: {
                   id: toolCall.id,
                   name: toolCall.name,
@@ -218,8 +225,42 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
         if (error?.toString().includes('missing finish_reason')) return;
 
-        const errorMessage = { role: Role.Assistant, content: `An error occurred:\n${error}` };
-        updateChat(id, () => ({ messages: [...conversation, errorMessage] }));
+        // Determine error code and user-friendly message based on error type
+        let errorCode = 'COMPLETION_ERROR';
+        let errorMessage = 'An unexpected error occurred while generating the response.';
+
+        const errorString = error?.toString() || '';
+        
+        if (errorString.includes('500')) {
+          errorCode = 'SERVER_ERROR';
+          errorMessage = 'The server encountered an internal error. Please try again in a moment.';
+        } else if (errorString.includes('401')) {
+          errorCode = 'AUTH_ERROR';
+          errorMessage = 'Authentication failed. Please check your API key or credentials.';
+        } else if (errorString.includes('403')) {
+          errorCode = 'AUTH_ERROR';
+          errorMessage = 'Access denied. You may not have permission to use this model.';
+        } else if (errorString.includes('404')) {
+          errorCode = 'NOT_FOUND_ERROR';
+          errorMessage = 'The requested model or resource was not found.';
+        } else if (errorString.includes('429')) {
+          errorCode = 'RATE_LIMIT_ERROR';
+          errorMessage = 'Rate limit exceeded. Please wait a moment before trying again.';
+        } else if (errorString.includes('timeout') || errorString.includes('network')) {
+          errorCode = 'NETWORK_ERROR';
+          errorMessage = 'Network connection failed. Please check your internet connection and try again.';
+        }
+
+        // Create error message with proper error field
+        const errorMessage_obj = { 
+          role: Role.Assistant, 
+          content: '',
+          error: {
+            code: errorCode,
+            message: errorMessage
+          }
+        };
+        updateChat(id, () => ({ messages: [...conversation, errorMessage_obj] }));
       }
     }, [getOrCreateChat, chats, updateChat, chatTools, chatInstructions, client, model, setIsResponding]);
 

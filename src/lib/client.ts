@@ -133,10 +133,21 @@ export class Client {
     
     const message = completion.choices[0].message;
 
+    // Check if the response was refused by the model
+    if (message.refusal) {
+      return {
+        role: Role.Assistant,
+        content: "",
+        error: {
+          code: "CONTENT_REFUSAL",
+          message: message.refusal
+        }
+      };
+    }
+
     return {
       role: Role.Assistant,
       content: message.content ?? "",
-      refusal: message.refusal ?? "",
       toolCalls: message.tool_calls?.filter(tc => tc.type === 'function').map(tc => ({
         id: tc.id,
         name: tc.function.name,

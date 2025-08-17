@@ -25,14 +25,20 @@ export type ToolResult = {
     data: string;
 };
 
+export type MessageError = {
+    code: string;
+    message: string;
+};
+
 export type Message = {
     role: 'user' | 'assistant' | 'tool';
 
     content: string;
-    refusal?: string;
 
     attachments?: Attachment[];
     
+    error?: MessageError | null;
+
     toolCalls?: ToolCall[];
     toolResult?: ToolResult;
 };
