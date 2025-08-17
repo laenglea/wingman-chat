@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { ReactNode } from "react";
 import { getConfig } from "../config";
-import { TranslateContext, supportedLanguages, supportedFiles } from './TranslateContext';
+import { TranslateContext, supportedLanguages, supportedFiles, toneOptions, styleOptions } from './TranslateContext';
 import type { TranslateContextType } from './TranslateContext';
 
 interface TranslateProviderProps {
@@ -16,10 +16,13 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
   const [targetLang, setTargetLang] = useState("en");
+  const [tone, setTone] = useState("default");
+  const [style, setStyle] = useState("default");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [translatedFileUrl, setTranslatedFileUrl] = useState<string | null>(null);
   const [translatedFileName, setTranslatedFileName] = useState<string | null>(null);
+  const [lastTranslatedText, setLastTranslatedText] = useState(""); // Track what was last translated
 
   // Refs for stable references
   const sourceTextRef = useRef(sourceText);
@@ -38,8 +41,10 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
   const selectedLanguage = supportedLanguages().find(l => l.code === targetLang);
 
   // Actions with stable references
-  const performTranslate = useCallback(async (langCode?: string, textToTranslate?: string) => {
+  const performTranslate = useCallback(async (langCode?: string, textToTranslate?: string, toneToUse?: string, styleToUse?: string) => {
     const langToUse = langCode ?? targetLangRef.current;
+    const toneValue = toneToUse ?? tone;
+    const styleValue = styleToUse ?? style;
     
     // Handle file translation if a file is selected
     if (selectedFile) {
@@ -103,14 +108,21 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     try {
       const result = await client.translate(langToUse, textToUse);
       if (typeof result === 'string') {
-        setTranslatedText(result);
+        // Apply tone/style rewriting if either is not default
+        if (toneValue !== 'default' || styleValue !== 'default') {
+          const rewrittenResult = await client.rewriteText(config.translator.model || '', result, langToUse, toneValue, styleValue);
+          setTranslatedText(rewrittenResult);
+        } else {
+          setTranslatedText(result);
+        }
+        setLastTranslatedText(textToUse); // Track what text was translated
       }
     } catch (err) {
       setTranslatedText(err instanceof Error ? err.message : "An unknown error occurred during translation.");
     } finally {
       setIsLoading(false);
     }
-  }, [client, selectedFile]);
+  }, [client, selectedFile, tone, style, config.translator.model]);
 
   const handleReset = useCallback(() => {
     setSourceText("");
@@ -118,6 +130,7 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     setSelectedFile(null);
     setTranslatedFileUrl(null);
     setTranslatedFileName(null);
+    setLastTranslatedText(""); // Reset tracking when clearing everything
   }, []);
 
   const handleSetTargetLang = useCallback(async (newLangCode: string) => {
@@ -130,22 +143,32 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
       setTranslatedText("");  // Also clear text translation for files
     }
     
+    // Clear the tracking when language changes to allow re-translation
+    setLastTranslatedText("");
+    
     // Automatically translate with new language if there's source text (but not if file is selected)
     if (sourceTextRef.current.trim() && !selectedFile) {
-      await performTranslate(newLangCode, sourceTextRef.current);
+      await performTranslate(newLangCode, sourceTextRef.current, tone, style);
     }
-  }, [performTranslate, selectedFile]);
+  }, [performTranslate, selectedFile, tone, style]);
 
-  // Auto-translate effect (3 second delay)
+  // Auto-translate effect (1 second delay) - only if text hasn't been translated yet
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (sourceText.trim() && !selectedFile) {
-        performTranslate(targetLang, sourceText);
+      if (sourceText.trim() && !selectedFile && sourceText !== lastTranslatedText) {
+        performTranslate(targetLang, sourceText, tone, style);
       }
-    }, 3000);
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [sourceText, targetLang, performTranslate, selectedFile]);
+  }, [sourceText, targetLang, tone, style, performTranslate, selectedFile, lastTranslatedText]);
+
+  // Auto-rewrite when tone or style changes (if there's already translated text)
+  useEffect(() => {
+    if (sourceText.trim() && !selectedFile && lastTranslatedText) {
+      performTranslate(targetLang, sourceText, tone, style);
+    }
+  }, [tone, style, targetLang, sourceText, selectedFile, lastTranslatedText, performTranslate]);
 
   const selectFile = useCallback((file: File) => {
     setSelectedFile(file);
@@ -163,11 +186,22 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     setTranslatedText("");  // Clear translated text when clearing file
   }, []);
 
+  // Custom setSourceText that clears the translation tracking
+  const handleSetSourceText = useCallback((text: string) => {
+    setSourceText(text);
+    // If user is changing the source text, clear the tracking so auto-translate can work
+    if (text !== lastTranslatedText) {
+      setLastTranslatedText("");
+    }
+  }, [lastTranslatedText]);
+
   const contextValue: TranslateContextType = {
     // State
     sourceText,
     translatedText,
     targetLang,
+    tone,
+    style,
     isLoading,
     selectedFile,
     translatedFileUrl,
@@ -177,10 +211,14 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     supportedLanguages: supportedLanguages(),
     selectedLanguage,
     supportedFiles: supportedFiles(),
+    toneOptions: toneOptions(),
+    styleOptions: styleOptions(),
     
     // Actions
-    setSourceText,
+    setSourceText: handleSetSourceText,
     setTargetLang: handleSetTargetLang,
+    setTone,
+    setStyle,
     performTranslate,
     handleReset,
     selectFile,
