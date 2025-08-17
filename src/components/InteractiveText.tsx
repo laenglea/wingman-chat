@@ -134,10 +134,12 @@ export function InteractiveText({
   const handleWordClick = (word: string, wordPosition: number, event: React.MouseEvent<HTMLSpanElement>) => {
     if (!onTextSelect) return;
     
-    // Debounce rapid clicks
-    const now = Date.now();
-    if (now - lastSelectionTimeRef.current < 300) return;
-    lastSelectionTimeRef.current = now;
+    // Find the actual position of the clean word within the text
+    // word is the clean word (no punctuation), wordPosition is the start of the original segment
+    const segment = text.substring(wordPosition, wordPosition + event.currentTarget.textContent!.length);
+    const wordStartInSegment = segment.search(/[\p{L}\p{N}]/u); // Find first word character (Unicode-compatible)
+    const actualWordStart = wordPosition + Math.max(0, wordStartInSegment);
+    const actualWordEnd = actualWordStart + word.length;
     
     // Clear any text selection when a word is clicked
     const selection = window.getSelection();
@@ -145,16 +147,9 @@ export function InteractiveText({
       selection.removeAllRanges();
     }
     
-    // Stop propagation to prevent the mouseUp event from firing on the container
+    // Stop propagation to prevent other click handlers from firing
     event.stopPropagation();
     event.preventDefault();
-    
-    // Find the actual position of the clean word within the text
-    // word is the clean word (no punctuation), wordPosition is the start of the original segment
-    const segment = text.substring(wordPosition, wordPosition + event.currentTarget.textContent!.length);
-    const wordStartInSegment = segment.search(/[\p{L}\p{N}]/u); // Find first word character (Unicode-compatible)
-    const actualWordStart = wordPosition + Math.max(0, wordStartInSegment);
-    const actualWordEnd = actualWordStart + word.length;
     
     // Set the clicked word position for highlighting (only the clean word)
     setClickedWordPosition({ start: actualWordStart, end: actualWordEnd });
@@ -293,14 +288,16 @@ export function InteractiveText({
       ref={containerRef} 
       className={`${className} ${previewText ? 'bg-blue-50/30 dark:bg-blue-900/20 transition-colors' : ''}`}
       onMouseUp={handleTextSelection}
+      onClick={(e) => {
+        // Clear highlighting when clicking on empty space within the component
+        if (e.target === e.currentTarget) {
+          setClickedWordPosition(null);
+          setSentenceBounds(null);
+        }
+      }}
       style={{ userSelect: 'text' }}
     >
       {renderText()}
-      {previewText && (
-        <div className="absolute top-2 right-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-100/80 dark:bg-blue-900/60 px-2 py-1 rounded">
-          Preview
-        </div>
-      )}
     </div>
   );
 }

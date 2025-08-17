@@ -157,6 +157,7 @@ export function TranslatePage() {
   const closeRewriteMenu = () => {
     setRewriteMenu(null);
     setPreviewText(null); // Clear preview when closing menu
+    lastSelectionRef.current = ''; // Clear last selection to allow clicking the same word again
   };
 
   const handlePreview = (previewText: string | null) => {
