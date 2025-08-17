@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useDropZone } from "../hooks/useDropZone";
 import { Button, Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
-import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, XIcon, DownloadIcon, ThermometerIcon, SwatchBookIcon } from "lucide-react";
+import { PilcrowRightIcon, Loader2, PlusIcon, GlobeIcon, FileIcon, UploadIcon, XIcon, DownloadIcon, ThermometerIcon, SwatchBookIcon, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { useNavigation } from "../hooks/useNavigation";
 import { useLayout } from "../hooks/useLayout";
 import { useTranslate } from "../hooks/useTranslate";
@@ -35,6 +35,7 @@ export function TranslatePage() {
     tone,
     style,
     isLoading,
+    error,
     supportedLanguages,
     selectedLanguage,
     selectedFile,
@@ -56,6 +57,7 @@ export function TranslatePage() {
   // Local state for editable translated text (to allow rewriting)
   const [currentText, setCurrentText] = useState(translatedText);
   const [previewText, setPreviewText] = useState<string | null>(null);
+  const [errorExpanded, setErrorExpanded] = useState(false);
   const lastSelectionRef = useRef<string>('');
 
   // Update editable text when translated text changes
@@ -395,6 +397,44 @@ export function TranslatePage() {
                     onTextSelect={handleTextSelect}
                     previewText={previewText}
                   />
+
+                  {/* Subtle error notification for both text and file translations */}
+                  {error && (
+                    <div className="absolute bottom-2 left-2 right-2 z-10">
+                      <div className="border border-red-200 dark:border-red-800 bg-red-50/95 dark:bg-red-950/20 backdrop-blur-lg rounded-lg overflow-hidden">
+                        <button 
+                          onClick={() => setErrorExpanded(!errorExpanded)}
+                          className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-red-100/50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" />
+                            <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                              {selectedFile ? 'File translation failed' : 'Translation failed'}
+                            </span>
+                            {!errorExpanded && (
+                              <span className="text-xs text-red-500 dark:text-red-400 truncate">
+                                Click to see details
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {errorExpanded ? 
+                              <ChevronDown className="w-3 h-3 text-red-500" /> : 
+                              <ChevronRight className="w-3 h-3 text-red-500" />
+                            }
+                          </div>
+                        </button>
+                        
+                        {errorExpanded && (
+                          <div className="px-3 pb-3 border-t border-red-200/50 dark:border-red-800/50">
+                            <div className="mt-2 text-xs text-red-700 dark:text-red-300 break-words">
+                              {error}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Show download link for translated files */}
                   {translatedFileUrl && translatedFileName && (
@@ -431,7 +471,7 @@ export function TranslatePage() {
                   )}
 
                   {/* Show candidate file when selected but not translated */}
-                  {selectedFile && !isLoading && !translatedFileUrl && !translatedText && (
+                  {selectedFile && !isLoading && !translatedFileUrl && !translatedText && !error && (
                     <div className="absolute inset-2 flex items-center justify-center">
                       <div 
                         className="bg-neutral-50/40 dark:bg-neutral-900/30 backdrop-blur-lg border-2 border-dashed border-neutral-200/70 dark:border-neutral-700/60 p-6 rounded-xl flex flex-col items-center gap-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/40 transition-all"
@@ -451,7 +491,7 @@ export function TranslatePage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* Show copy button for text translations and file translations that return text */}
                   {translatedText && (
                     <div className="absolute top-2 right-2 flex gap-1">

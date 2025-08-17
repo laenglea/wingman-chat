@@ -34,6 +34,7 @@ export interface TranslateContextType {
   selectedFile: File | null;
   translatedFileUrl: string | null;
   translatedFileName: string | null;
+  error: string | null;
   
   // Data
   selectedLanguage: Language | undefined;

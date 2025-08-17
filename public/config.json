@@ -23,5 +23,18 @@
     },
     "bridge": {
         "url": "http://localhost:4200"
+    },
+    "translator": {
+        "files": [
+            ".txt",
+            ".pdf"
+        ],
+
+        "languages": [
+            "en",
+            "de",
+            "fr",
+            "it"
+        ]
     }
 }
