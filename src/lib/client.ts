@@ -453,7 +453,7 @@ Please provide alternative ways to rewrite this text. For each alternative, incl
     return resp.blob();
   }
 
-  async rewriteText(model: string, text: string, lang: string, tone: string = 'default', style: string = 'default'): Promise<string> {
+  async rewriteText(model: string, text: string, lang: string, tone: string = '', style: string = ''): Promise<string> {
     const Schema = z.object({
       rewrittenText: z.string(),
     }).strict();
@@ -463,7 +463,7 @@ Please provide alternative ways to rewrite this text. For each alternative, incl
     }
 
     // Build tone instruction
-    const toneInstruction = tone === 'default' ? '' : 
+    const toneInstruction = !tone ? '' : 
       tone === 'enthusiastic' ? 'Use an enthusiastic and energetic tone.' :
       tone === 'friendly' ? 'Use a warm and friendly tone.' :
       tone === 'confident' ? 'Use a confident and assertive tone.' :
@@ -471,7 +471,7 @@ Please provide alternative ways to rewrite this text. For each alternative, incl
       '';
 
     // Build style instruction
-    const styleInstruction = style === 'default' ? '' :
+    const styleInstruction = !style ? '' :
       style === 'simple' ? 'Use simple and clear language.' :
       style === 'business' ? 'Use professional business language.' :
       style === 'academic' ? 'Use formal academic language.' :

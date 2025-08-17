@@ -86,7 +86,7 @@ export const supportedFiles = (): SupportedFile[] => {
 };
 
 export const toneOptions = (): ToneOption[] => [
-  { value: 'default', label: 'Default' },
+  { value: '', label: 'Default' },
   { value: 'enthusiastic', label: 'Enthusiastic' },
   { value: 'friendly', label: 'Friendly' },
   { value: 'confident', label: 'Confident' },
@@ -94,7 +94,7 @@ export const toneOptions = (): ToneOption[] => [
 ];
 
 export const styleOptions = (): StyleOption[] => [
-  { value: 'default', label: 'Default' },
+  { value: '', label: 'Default' },
   { value: 'simple', label: 'Simple' },
   { value: 'business', label: 'Business' },
   { value: 'academic', label: 'Academic' },

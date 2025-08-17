@@ -145,7 +145,7 @@ export function TranslatePage() {
     }, 50);
   }, []);
 
-  const handleAlternativeSelect = (alternative: string, contextToReplace: string) => {
+  const handleSelect = (alternative: string, contextToReplace: string) => {
     if (rewriteMenu && currentText) {
       // Replace the entire context with the alternative instead of just the selected text
       const newText = currentText.replace(contextToReplace, alternative);
@@ -337,7 +337,7 @@ export function TranslatePage() {
                         <MenuButton className="inline-flex items-center gap-1 pl-1 pr-2 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 text-sm transition-colors">
                           <ThermometerIcon size={14} />
                           <span>
-                            {toneOptions.find(t => t.value === tone)?.label || 'Default'}
+                            {tone ? toneOptions.find(t => t.value === tone)?.label : 'Tone'}
                           </span>
                         </MenuButton>
                         <MenuItems
@@ -365,7 +365,7 @@ export function TranslatePage() {
                         <MenuButton className="inline-flex items-center gap-1 pl-1 pr-2 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 text-sm transition-colors">
                           <SwatchBookIcon size={14} />
                           <span>
-                            {styleOptions.find(s => s.value === style)?.label || 'Default'}
+                            {style ? styleOptions.find(s => s.value === style)?.label : 'Style'}
                           </span>
                         </MenuButton>
                         <MenuItems
@@ -513,7 +513,7 @@ export function TranslatePage() {
           selectionEnd={rewriteMenu.selectionEnd}
           position={rewriteMenu.position}
           onClose={closeRewriteMenu}
-          onAlternativeSelect={handleAlternativeSelect}
+          onSelect={handleSelect}
           onPreview={handlePreview}
         />
       )}
