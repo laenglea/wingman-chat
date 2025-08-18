@@ -183,9 +183,6 @@ export function InteractiveText({
       
       const isSelected = selectedWord?.start === word.start;
       const isHovered = hoveredWord === word.clean;
-      const isInSentence = sentenceBounds && 
-        word.start >= sentenceBounds.start && 
-        word.end <= sentenceBounds.end;
       
       // Add interactive word
       elements.push(
@@ -196,7 +193,6 @@ export function InteractiveText({
             ${isSelected ? 'bg-blue-200 dark:bg-blue-800/50 text-blue-900 dark:text-blue-100 px-1 font-medium' :
               isHovered ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-0.5' :
               'hover:bg-neutral-100 dark:hover:bg-neutral-800/50 px-0.5'}
-            ${isInSentence && !isSelected ? 'border-b border-neutral-300 dark:border-neutral-600 border-dotted' : ''}
           `}
           onMouseEnter={() => setHoveredWord(word.clean)}
           onMouseLeave={() => setHoveredWord(null)}
@@ -231,7 +227,7 @@ export function InteractiveText({
   return (
     <div 
       ref={containerRef} 
-      className={`${className} ${previewText ? 'bg-blue-50/30 dark:bg-blue-900/20 transition-colors' : ''}`}
+      className={`${className}`}
       onMouseUp={handleTextSelection}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
