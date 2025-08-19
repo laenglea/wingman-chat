@@ -556,7 +556,21 @@ Guidelines:
 
   async transcribe(model: string, blob: Blob): Promise<string> {
     const data = new FormData();
-    data.append('file', blob);
+    
+    // Determine file extension based on blob type
+    const getFileExtension = (mimeType: string): string => {
+      if (mimeType.includes('wav')) return '.wav';
+      if (mimeType.includes('mp3') || mimeType.includes('mpeg')) return '.mp3';
+      if (mimeType.includes('mp4')) return '.mp4';
+      if (mimeType.includes('webm')) return '.webm';
+      if (mimeType.includes('ogg')) return '.ogg';
+      return '.audio'; // fallback
+    };
+    
+    const extension = getFileExtension(blob.type);
+    const filename = `audio_recording${extension}`;
+    
+    data.append('file', blob, filename);
 
     if(model) {
       data.append('model', model);
