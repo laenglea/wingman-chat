@@ -76,6 +76,12 @@ export class Bridge {
                 await client.connect(transport);
                 bridge.mcp = client;
 
+                const instructions = client.getInstructions();
+
+                if (instructions !== undefined) {
+                    bridge.instructions = instructions;
+                }
+
                 console.info("Bridge connected");
             } catch {
                 if (client) client.close();
