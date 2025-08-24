@@ -259,7 +259,7 @@ func main() {
 		},
 	}))
 
-	host := os.Getenv("HOST")
+	host := os.Getenv("ALLOWEDIP")
 	if host == "" {
     	host = "127.0.0.1"
 	}
