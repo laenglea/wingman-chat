@@ -27,6 +27,6 @@ WORKDIR /app
 COPY --from=app /src/dist ./dist
 COPY --from=server /src/server .
 
-EXPOSE 8080
+EXPOSE 8000
 
 CMD ["./server"]
