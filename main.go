@@ -259,18 +259,7 @@ func main() {
 		},
 	}))
 
-	host := os.Getenv("ALLOWEDIP")
-	if host == "" {
-    	host = "127.0.0.1"
-	}
-
-	port := os.Getenv("PORT")
-	if port == "" {
-    	port = "8000"
-	}
-
-	addr := fmt.Sprintf("%s:%s", host, port)
-	http.ListenAndServe(addr, mux)
+	http.ListenAndServe("0.0.0.0.:8000", mux)
 
 }
 
