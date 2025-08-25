@@ -258,7 +258,7 @@ func main() {
 		},
 	}))
 
-	http.ListenAndServe("0.0.0.0.:8000", mux)
+	http.ListenAndServe("0.0.0.0:8000", mux)
 
 }
 
