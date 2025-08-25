@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          rev: dev
+          ref: dev
 
       - name: Set up QEMU (for multi-platform builds)
         uses: docker/setup-qemu-action@v2
