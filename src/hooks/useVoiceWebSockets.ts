@@ -219,7 +219,7 @@ export function useVoiceWebSockets(
 
           case 'conversation.item.input_audio_transcription.failed':
             console.error('Transcription failed:', msg.error);
-            onUser('Input Transcription failed');
+            //onUser('Input Transcription failed');
             break;
 
           case 'response.output_audio.delta':
