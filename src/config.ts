@@ -77,6 +77,8 @@ interface repositoryConfig {
   enabled: boolean;
   embedder?: string;
   extractor?: string;
+
+  context_pages?: number;
 }
 
 interface artifactsConfig {
@@ -198,6 +200,10 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       },
 
       backgrounds: cfg.backgrounds ?? {},
+    }
+
+    if (config.repository.enabled && !config.repository.context_pages) {
+      config.repository.context_pages = 150;
     }
 
     return config;

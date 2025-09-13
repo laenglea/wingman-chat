@@ -6,6 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -43,6 +44,7 @@ func main() {
 	repository := os.Getenv("REPOSITORY_ENABLED") == "true"
 	repositoryEmbedder := os.Getenv("REPOSITORY_EMBEDDER")
 	repositoryExtractor := os.Getenv("REPOSITORY_EXTRACTOR")
+	repositoryContextPages := os.Getenv("REPOSITORY_CONTEXT_PAGES")
 
 	mux := http.NewServeMux()
 	dist := os.DirFS("dist")
@@ -98,6 +100,8 @@ func main() {
 			Enabled   bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 			Embedder  string `json:"embedder,omitempty" yaml:"embedder,omitempty"`
 			Extractor string `json:"extractor,omitempty" yaml:"extractor,omitempty"`
+
+			ContextPages *int `json:"context_pages,omitempty" yaml:"context_pages,omitempty"`
 		}
 
 		type translatorType struct {
@@ -207,6 +211,10 @@ func main() {
 				Enabled:   true,
 				Embedder:  repositoryEmbedder,
 				Extractor: repositoryExtractor,
+			}
+
+			if n, err := strconv.Atoi(repositoryContextPages); err == nil && n > 0 {
+				config.Repository.ContextPages = &n
 			}
 		}
 

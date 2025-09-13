@@ -6,6 +6,7 @@ import type { Document } from '../lib/vectordb';
 import type { Tool } from '../types/chat';
 import type { RepositoryFile } from '../types/repository';
 import { useRepositories } from './useRepositories';
+import { getConfig } from '../config';
 
 export interface FileChunk {
   file: RepositoryFile;
@@ -65,7 +66,8 @@ export function useRepository(repositoryId: string, mode: 'auto' | 'rag' | 'cont
     if (mode === 'rag') return true;
     if (mode === 'context') return false;
     // auto mode: determine based on repository size
-    return totalPages > 150;
+    const config = getConfig();
+    return totalPages > (config.repository?.context_pages ?? 0);
   }, [mode, totalPages]);
 
   // Handle repository changes and rebuild vector database
