@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - dev
+      - main
 
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: dev
+          ref: main
           fetch-depth: 0
 
       - name: Get current commit SHA
