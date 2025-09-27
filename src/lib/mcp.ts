@@ -46,15 +46,17 @@ export class MCPClient {
       await this.disconnect();
     }
 
-    // Only support HTTP/HTTPS URLs for browser compatibility
-    if (!this.serverUrl.startsWith('http://') && !this.serverUrl.startsWith('https://')) {
-      throw new Error(`Unsupported MCP server URL: ${this.serverUrl}. Only HTTP/HTTPS URLs are supported in browser environment (e.g., http://localhost:1234/mcp).`);
-    }
+    const opts = {
+      reconnectionOptions: {
+        maxReconnectionDelay: 30000,
+        initialReconnectionDelay: 1000,
+        reconnectionDelayGrowFactor: 1.5,
+        maxRetries: -1,
+      }
+    };
 
-    // Use StreamableHTTPClientTransport for HTTP/HTTPS
-    const transport = new StreamableHTTPClientTransport(new URL(this.serverUrl));
+    const transport = new StreamableHTTPClientTransport(new URL(this.serverUrl), opts);
 
-    // Create and connect client
     this.client = new Client({
       name: 'Wingman Chat',
       version: '1.0.0'
@@ -62,7 +64,6 @@ export class MCPClient {
 
     await this.client.connect(transport);
 
-    // List available tools
     const toolsResponse = await this.client.listTools();
     this.tools = toolsResponse.tools || [];
 

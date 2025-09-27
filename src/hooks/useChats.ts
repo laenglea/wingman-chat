@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import type { Chat } from '../types/chat';
 import { setValue, getValue } from '../lib/db';
@@ -46,7 +46,7 @@ export function useChats() {
     load();
   }, []);
 
-  function createChat() {
+  const createChat = useCallback(() => {
     const chat: Chat = {
       id: crypto.randomUUID(),
       created: new Date(),
@@ -59,9 +59,9 @@ export function useChats() {
     setChats((prev) => [chat, ...prev]);
     
     return chat;
-  }
+  }, []);
 
-  function updateChat(chatId: string, updater: (chat: Chat) => Partial<Chat>): void {
+  const updateChat = useCallback((chatId: string, updater: (chat: Chat) => Partial<Chat>): void => {
     setChats((prev) =>
       prev.map((chat) => {
         if (chat.id === chatId) {
@@ -71,11 +71,11 @@ export function useChats() {
         return chat;
       })
     );
-  }
+  }, []);
 
-  function deleteChat(chatId: string) {
+  const deleteChat = useCallback((chatId: string) => {
     setChats((prev) => prev.filter((chat) => chat.id !== chatId));
-  }
+  }, []);
 
   // Persist chats to storage with debounce when chats change
   useEffect(() => {
