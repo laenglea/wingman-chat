@@ -1,51 +1,64 @@
-import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import type { Tool } from '../types/chat';
-import { getConfig } from '../config';
 import { BridgeContext } from './BridgeContext';
-import type { BridgeContextType } from './BridgeContext';
+import type { BridgeServer } from './BridgeContext';
+import { usePersistedState } from '../hooks/usePersistedState';
 
 interface BridgeProviderProps {
   children: ReactNode;
 }
 
 export function BridgeProvider({ children }: BridgeProviderProps) {
-  const config = getConfig();
-  const bridge = config.bridge;
-  const [bridgeTools, setBridgeTools] = useState<Tool[]>([]);
-  const [bridgeInstructions, setBridgeInstructions] = useState<string | null>(bridge.getInstructions());
+  const { value: servers, setValue: setServers, isLoaded } = usePersistedState<BridgeServer[]>({
+    key: 'bridge.json',
+    defaultValue: [],
+  });
 
-  // Fetch bridge tools when bridge is connected
-  useEffect(() => {
-    const updateBridge = async () => {
-      if (bridge.isConnected()) {
-        try {
-          const tools = await bridge.listTools();
-          setBridgeTools(tools);
-        } catch (error) {
-          console.error("Failed to fetch bridge tools:", error);
-          setBridgeTools([]);
-        }
-      } else {
-        setBridgeTools([]);
-      }
-      
-      // Update instructions (can be available even when not connected)
-      const instructions = bridge.getInstructions();
-      setBridgeInstructions(instructions);
+  const addServer = (serverData: Omit<BridgeServer, 'id'>): BridgeServer => {
+    const newServer: BridgeServer = {
+      ...serverData,
+      id: crypto.randomUUID(),
     };
-
-    updateBridge();
-    
-    const interval = setInterval(updateBridge, 5000);    
-    return () => clearInterval(interval);
-  }, [bridge]);
-
-  const value: BridgeContextType = {
-    isConnected: bridge.isConnected(),
-    bridgeTools,
-    bridgeInstructions,
+    setServers(prev => [...prev, newServer]);
+    return newServer;
   };
 
-  return <BridgeContext.Provider value={value}>{children}</BridgeContext.Provider>;
+  const updateServer = (id: string, updates: Partial<Omit<BridgeServer, 'id'>>) => {
+    setServers(prev => 
+      prev.map(server => 
+        server.id === id ? { ...server, ...updates } : server
+      )
+    );
+  };
+
+  const removeServer = (id: string) => {
+    setServers(prev => prev.filter(server => server.id !== id));
+  };
+
+  const toggleServer = (id: string) => {
+    setServers(prev => 
+      prev.map(server => 
+        server.id === id ? { ...server, enabled: !server.enabled } : server
+      )
+    );
+  };
+
+  const getEnabledServers = (): BridgeServer[] => {
+    return servers.filter(server => server.enabled);
+  };
+
+  return (
+    <BridgeContext.Provider
+      value={{
+        servers,
+        addServer,
+        updateServer,
+        removeServer,
+        toggleServer,
+        getEnabledServers,
+        isLoaded,
+      }}
+    >
+      {children}
+    </BridgeContext.Provider>
+  );
 }

@@ -1,10 +1,22 @@
 import { createContext } from 'react';
-import type { Tool } from '../types/chat';
 
-export type BridgeContextType = {
-  isConnected: boolean;
-  bridgeTools: Tool[];
-  bridgeInstructions: string | null;
+export type BridgeServer = {
+  id: string;
+  name: string;
+  description: string;
+  url: string;
+  headers?: Record<string, string>;
+  enabled: boolean;
 };
+
+export interface BridgeContextType {
+  servers: BridgeServer[];
+  addServer: (server: Omit<BridgeServer, 'id'>) => BridgeServer;
+  updateServer: (id: string, updates: Partial<Omit<BridgeServer, 'id'>>) => void;
+  removeServer: (id: string) => void;
+  toggleServer: (id: string) => void;
+  getEnabledServers: () => BridgeServer[];
+  isLoaded: boolean;
+}
 
 export const BridgeContext = createContext<BridgeContextType | undefined>(undefined);

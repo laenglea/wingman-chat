@@ -1,4 +1,52 @@
 import mime from 'mime';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
+import remarkRehype from 'remark-rehype';
+import rehypeStringify from 'rehype-stringify';
+import type { TextContent, ImageContent, AudioContent, FileContent } from '../types/chat';
+
+// Parse a data URL to extract mimeType and base64 data
+export function parseDataUrl(dataUrl: string): { mimeType: string; data: string } | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (match) {
+    return { mimeType: match[1], data: match[2] };
+  }
+  return null;
+}
+
+/**
+ * Serialize tool result content for API transmission.
+ * Strips binary data (images, audio, files) and replaces with text descriptions
+ * to avoid sending large base64 data URLs to the model which it cannot process.
+ */
+export function serializeToolResultForApi(result: (TextContent | ImageContent | AudioContent | FileContent)[]): string {
+  const serialized = result.map(item => {
+    if (item.type === 'text') {
+      return item;
+    }
+    if (item.type === 'image') {
+      return { 
+        type: 'text', 
+        text: `[Image${item.name ? `: ${item.name}` : ''} - displayed to user]` 
+      };
+    }
+    if (item.type === 'audio') {
+      return { 
+        type: 'text', 
+        text: `[Audio${item.name ? `: ${item.name}` : ''} - displayed to user]` 
+      };
+    }
+    if (item.type === 'file') {
+      return { 
+        type: 'text', 
+        text: `[File: ${item.name} - displayed to user]` 
+      };
+    }
+    return item;
+  });
+  return JSON.stringify(serialized);
+}
 
 export function lookupContentType(ext: string): string {
   const normalizedExt = ext.startsWith('.') ? ext : `.${ext}`;
@@ -37,6 +85,18 @@ export function readAsDataURL(blob: Blob): Promise<string> {
 
     reader.readAsDataURL(blob);
   });
+}
+
+export function decodeDataURL(dataURL: string): Blob {
+  const [header, base64] = dataURL.split(',');
+  const mimeType = header.match(/:(.*?);/)?.[1] || 'application/octet-stream';
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: mimeType });
 }
 
 export async function resizeImageBlob(
@@ -107,50 +167,6 @@ export function getFileExt(path: string): string {
   return parts.length > 1 ? "." + parts.pop() || "" : "";
 }
 
-export const textTypes = [
-  "text/csv",
-  "text/markdown",
-  "text/plain",
-  "application/json",
-  "application/sql",
-  "application/toml",
-  "application/x-yaml",
-  "application/xml",
-  "text/css",
-  "text/html",
-  "text/xml",
-  "text/yaml",
-  ".c",
-  ".cpp",
-  ".cs",
-  ".go",
-  ".html",
-  ".java",
-  ".js",
-  ".kt",
-  ".py",
-  ".rs",
-  ".ts",
-];
-
-export const imageTypes = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-];
-
-export const documentTypes = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ".msg",
-  ".eml",
-];
-
-export const supportedTypes = [...textTypes, ...imageTypes, ...documentTypes];
-
 export function isAudioUrl(url: string): boolean {
   const audioExtensions = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac'];
   
@@ -189,49 +205,111 @@ export function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
-export function stripMarkdown(text: string): string {
-  if (!text) return '';
+export function markdownToHtml(markdown: string): string {
+  if (!markdown) return '';
   
-  return text
-    // Remove headers but add spacing (2 lines before, 1 after)
-    .replace(/^#{1,6}\s+(.+)$/gm, '\n\n$1\n')
-    // Remove bold/italic
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    // Remove strikethrough
-    .replace(/~~([^~]+)~~/g, '$1')
-    // Remove inline code
-    .replace(/`([^`]+)`/g, '$1')
-    // Remove malformed code blocks (double backticks)
-    .replace(/``[\w]*\n?([\s\S]*?)``/g, (_, code) => {
-      const cleanCode = code.trim();
-      return `\n\n${cleanCode}\n\n`;
-    })
-    // Remove code blocks but keep content with spacing
-    .replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => {
-      const cleanCode = code.trim();
-      return `\n\n${cleanCode}\n\n`;
-    })
-    // Remove any remaining single backticks (malformed inline code)
-    .replace(/`/g, '')
-    // Remove links but keep text
+  try {
+    const result = unified()
+      .use(remarkParse)        // Parse markdown
+      .use(remarkGfm)          // Support tables, strikethrough, task lists, etc.
+      .use(remarkRehype, { allowDangerousHtml: true })       // Convert to HTML with raw HTML support
+      .use(rehypeStringify, { allowDangerousHtml: true })    // Stringify to HTML
+      .processSync(markdown);
+    
+    let html = String(result);
+    
+    // Add Word-compatible styling for tables
+    html = html
+      .replace(/<table>/g, '<table border="1" cellspacing="0" cellpadding="4" style="border-collapse: collapse; border: 1px solid black;">')
+      .replace(/<td>/g, '<td style="border: 1px solid black; padding: 4px;">')
+      .replace(/<th>/g, '<th style="border: 1px solid black; padding: 4px; font-weight: bold;">');
+    
+    return html;
+  } catch (error) {
+    console.error('Failed to convert markdown to HTML:', error);
+    return markdown;
+  }
+}
+
+export function markdownToText(markdown: string): string {
+  if (!markdown) return '';
+
+  const escapeHtml = (text: string) => text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  const unescapeHtml = (text: string) => text
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+
+  // Extract code blocks and inline code first to protect them from transformations
+  const codeBlocks: string[] = [];
+  const inlineCodes: string[] = [];
+  const CODE_BLOCK_PLACEHOLDER = '\u0000CB\u0000';
+  const INLINE_CODE_PLACEHOLDER = '\u0000IC\u0000';
+
+  // Extract fenced code blocks first
+  let processed = markdown.replace(/```[\s\S]*?\n([\s\S]*?)```/g, (_, code) => {
+    codeBlocks.push(code.trim());
+    return CODE_BLOCK_PLACEHOLDER;
+  });
+
+  // Extract inline code
+  processed = processed.replace(/`([^`]+)`/g, (_, code) => {
+    inlineCodes.push(code);
+    return INLINE_CODE_PLACEHOLDER;
+  });
+
+  // Simple markdown patterns to plain text (now safe from code content)
+  const text = processed
+    // Remove HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Headers - just the text with double newline
+    .replace(/^#{1,6}\s+(.+)$/gm, '$1\n')
+    // Bold/italic - keep text only (using word boundaries to avoid breaking identifiers)
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/__(.+?)__/g, '$1')
+    .replace(/(?<!\w)\*(.+?)\*(?!\w)/g, '$1')
+    .replace(/(?<!\w)_(.+?)_(?!\w)/g, '$1')
+    // Strikethrough
+    .replace(/~~(.*?)~~/g, '$1')
+    // Links - keep text only
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Remove images
+    .replace(/\[([^\]]+)\]\[[^\]]*\]/g, '$1')
+    // Images - keep alt text
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-    // Remove horizontal rules
-    .replace(/^[-*_]{3,}$/gm, '')
-    // Remove blockquotes but keep indentation
-    .replace(/^>\s+/gm, '  ')
-    // Convert unordered list markers to bullet points
-    .replace(/^[\s]*[-*+]\s+/gm, '• ')
-    // Convert numbered lists to numbered format
-    .replace(/^[\s]*(\d+)\.\s+/gm, '$1. ')
-    // Clean up extra whitespace (but preserve intentional spacing)
-    .replace(/\n{4,}/g, '\n\n\n')
-    .replace(/^\n+/, '')
+    // Lists - keep items with newlines
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    // Blockquotes
+    .replace(/^\s*>\s+/gm, '')
+    // Horizontal rules
+    .replace(/^[\s]*[-*_]{3,}[\s]*$/gm, '')
+    // Tables - preserve structure roughly
+    .replace(/\|/g, ' ')
+    .replace(/^[\s]*:?-+:?[\s]*$/gm, '')
+    // Restore code blocks
+    .replace(new RegExp(CODE_BLOCK_PLACEHOLDER, 'g'), () => {
+      const code = codeBlocks.shift() || '';
+      return escapeHtml(code) + '\n\n';
+    })
+    // Restore inline code
+    .replace(new RegExp(INLINE_CODE_PLACEHOLDER, 'g'), () => {
+      const code = inlineCodes.shift() || '';
+      return escapeHtml(code);
+    })
+    // Multiple blank lines to double newline
+    .replace(/\n{3,}/g, '\n\n')
+    // Trim
     .trim();
+
+  return unescapeHtml(text);
 }
 
 export function downloadFromUrl(url: string, filename: string = ''): void {
@@ -244,7 +322,9 @@ export function downloadFromUrl(url: string, filename: string = ''): void {
 }
 
 export function downloadBlob(blob: Blob, filename: string): void {
-  return downloadFromUrl(URL.createObjectURL(blob), filename);
+  const url = URL.createObjectURL(blob);
+  downloadFromUrl(url, filename);
+  URL.revokeObjectURL(url);
 }
 
 export function filenameFromUrl(src: string): string {
@@ -265,4 +345,42 @@ export function filenameFromUrl(src: string): string {
   }
   // For non-data URLs, don't attempt to infer; let the browser decide
   return '';
+}
+
+export function simplifyMarkdown(content: string): string {
+  // Remove markdown images: ![alt](url) or ![alt][ref]
+  content = content.replace(/!\[[^\]]*\]\([^)]+\)/g, '');
+  content = content.replace(/!\[[^\]]*\]\[[^\]]*\]/g, '');
+
+  // Remove HTML img tags
+  content = content.replace(/<img[^>]*>/gi, '');
+
+  // Remove data URLs (base64 embedded content)
+  content = content.replace(/data:[a-zA-Z0-9]+\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/g, '[data-url]');
+
+  // Remove other embedded data URLs (non-base64)
+  content = content.replace(/data:[a-zA-Z0-9]+\/[a-zA-Z0-9.+-]+,[^\s)"']+/g, '[data-url]');
+
+  // Remove SVG content (often very long)
+  content = content.replace(/<svg[\s\S]*?<\/svg>/gi, '[svg]');
+
+  // Remove style blocks
+  content = content.replace(/<style[\s\S]*?<\/style>/gi, '');
+
+  // Remove script blocks
+  content = content.replace(/<script[\s\S]*?<\/script>/gi, '');
+
+  // Remove HTML comments
+  content = content.replace(/<!--[\s\S]*?-->/g, '');
+
+  // Remove long hex color codes or hashes (more than 32 chars)
+  content = content.replace(/[a-f0-9]{32,}/gi, '[hash]');
+
+  // Collapse multiple consecutive blank lines into one
+  content = content.replace(/\n{3,}/g, '\n\n');
+
+  // Trim whitespace
+  content = content.trim();
+
+  return content;
 }

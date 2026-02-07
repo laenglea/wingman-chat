@@ -1,170 +1,115 @@
-import { useMemo, useEffect, useState, useRef } from "react";
-import type { Tool, Model } from "../types/chat";
+import { useMemo } from "react";
+import type { Tool, Model, ToolProvider } from "../types/chat";
+import { ProviderState } from "../types/chat";
 import { useProfile } from "./useProfile";
+import { useToolsContext } from "./useToolsContext";
+import { useArtifactsProvider } from "./useArtifactsProvider";
+import { useRepositoryProvider } from "./useRepositoryProvider";
+import { useSkillsProvider } from "./useSkillsProvider";
 import { useArtifacts } from "./useArtifacts";
-import { useRepository } from "./useRepository";
 import { useRepositories } from "./useRepositories";
-import { useBridge } from "./useBridge";
-import { useSearch } from "./useSearch";
-import { useImageGeneration } from "./useImageGeneration";
-import { MCPClient } from "../lib/mcp";
+import defaultInstructions from "../prompts/default.txt?raw";
 
 export interface ChatContext {
-  tools: Tool[];
-  instructions: string;
-  mcpConnected: boolean | null; // null = no MCP server, false = connecting, true = connected
-  mcpTools: Tool[];
+  tools: () => Promise<Tool[]>;
+  instructions: () => string;
 }
 
-/**
- * Shared hook for gathering completion tools and instructions
- * Used by both ChatProvider and VoiceProvider
- */
 export function useChatContext(mode: 'voice' | 'chat' = 'chat', model?: Model | null): ChatContext {
   const { generateInstructions } = useProfile();
-  const { artifactsTools, artifactsInstructions, isEnabled: isArtifactsEnabled } = useArtifacts();
+  const { providers, getProviderState } = useToolsContext();
+  
+  // Conditionally include artifacts, repository, and skills providers
+  const { isEnabled: artifactsEnabled, showArtifactsDrawer } = useArtifacts();
   const { currentRepository } = useRepositories();
-  
-  // Override query mode based on context mode
-  const queryMode = mode === 'voice' ? 'rag' : 'auto';
-  const { queryTools, queryInstructions } = useRepository(currentRepository?.id || '', queryMode);
-  
-  const { bridgeTools, bridgeInstructions } = useBridge();
-  const { searchTools, searchInstructions } = useSearch();
-  const { imageGenerationTools, imageGenerationInstructions } = useImageGeneration();
-  
-  // MCP Integration - simplified client management
-  const [mcpConnected, setMcpConnected] = useState<boolean | null>(null);
-  const [mcpTools, setMcpTools] = useState<Tool[]>([]);
-  const mcpClientRef = useRef<MCPClient | null>(null);
-  const mcpServerUrl = model?.mcpServer || null;
+  const artifactsProvider = useArtifactsProvider();
+  const repositoryProvider = useRepositoryProvider(currentRepository?.id || '');
+  const skillsProvider = useSkillsProvider();
 
-  // Handle MCP connection lifecycle - reconnect when model changes
-  useEffect(() => {
-    let isCancelled = false;
-
-    // Cleanup previous client
-    const cleanupPreviousClient = async () => {
-      if (mcpClientRef.current) {
-        await mcpClientRef.current.disconnect();
-        mcpClientRef.current = null;
+  const context = useMemo<ChatContext>(() => {
+    const getFilteredProviders = () => {
+      // Start with base providers
+      let filteredProviders = providers.filter((p: ToolProvider) => getProviderState(p.id) === ProviderState.Connected);
+      
+      // Add artifacts provider if conditions are met (enabled OR drawer is visible)
+      if (artifactsProvider && (artifactsEnabled || showArtifactsDrawer)) {
+        filteredProviders = [...filteredProviders, artifactsProvider];
       }
+      
+      // Add repository provider if current repository is set
+      if (repositoryProvider && currentRepository) {
+        filteredProviders = [...filteredProviders, repositoryProvider];
+      }
+      
+      // Add skills provider if it has enabled skills
+      if (skillsProvider) {
+        filteredProviders = [...filteredProviders, skillsProvider];
+      }
+      
+      // Further filter based on model configuration
+      if (model?.tools) {
+        const enabledTools = new Set(model.tools.enabled || []);
+        const disabledTools = new Set(model.tools.disabled || []);
+        
+        filteredProviders = filteredProviders.filter((provider: ToolProvider) => {
+          // Check provider ID against enabled/disabled lists
+          const matchId = provider.id;
+          
+          // If there are enabled tools specified, only include those
+          if (enabledTools.size > 0) {
+            return enabledTools.has(matchId);
+          }
+          // Otherwise, exclude disabled tools
+          return !disabledTools.has(matchId);
+        });
+      }
+      
+      return filteredProviders;
     };
-
-    const connectToMCP = async () => {
-      if (!mcpServerUrl) {
-        setMcpConnected(null); // null = no MCP server
-        setMcpTools([]);
-        return;
-      }
-
-      try {
-        await cleanupPreviousClient();
-        
-        if (isCancelled) return;
-        
-        setMcpConnected(false); // false = connecting
-        setMcpTools([]);
-
-        const client = new MCPClient(mcpServerUrl);
-        mcpClientRef.current = client;
-        
-        await client.connect();
-        
-        if (!isCancelled) {
-          setMcpConnected(true); // true = connected
-          setMcpTools(client.getChatTools());
-        }
-      } catch (error) {
-        if (!isCancelled) {
-          setMcpConnected(false); // false = connection failed
-          setMcpTools([]);
-          console.error('Failed to connect to MCP server:', error);
-        }
-      }
-    };
-
-    connectToMCP();
-
-    return () => {
-      isCancelled = true;
-      if (mcpClientRef.current) {
-        mcpClientRef.current.disconnect();
-        mcpClientRef.current = null;
-      }
-    };
-  }, [mcpServerUrl]); // Reconnect when mcpServerUrl changes
-
-  return useMemo(() => {
-    const profileInstructions = generateInstructions();
-    
-    const filesTools = isArtifactsEnabled ? artifactsTools() : [];
-    const filesInstructions = isArtifactsEnabled ? artifactsInstructions() : '';
-    
-    const repositoryTools = currentRepository ? queryTools() : [];
-    const repositoryInstructions = currentRepository ? queryInstructions() : '';
-
-    const webSearchTools = searchTools();
-    const webSearchInstructions = searchInstructions();
-
-    const imageGenTools = imageGenerationTools();
-    const imageGenInstructions = imageGenerationInstructions();
-
-    const completionTools = [...bridgeTools, ...repositoryTools, ...filesTools, ...webSearchTools, ...imageGenTools, ...mcpTools];
-
-    const instructionsList: string[] = [];
-
-    if (profileInstructions.trim()) {
-      instructionsList.push(profileInstructions);
-    }
-
-    if (filesInstructions.trim()) {
-      instructionsList.push(filesInstructions);
-    }
-
-    if (repositoryInstructions.trim()) {
-      instructionsList.push(repositoryInstructions);
-    }
-
-    if (bridgeTools.length > 0 && bridgeInstructions?.trim()) {
-      instructionsList.push(bridgeInstructions);
-    }
-
-    if (webSearchTools.length > 0 && webSearchInstructions?.trim()) {
-      instructionsList.push(webSearchInstructions);
-    }
-
-    if (imageGenTools.length > 0 && imageGenInstructions?.trim()) {
-      instructionsList.push(imageGenInstructions);
-    }
-
-    // Add mode-specific instructions
-    if (mode === 'voice') {
-      instructionsList.push('Respond concisely and naturally for voice interaction.');
-    }
 
     return {
-      tools: completionTools,
-      instructions: instructionsList.join('\n\n'),
-      mcpConnected,
-      mcpTools
+      tools: async () => {
+        const filteredProviders = getFilteredProviders();
+        
+        // Extract tools from filtered providers
+        const toolsArrays = filteredProviders.map((p: ToolProvider) => p.tools);
+
+        console.log("Compiled Tools from Providers:", toolsArrays);
+
+        return toolsArrays.flat();
+      },
+      
+      instructions: () => {
+        const filteredProviders = getFilteredProviders();
+        const profileInstructions = generateInstructions();
+        
+        const instructionsList: string[] = [];
+
+        if (profileInstructions.trim()) {
+          instructionsList.push(profileInstructions);
+        }
+        
+        if (defaultInstructions.trim()) {
+          instructionsList.push(defaultInstructions);
+        }
+
+        if (mode === 'voice') {
+          instructionsList.push('Respond concisely and naturally for voice interaction.');
+        }
+
+        // Add instructions from filtered providers
+        filteredProviders.forEach((provider: ToolProvider) => {
+          if (provider.instructions?.trim()) {
+            instructionsList.push(provider.instructions);
+          }
+        });
+
+        console.log("Compiled Instructions:", instructionsList);
+
+        return instructionsList.join('\n\n');
+      }
     };
-  }, [
-    mode,
-    generateInstructions,
-    isArtifactsEnabled,
-    artifactsTools,
-    artifactsInstructions,
-    currentRepository,
-    queryTools,
-    queryInstructions,
-    bridgeTools,
-    bridgeInstructions,
-    searchTools,
-    searchInstructions,
-    imageGenerationTools,
-    imageGenerationInstructions,
-    mcpConnected,
-    mcpTools
-  ]);
+  }, [mode, model, generateInstructions, providers, getProviderState, artifactsEnabled, showArtifactsDrawer, artifactsProvider, repositoryProvider, currentRepository, skillsProvider]);
+
+  return context;
 }

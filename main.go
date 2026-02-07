@@ -29,15 +29,33 @@ func main() {
 	bridgeURL := os.Getenv("BRIDGE_URL")
 
 	tts := os.Getenv("TTS_ENABLED") == "true"
+	ttsModel := os.Getenv("TTS_MODEL")
 	stt := os.Getenv("STT_ENABLED") == "true"
+	sttModel := os.Getenv("STT_MODEL")
 
 	voice := os.Getenv("VOICE_ENABLED") == "true"
+	voiceModel := os.Getenv("VOICE_MODEL")
+	voiceTranscriber := os.Getenv("VOICE_TRANSCRIBER")
 	vision := os.Getenv("VISION_ENABLED") == "true"
 
-	image := os.Getenv("IMAGE_ENABLED") == "true"
-	imageModel := os.Getenv("IMAGE_MODEL")
-
 	internet := os.Getenv("INTERNET_ENABLED") == "true"
+	internetScraper := os.Getenv("INTERNET_SCRAPER")
+	internetSearcher := os.Getenv("INTERNET_SEARCHER")
+	internetResearcher := os.Getenv("INTERNET_RESEARCHER")
+	internetElicitation := os.Getenv("INTERNET_ELICITATION") == "true"
+
+	researcher := os.Getenv("RESEARCHER_ENABLED") == "true"
+	researcherModel := os.Getenv("RESEARCHER_MODEL")
+
+	renderer := os.Getenv("RENDERER_ENABLED") == "true"
+	rendererModel := os.Getenv("RENDERER_MODEL")
+	rendererDisclaimer := os.Getenv("RENDERER_DISCLAIMER")
+	rendererElicitation := os.Getenv("RENDERER_ELICITATION") == "true"
+
+	extractor := os.Getenv("EXTRACTOR_ENABLED") == "true"
+	extractorModel := os.Getenv("EXTRACTOR_MODEL")
+
+	interpreter := os.Getenv("INTERPRETER_ENABLED") == "true"
 
 	artifacts := os.Getenv("ARTIFACTS_ENABLED") == "true"
 
@@ -46,17 +64,35 @@ func main() {
 	repositoryExtractor := os.Getenv("REPOSITORY_EXTRACTOR")
 	repositoryContextPages := os.Getenv("REPOSITORY_CONTEXT_PAGES")
 
+	workflow := os.Getenv("WORKFLOW_ENABLED") == "true"
+	recorder := os.Getenv("RECORDER_ENABLED") == "true"
+
+	chatRetentionDays := os.Getenv("CHAT_RETENTION_DAYS")
+
 	mux := http.NewServeMux()
 	dist := os.DirFS("dist")
 
 	mux.Handle("/", http.FileServerFS(dist))
 
 	mux.HandleFunc("GET /config.json", func(w http.ResponseWriter, r *http.Request) {
+		type toolType struct {
+			ID string `json:"id,omitempty" yaml:"id,omitempty"`
+
+			URL string `json:"url,omitempty" yaml:"url,omitempty"`
+
+			Name        string `json:"name,omitempty" yaml:"name,omitempty"`
+			Description string `json:"description,omitempty" yaml:"description,omitempty"`
+		}
+
 		type modelType struct {
 			ID string `json:"id,omitempty" yaml:"id,omitempty"`
 
 			Name        string `json:"name,omitempty" yaml:"name,omitempty"`
 			Description string `json:"description,omitempty" yaml:"description,omitempty"`
+
+			Effort    string `json:"effort,omitempty" yaml:"effort,omitempty"`
+			Summary   string `json:"summary,omitempty" yaml:"summary,omitempty"`
+			Verbosity string `json:"verbosity,omitempty" yaml:"verbosity,omitempty"`
 
 			MCP []string `json:"mcp,omitempty" yaml:"mcp,omitempty"`
 
@@ -64,48 +100,72 @@ func main() {
 		}
 
 		type ttsType struct {
-			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+			Model string `json:"model,omitempty" yaml:"model,omitempty"`
 		}
 
 		type sttType struct {
-			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+			Model string `json:"model,omitempty" yaml:"model,omitempty"`
 		}
 
 		type voiceType struct {
-			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+			Model       string `json:"model,omitempty" yaml:"model,omitempty"`
+			Transcriber string `json:"transcriber,omitempty" yaml:"transcriber,omitempty"`
 		}
 
 		type visionType struct {
-			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+			Files []string `json:"files,omitempty" yaml:"files,omitempty"`
 		}
 
-		type imageType struct {
-			Enabled bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-			Model   string `json:"model,omitempty" yaml:"model,omitempty"`
+		type textType struct {
+			Files []string `json:"files,omitempty" yaml:"files,omitempty"`
+		}
+
+		type extractorType struct {
+			Model string   `json:"model,omitempty" yaml:"model,omitempty"`
+			Files []string `json:"files,omitempty" yaml:"files,omitempty"`
 		}
 
 		type internetType struct {
-			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+			Searcher    string `json:"searcher,omitempty" yaml:"searcher,omitempty"`
+			Scraper     string `json:"scraper,omitempty" yaml:"scraper,omitempty"`
+			Researcher  string `json:"researcher,omitempty" yaml:"researcher,omitempty"`
+			Elicitation bool   `json:"elicitation,omitempty" yaml:"elicitation,omitempty"`
 		}
+
+		type rendererType struct {
+			Model       string `json:"model,omitempty" yaml:"model,omitempty"`
+			Disclaimer  string `json:"disclaimer,omitempty" yaml:"disclaimer,omitempty"`
+			Elicitation bool   `json:"elicitation,omitempty" yaml:"elicitation,omitempty"`
+		}
+
+		type interpreterType struct{}
 
 		type bridgeType struct {
 			URL string `json:"url,omitempty" yaml:"url,omitempty"`
 		}
 
-		type artifactsType struct {
-			Enabled bool `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-		}
+		type artifactsType struct{}
 
 		type repositoryType struct {
-			Enabled   bool   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 			Embedder  string `json:"embedder,omitempty" yaml:"embedder,omitempty"`
 			Extractor string `json:"extractor,omitempty" yaml:"extractor,omitempty"`
 
 			ContextPages *int `json:"context_pages,omitempty" yaml:"context_pages,omitempty"`
 		}
 
+		type workflowType struct{}
+
+		type recorderType struct{}
+
+		type researcherType struct {
+			Model string `json:"model,omitempty" yaml:"model,omitempty"`
+		}
+
+		type chatType struct {
+			RetentionDays *int `json:"retentionDays,omitempty" yaml:"retentionDays,omitempty"`
+		}
+
 		type translatorType struct {
-			Enabled   bool     `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 			Model     string   `json:"model,omitempty" yaml:"model,omitempty"`
 			Files     []string `json:"files,omitempty" yaml:"files,omitempty"`
 			Languages []string `json:"languages,omitempty" yaml:"languages,omitempty"`
@@ -119,22 +179,32 @@ func main() {
 			Title      string `json:"title,omitempty" yaml:"title,omitempty"`
 			Disclaimer string `json:"disclaimer,omitempty" yaml:"disclaimer,omitempty"`
 
+			Tools  []toolType  `json:"tools,omitempty" yaml:"tools,omitempty"`
 			Models []modelType `json:"models,omitempty" yaml:"models,omitempty"`
 
 			TTS *ttsType `json:"tts,omitempty" yaml:"tts,omitempty"`
 			STT *sttType `json:"stt,omitempty" yaml:"stt,omitempty"`
 
-			Voice  *voiceType  `json:"voice,omitempty" yaml:"voice,omitempty"`
-			Vision *visionType `json:"vision,omitempty" yaml:"vision,omitempty"`
+			Voice     *voiceType     `json:"voice,omitempty" yaml:"voice,omitempty"`
+			Vision    *visionType    `json:"vision,omitempty" yaml:"vision,omitempty"`
+			Text      *textType      `json:"text,omitempty" yaml:"text,omitempty"`
+			Extractor *extractorType `json:"extractor,omitempty" yaml:"extractor,omitempty"`
 
-			Image    *imageType    `json:"image,omitempty" yaml:"image,omitempty"`
-			Internet *internetType `json:"internet,omitempty" yaml:"internet,omitempty"`
+			Internet    *internetType    `json:"internet,omitempty" yaml:"internet,omitempty"`
+			Renderer    *rendererType    `json:"renderer,omitempty" yaml:"renderer,omitempty"`
+			Interpreter *interpreterType `json:"interpreter,omitempty" yaml:"interpreter,omitempty"`
 
 			Bridge *bridgeType `json:"bridge,omitempty" yaml:"bridge,omitempty"`
 
 			Artifacts  *artifactsType  `json:"artifacts,omitempty" yaml:"artifacts,omitempty"`
 			Repository *repositoryType `json:"repository,omitempty" yaml:"repository,omitempty"`
+
+			Workflow   *workflowType   `json:"workflow,omitempty" yaml:"workflow,omitempty"`
+			Recorder   *recorderType   `json:"recorder,omitempty" yaml:"recorder,omitempty"`
+			Researcher *researcherType `json:"researcher,omitempty" yaml:"researcher,omitempty"`
 			Translator *translatorType `json:"translator,omitempty" yaml:"translator,omitempty"`
+
+			Chat *chatType `json:"chat,omitempty" yaml:"chat,omitempty"`
 
 			Backgrounds map[string][]backgroundType `json:"backgrounds,omitempty" yaml:"backgrounds,omitempty"`
 		}
@@ -144,54 +214,136 @@ func main() {
 			Disclaimer: disclaimer,
 		}
 
+		if data, err := os.ReadFile("tools.yaml"); err == nil {
+			yaml.Unmarshal(data, &config.Tools)
+		}
+
 		if data, err := os.ReadFile("models.yaml"); err == nil {
 			yaml.Unmarshal(data, &config.Models)
 		}
 
 		if data, err := os.ReadFile("translator.yaml"); err == nil {
-			yaml.Unmarshal(data, &config.Translator)
-			config.Translator.Enabled = true
+			config.Translator = &translatorType{}
+			yaml.Unmarshal(data, config.Translator)
+		}
+
+		if data, err := os.ReadFile("vision.yaml"); err == nil {
+			config.Vision = &visionType{}
+			yaml.Unmarshal(data, config.Vision)
+		}
+
+		if data, err := os.ReadFile("text.yaml"); err == nil {
+			config.Text = &textType{}
+			yaml.Unmarshal(data, config.Text)
+		}
+
+		if data, err := os.ReadFile("extractor.yaml"); err == nil {
+			config.Extractor = &extractorType{}
+			yaml.Unmarshal(data, config.Extractor)
+		}
+
+		if data, err := os.ReadFile("internet.yaml"); err == nil {
+			config.Internet = &internetType{}
+			yaml.Unmarshal(data, config.Internet)
+		}
+
+		if data, err := os.ReadFile("renderer.yaml"); err == nil {
+			config.Renderer = &rendererType{}
+			yaml.Unmarshal(data, config.Renderer)
+		}
+
+		if data, err := os.ReadFile("repository.yaml"); err == nil {
+			config.Repository = &repositoryType{}
+			yaml.Unmarshal(data, config.Repository)
 		}
 
 		if data, err := os.ReadFile("backgrounds.yaml"); err == nil {
 			yaml.Unmarshal(data, &config.Backgrounds)
 		}
 
+		// Environment variables can override/enable configs
+		// Presence of the config object means enabled
+
 		if tts {
-			config.TTS = &ttsType{
-				Enabled: true,
+			if config.TTS == nil {
+				config.TTS = &ttsType{}
+			}
+
+			if ttsModel != "" {
+				config.TTS.Model = ttsModel
 			}
 		}
 
 		if stt {
-			config.STT = &sttType{
-				Enabled: true,
+			if config.STT == nil {
+				config.STT = &sttType{}
+			}
+
+			if sttModel != "" {
+				config.STT.Model = sttModel
 			}
 		}
 
 		if voice {
-			config.Voice = &voiceType{
-				Enabled: true,
+			if config.Voice == nil {
+				config.Voice = &voiceType{}
+			}
+
+			if voiceModel != "" {
+				config.Voice.Model = voiceModel
+			}
+
+			if voiceTranscriber != "" {
+				config.Voice.Transcriber = voiceTranscriber
 			}
 		}
 
-		if vision {
-			config.Vision = &visionType{
-				Enabled: true,
-			}
-		}
-
-		if image {
-			config.Image = &imageType{
-				Enabled: true,
-				Model:   imageModel,
-			}
+		if vision && config.Vision == nil {
+			config.Vision = &visionType{}
 		}
 
 		if internet {
-			config.Internet = &internetType{
-				Enabled: true,
+			if config.Internet == nil {
+				config.Internet = &internetType{}
 			}
+
+			if internetScraper != "" {
+				config.Internet.Scraper = internetScraper
+			}
+
+			if internetSearcher != "" {
+				config.Internet.Searcher = internetSearcher
+			}
+
+			if internetResearcher != "" {
+				config.Internet.Researcher = internetResearcher
+			}
+
+			if internetElicitation {
+				config.Internet.Elicitation = true
+			}
+		}
+
+		if renderer {
+			if config.Renderer == nil {
+				config.Renderer = &rendererType{}
+			}
+
+			if rendererModel != "" {
+				config.Renderer.Model = rendererModel
+			}
+
+			if rendererDisclaimer != "" {
+				config.Renderer.Disclaimer = rendererDisclaimer
+			}
+
+			if rendererElicitation {
+				config.Renderer.Elicitation = true
+			}
+		}
+
+		if interpreter {
+			config.Interpreter = &interpreterType{}
 		}
 
 		if bridgeURL != "" {
@@ -201,16 +353,20 @@ func main() {
 		}
 
 		if artifacts {
-			config.Artifacts = &artifactsType{
-				Enabled: true,
-			}
+			config.Artifacts = &artifactsType{}
 		}
 
 		if repository {
-			config.Repository = &repositoryType{
-				Enabled:   true,
-				Embedder:  repositoryEmbedder,
-				Extractor: repositoryExtractor,
+			if config.Repository == nil {
+				config.Repository = &repositoryType{}
+			}
+
+			if repositoryEmbedder != "" {
+				config.Repository.Embedder = repositoryEmbedder
+			}
+
+			if repositoryExtractor != "" {
+				config.Repository.Extractor = repositoryExtractor
 			}
 
 			if n, err := strconv.Atoi(repositoryContextPages); err == nil && n > 0 {
@@ -218,37 +374,74 @@ func main() {
 			}
 		}
 
+		if workflow {
+			config.Workflow = &workflowType{}
+		}
+
+		if recorder {
+			config.Recorder = &recorderType{}
+		}
+
+		if researcher {
+			if config.Researcher == nil {
+				config.Researcher = &researcherType{}
+			}
+
+			if researcherModel != "" {
+				config.Researcher.Model = researcherModel
+			}
+		}
+
+		if extractor {
+			if config.Extractor == nil {
+				config.Extractor = &extractorType{}
+			}
+
+			if extractorModel != "" {
+				config.Extractor.Model = extractorModel
+			}
+		}
+
+		if chatRetentionDays != "" {
+			if n, err := strconv.Atoi(chatRetentionDays); err == nil && n > 0 {
+				config.Chat = &chatType{
+					RetentionDays: &n,
+				}
+			}
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(config)
 	})
 
-	mux.HandleFunc("GET /manifest.json", func(w http.ResponseWriter, r *http.Request) {
-		manifest := map[string]any{
-			"name":             title,
-			"short_name":       title,
-			"start_url":        "/",
-			"display":          "standalone",
-			"background_color": "#0a0a0a",
-			"theme_color":      "#0a0a0a",
-			"orientation":      "portrait",
-			"icons": []map[string]any{
-				{
-					"src":     "/icon_light.png",
-					"sizes":   "512x512",
-					"type":    "image/png",
-					"purpose": "any maskable",
-				},
-				{
-					"src":   "/icon_light.svg",
-					"sizes": "any",
-					"type":  "image/svg+xml",
-				},
-			},
-		}
+	// mux.HandleFunc("GET /manifest.json", func(w http.ResponseWriter, r *http.Request) {
+	// 	manifest := map[string]any{
+	// 		"name":             title,
+	// 		"short_name":       title,
+	// 		"start_url":        "/",
+	// 		"display":          "standalone",
+	// 		"background_color": "#0a0a0a",
+	// 		"theme_color":      "#0a0a0a",
+	// 		"orientation":      "portrait",
+	// 		"icons": []map[string]any{
+	// 			{
+	// 				"src":     "/icon_light.png",
+	// 				"sizes":   "512x512",
+	// 				"type":    "image/png",
+	// 				"purpose": "any",
+	// 			},
+	// 			{
+	// 				"src":     "/icon_app.png",
+	// 				"sizes":   "512x512",
+	// 				"type":    "image/png",
+	// 				"purpose": "maskable",
+	// 			},
+	// 		},
+	// 	}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(manifest)
-	})
+	// 	w.Header().Set("Content-Type", "application/json")
+	// 	json.NewEncoder(w).Encode(manifest)
+	// })
 
 	if realtimeURL != nil {
 		mux.Handle("/api/v1/realtime", http.StripPrefix("/api", &httputil.ReverseProxy{

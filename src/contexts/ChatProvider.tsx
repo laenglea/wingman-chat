@@ -1,14 +1,14 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { Role } from "../types/chat";
-import type { Message, Model, ToolContext } from "../types/chat";
-import type { FileSystem } from "../types/file";
+import type { Message, ToolProvider, Model, ToolContext, PendingElicitation, ElicitationResult, Elicitation, Content } from '../types/chat';
+import { ProviderState } from '../types/chat';
 import { useModels } from "../hooks/useModels";
 import { useChats } from "../hooks/useChats";
 import { useChatContext } from "../hooks/useChatContext";
-import { useSearch } from "../hooks/useSearch";
 import { useArtifacts } from "../hooks/useArtifacts";
+import { useApp } from "../hooks/useApp";
+import { useToolsContext } from "../hooks/useToolsContext";
 import { getConfig } from "../config";
-import { parseResource } from "../lib/resource";
 import { ChatContext } from './ChatContext';
 import type { ChatContextType } from './ChatContext';
 
@@ -22,54 +22,65 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   const { models, selectedModel, setSelectedModel } = useModels();
   const { chats, createChat: createChatHook, updateChat, deleteChat: deleteChatHook } = useChats();
-  const { setEnabled: setSearchEnabled } = useSearch();
-  const { isAvailable: artifactsEnabled, setFileSystemForChat } = useArtifacts();
+  const { isAvailable: artifactsEnabled, setChatId: setArtifactsChatId } = useArtifacts();
+  const { getIframe, showDrawer } = useApp();
   const [chatId, setChatId] = useState<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
-  const messagesRef = useRef<Message[]>([]);
+  const [pendingElicitation, setPendingElicitation] = useState<PendingElicitation | null>(null);
+  const [streamingMessage, setStreamingMessage] = useState<{ chatId: string; message: Message } | null>(null);
 
   const chat = chats.find(c => c.id === chatId) ?? null;
   const model = chat?.model ?? selectedModel ?? models[0];
-  const { tools: chatTools, instructions: chatInstructions, mcpConnected, mcpTools } = useChatContext('chat', model);
+  const { tools: chatTools, instructions: chatInstructions } = useChatContext('chat', model);
+  const { providers, getProviderState, setProviderEnabled } = useToolsContext();
+
+  // Calculate tool providers connection state
+  const isInitializing = useMemo(() => {
+    const hasProviders = providers.length > 0;
+    if (!hasProviders) {
+      return null; // No providers configured
+    }
+    const isAnyInitializing = providers.some((p: ToolProvider) => getProviderState(p.id) === ProviderState.Initializing);
+    if (isAnyInitializing) {
+      return true; // At least one provider is initializing
+    }
+    return false; // All providers are ready
+  }, [providers, getProviderState]);
+
   const messages = useMemo(() => {
-    const msgs = chat?.messages ?? [];
-    messagesRef.current = msgs;
-    return msgs;
-  }, [chat?.messages]);
+    const baseMessages = chat?.messages ?? [];
 
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+    // Attach transient streaming content without persisting it on every token
+    if (streamingMessage && chat?.id === streamingMessage.chatId) {
+      return [...baseMessages, streamingMessage.message];
+    }
 
-  // Set up the filesystem for the current chat
+    return baseMessages;
+  }, [chat?.messages, chat?.id, streamingMessage]);
+
+  // Set up the artifacts filesystem for the current chat
   useEffect(() => {
-    if (!chat?.id || !artifactsEnabled) {
-      setFileSystemForChat(null, null);
+    if (!artifactsEnabled) {
+      setArtifactsChatId(null);
       return;
     }
 
-    // Create focused methods for filesystem access
-    const getFileSystem = () => chat.artifacts || {};
-    const setFileSystem = (artifacts: FileSystem) => {
-      updateChat(chat.id, () => ({ artifacts }));
-    };
+    setArtifactsChatId(chat?.id ?? null);
+  }, [chat?.id, artifactsEnabled, setArtifactsChatId]);
 
-    setFileSystemForChat(getFileSystem, setFileSystem);
-  }, [chat?.id, chat?.artifacts, artifactsEnabled, setFileSystemForChat, updateChat]);
-
-  const createChat = useCallback(() => {
-    const newChat = createChatHook();
+  const createChat = useCallback(async () => {
+    const newChat = await createChatHook();
     setChatId(newChat.id);
-    // Disable search when creating a new chat to prevent accidental usage
-    setSearchEnabled(false);
+    // Disable all tools when creating a new chat to prevent accidental usage
+    providers.forEach((p: ToolProvider) => setProviderEnabled(p.id, false));
     return newChat;
-  }, [createChatHook, setSearchEnabled]);
+  }, [createChatHook, providers, setProviderEnabled]);
 
   const selectChat = useCallback((chatId: string) => {
     setChatId(chatId);
-    // Disable search when switching chats to prevent accidental usage
-    setSearchEnabled(false);
-  }, [setSearchEnabled]);
+    // Disable all tools when switching chats to prevent accidental usage
+    providers.forEach((p: ToolProvider) => setProviderEnabled(p.id, false));
+  }, [providers, setProviderEnabled]);
 
   const deleteChat = useCallback(
     (id: string) => {
@@ -89,7 +100,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   }, [chat, updateChat, setSelectedModel]);
 
-  const getOrCreateChat = useCallback(() => {
+  const getOrCreateChat = useCallback(async () => {
     if (!model) {
       throw new Error('no model selected');
     }
@@ -98,7 +109,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     let chatItem = id ? chats.find(c => c.id === id) || null : null;
 
     if (!chatItem) {
-      chatItem = createChatHook();
+      chatItem = await createChatHook();
       chatItem.model = model;
 
       setChatId(chatItem.id);
@@ -111,86 +122,127 @@ export function ChatProvider({ children }: ChatProviderProps) {
   }, [model, createChatHook, updateChat, setChatId, chatId, chats]);
 
   const addMessage = useCallback(
-    (message: Message) => {
-      const { id } = getOrCreateChat();
-      
-      const currentMessages = messagesRef.current;
-      const updatedMessages = [...currentMessages, message];
-      
-      messagesRef.current = updatedMessages;
-      updateChat(id, () => ({ messages: updatedMessages }));
+    async (message: Message) => {
+      const { id } = await getOrCreateChat();
+
+      // Use the updater pattern to get fresh messages from the chat
+      updateChat(id, (currentChat) => ({
+        messages: [...(currentChat.messages || []), message]
+      }));
     },
     [getOrCreateChat, updateChat]
   );
 
   const sendMessage = useCallback(
-    async (message: Message) => {
-      const { id, chat: chatObj } = getOrCreateChat();
+    async (message: Message, historyOverride?: Message[]) => {
+      const { id, chat: chatObj } = await getOrCreateChat();
 
-      const history = chats.find(c => c.id === id)?.messages || [];
+      const history = historyOverride ?? (chats.find(c => c.id === id)?.messages || []);
       let conversation = [...history, message];
 
       updateChat(id, () => ({ messages: conversation }));
       setIsResponding(true);
 
-      // Create tool context with current message attachments
-      const toolContext: ToolContext = {
-        attachments: () => message.attachments || []
-      };
+      // Create tool context with current message content and elicitation support
+      const createToolContext = (currentToolCall: { id: string; name: string }): ToolContext => ({
+        content: () => message.content.filter(p => 
+          p.type === 'text' || p.type === 'image' || p.type === 'file'
+        ) as Content[],
+        elicit: (elicitation: Elicitation): Promise<ElicitationResult> => {
+          return new Promise((resolve) => {
+            setPendingElicitation({
+              toolCallId: currentToolCall.id,
+              toolName: currentToolCall.name,
+              elicitation,
+              resolve,
+            });
+          });
+        },
+        render: async (): Promise<HTMLIFrameElement> => {
+          console.log('[Render] Getting iframe for tool call:', currentToolCall.id, currentToolCall.name);
+          
+          // Get the persistent iframe from the drawer
+          const iframe = getIframe();
+          
+          if (!iframe) {
+            throw new Error('App drawer iframe not available. Make sure the drawer is mounted.');
+          }
+          
+          // Show the drawer when rendering
+          showDrawer();
+          
+          return iframe;
+        }
+      });
 
       try {
+        // Get tools and instructions when needed
+        const tools = await chatTools();
+        const instructions = chatInstructions();
+
         // Main completion loop to handle tool calls
         while (true) {
-          // Create empty assistant message for this completion iteration
-          updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: '' }] }));
-          
+          // Track streaming content in-memory to avoid writing the full conversation on every token
+          setStreamingMessage({ chatId: id, message: { role: Role.Assistant, content: [] } });
+
           const assistantMessage = await client.complete(
             model!.id,
-            chatInstructions,
+            instructions,
             conversation,
-            chatTools,
-            (_, snapshot) => {
-              // Use the conversation state instead of fetching from chats to avoid stale closure
-              updateChat(id, () => ({ messages: [...conversation, { role: Role.Assistant, content: snapshot }] }))
+            tools,
+            (contentParts) => {
+              setStreamingMessage({ 
+                chatId: id, 
+                message: { 
+                  role: Role.Assistant, 
+                  content: contentParts
+                } 
+              });
+            },
+            {
+              effort: model?.effort,
+              summary: model?.summary,
+              verbosity: model?.verbosity,
             }
           );
-          
-          // Add the assistant message to conversation
-          conversation = [...conversation, {
-            role: Role.Assistant,
-            content: assistantMessage.content ?? "",
-            toolCalls: assistantMessage.toolCalls,
-          }];
 
-          // Update UI with the assistant message
+          // Add the assistant message to conversation
+          conversation = [...conversation, assistantMessage];
+
+          // Commit the completed message once per turn
           updateChat(id, () => ({ messages: conversation }));
 
+          // Clear streaming buffer now that the message is persisted
+          setStreamingMessage(null);
+
           // Check if there are tool calls to handle
-          const toolCalls = assistantMessage.toolCalls;
-          
-          if (!toolCalls || toolCalls.length === 0) {
+          const toolCalls = assistantMessage.content.filter(p => p.type === 'tool_call');
+
+          if (toolCalls.length === 0) {
             // No tool calls, we're done
             break;
           }
 
           // Handle each tool call
           for (const toolCall of toolCalls) {
-            const tool = chatTools.find((t) => t.name === toolCall.name);
+            if (toolCall.type !== 'tool_call') continue;
+            
+            const tool = tools.find((t) => t.name === toolCall.name);
 
             if (!tool) {
-              // Tool not found - add error message
+              // Tool not found - add error message as user message with tool result
               conversation = [...conversation, {
-                role: Role.Tool,
-                content: '',
-                error: {
-                  code: 'TOOL_NOT_FOUND',
-                  message: `Tool "${toolCall.name}" is not available or not executable.`
-                },
-                toolResult: {
+                role: Role.User,
+                content: [{
+                  type: 'tool_result',
                   id: toolCall.id,
                   name: toolCall.name,
                   arguments: toolCall.arguments,
-                  data: `Error: Tool "${toolCall.name}" not found or not executable.`
+                  result: [{ type: 'text', text: `Error: Tool "${toolCall.name}" not found or not executable.` }]
+                }],
+                error: {
+                  code: 'TOOL_NOT_FOUND',
+                  message: `Tool "${toolCall.name}" is not available or not executable.`
                 },
               }];
 
@@ -199,50 +251,41 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
             try {
               const args = JSON.parse(toolCall.arguments || "{}");
-              let content = await tool.function(args, toolContext);
+              const toolContext = createToolContext(toolCall);
 
-              const data = content;
-              const attachments = parseResource(data);
+              const result = await tool.function(args, toolContext);
 
-              if (attachments) {
-                content = JSON.stringify({
-                  successful: true
-                });
-              }
+              // Clear pending elicitation after tool completes
+              setPendingElicitation(null);
 
-              if (!content) {
-                content = 'No result returned';
-              }
-              
-              // Add tool result to conversation
+              // Add tool result to conversation as user message
               conversation = [...conversation, {
-                role: Role.Tool,
-                content: content,
-                attachments,
-                toolResult: {
+                role: Role.User,
+                content: [{
+                  type: 'tool_result',
                   id: toolCall.id,
                   name: toolCall.name,
                   arguments: toolCall.arguments,
-                  data: data,
-                },
+                  result: result,
+                }],
               }];
             }
             catch (error) {
               console.error("Tool failed", error);
 
-              // Add tool error to conversation
+              // Add tool error to conversation as user message
               conversation = [...conversation, {
-                role: Role.Tool,
-                content: '',
-                error: {
-                  code: 'TOOL_EXECUTION_ERROR',
-                  message: 'The tool could not complete the requested action. Please try again or use a different approach.'
-                },
-                toolResult: {
+                role: Role.User,
+                content: [{
+                  type: 'tool_result',
                   id: toolCall.id,
                   name: toolCall.name,
                   arguments: toolCall.arguments,
-                  data: "error: tool execution failed."
+                  result: [{ type: 'text', text: 'error: tool execution failed.' }]
+                }],
+                error: {
+                  code: 'TOOL_EXECUTION_ERROR',
+                  message: 'The tool could not complete the requested action. Please try again or use a different approach.'
                 },
               }];
             }
@@ -254,23 +297,33 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
         setIsResponding(false);
 
+        // Ensure streaming buffer is cleared after completion
+        setStreamingMessage(null);
+
         if (!chatObj.title || conversation.length % 3 === 0) {
           client
-            .summarize(model!.id, conversation)
-            .then(title => updateChat(id, () => ({ title })));
+            .summarizeTitle(model!.id, conversation)
+            .then(title => {
+              if (title) {
+                updateChat(id, () => ({ title }));
+              }
+            });
         }
       } catch (error) {
         console.error(error);
         setIsResponding(false);
 
-        if (error?.toString().includes('missing finish_reason')) return;
+        if (error?.toString().includes('missing finish_reason')) {
+          setStreamingMessage(null);
+          return;
+        }
 
         // Determine error code and user-friendly message based on error type
         let errorCode = 'COMPLETION_ERROR';
         let errorMessage = 'An unexpected error occurred while generating the response.';
 
         const errorString = error?.toString() || '';
-        
+
         if (errorString.includes('500')) {
           errorCode = 'SERVER_ERROR';
           errorMessage = 'The server encountered an internal error. Please try again in a moment.';
@@ -291,9 +344,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
           errorMessage = 'Network connection failed. Please check your internet connection and try again.';
         }
 
-        conversation = [...conversation, { 
-          role: Role.Assistant, 
-          content: '',
+        conversation = [...conversation, {
+          role: Role.Assistant,
+          content: [],
           error: {
             code: errorCode,
             message: errorMessage
@@ -301,8 +354,20 @@ export function ChatProvider({ children }: ChatProviderProps) {
         }];
 
         updateChat(id, () => ({ messages: conversation }));
+
+        // Ensure streaming buffer is cleared on errors
+        setStreamingMessage(null);
       }
-    }, [getOrCreateChat, chats, updateChat, chatTools, chatInstructions, client, model, setIsResponding]);
+    }, [getOrCreateChat, chats, updateChat, client, model, setIsResponding, chatTools, chatInstructions, getIframe, showDrawer]);
+
+
+
+  const resolveElicitation = useCallback((result: ElicitationResult) => {
+    if (pendingElicitation) {
+      pendingElicitation.resolve(result);
+      setPendingElicitation(null);
+    }
+  }, [pendingElicitation]);
 
   const value: ChatContextType = {
     // Models
@@ -314,7 +379,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
     chats,
     chat,
     messages,
-    isResponding,
 
     // Chat actions
     createChat,
@@ -326,9 +390,12 @@ export function ChatProvider({ children }: ChatProviderProps) {
     addMessage,
     sendMessage,
 
-    // MCP state
-    mcpConnected,
-    mcpTools,
+    isResponding,
+    isInitializing,
+
+    // Elicitation
+    pendingElicitation,
+    resolveElicitation,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

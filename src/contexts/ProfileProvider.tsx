@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { ProfileContext } from './ProfileContext';
 import type { ProfileSettings } from './ProfileContext';
-import { setValue, getValue, deleteValue } from '../lib/db';
+import { usePersistedState } from '../hooks/usePersistedState';
+import { getPersonaContent } from '../lib/personas';
+import type { PersonaKey } from '../lib/personas';
 
 interface ProfileProviderProps {
   children: ReactNode;
 }
 
 // Helper function to filter out empty/null values from profile settings
-const filterEmptySettings = (settings: ProfileSettings): ProfileSettings => {
+const filterEmptySettings = (settings: ProfileSettings): ProfileSettings | undefined => {
   const filtered: Record<string, unknown> = {};
   
   Object.keys(settings).forEach(key => {
@@ -24,120 +25,66 @@ const filterEmptySettings = (settings: ProfileSettings): ProfileSettings => {
     }
   });
   
-  return filtered as ProfileSettings;
+  // Return undefined if empty (will delete file)
+  return Object.keys(filtered).length > 0 ? filtered as ProfileSettings : undefined;
 };
 
 export function ProfileProvider({ children }: ProfileProviderProps) {
-  const [settings, setSettings] = useState<ProfileSettings>({});
-
-  // Load settings from database on mount
-  useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const saved = await getValue<ProfileSettings>('profile');
-        if (saved) {
-          setSettings(prev => ({ ...prev, ...saved }));
-        } else {
-          // Migration: Check if there are settings in localStorage
-          const legacySettings = localStorage.getItem('profile-settings');
-          if (legacySettings) {
-            try {
-              const parsed = JSON.parse(legacySettings);
-              // Remove the instructions field if it exists (from old format)
-              if ('instructions' in parsed) {
-                delete parsed.instructions;
-              }
-              const cleanedSettings = filterEmptySettings(parsed);
-              if (Object.keys(cleanedSettings).length > 0) {
-                setSettings(prev => ({ ...prev, ...cleanedSettings }));
-                // Save migrated settings to database
-                await setValue('profile', cleanedSettings);
-              }
-              // Remove the old localStorage entry
-              localStorage.removeItem('profile-settings');
-            } catch (error) {
-              console.warn('Failed to migrate legacy profile settings:', error);
-            }
+  const { value: settings, setValue: setSettings, isLoaded } = usePersistedState<ProfileSettings>({
+    key: 'profile.json',
+    defaultValue: {},
+    debounceMs: 300,
+    
+    migrate: () => {
+      const legacySettings = localStorage.getItem('profile-settings');
+      if (legacySettings) {
+        try {
+          const parsed = JSON.parse(legacySettings);
+          if ('instructions' in parsed) {
+            delete parsed.instructions;
           }
+          localStorage.removeItem('profile-settings');
+          return filterEmptySettings(parsed) || {};
+        } catch {
+          return undefined;
         }
-      } catch (error) {
-        console.warn('Failed to load profile settings:', error);
       }
-    };
+      return undefined;
+    },
     
-    loadSettings();
-  }, []);
-
-  // Save settings to database when they change
-  useEffect(() => {
-    const saveSettings = async () => {
-      try {
-        const filteredSettings = filterEmptySettings(settings);
-        // Only save if there are non-empty settings
-        if (Object.keys(filteredSettings).length > 0) {
-          await setValue('profile', filteredSettings);
-        } else {
-          // If all settings are empty, remove the profile from storage
-          await deleteValue('profile');
-        }
-      } catch (error) {
-        console.warn('Failed to save profile settings:', error);
-      }
-    };
-    
-    saveSettings();
-  }, [settings]);
+    onLoad: (data) => filterEmptySettings(data) || {},
+    onSave: (data) => filterEmptySettings(data),
+  });
 
   const updateSettings = (updates: Partial<ProfileSettings>) => {
     setSettings(prev => ({ ...prev, ...updates }));
   };
 
-  const generateInstructions = () => {
-    return generateInstructionsFromSettings(settings);
-  };
-
-  const generateInstructionsFromSettings = (settings: ProfileSettings): string => {
-    const instructions: string[] = [];
+  const generateInstructions = (): string => {
+    const sections: string[] = [];
     
-    if (settings.name || settings.role || settings.profile) {
-      instructions.push('````text');
-      
-      if (settings.name) {
-        instructions.push(`My name is ${settings.name.trim()}.`);
-      }
-      
-      if (settings.role) {
-        instructions.push(`I am a ${settings.role.trim()}.`);
-      }
-      
-      if (settings.profile) {
-        instructions.push(`About me: ${settings.profile.trim()}`);
-      }
-      
-      instructions.push('````');
-      instructions.push('');
+    // Add persona/personality first
+    const personaContent = getPersonaContent(settings.persona as PersonaKey);
+    
+    if (personaContent) {
+      sections.push(personaContent);
     }
     
-    if (settings.traits && settings.traits.length > 0) {
-      instructions.push(`Please be ${settings.traits.join(', ')} when responding to the user.`);
+    // Add user profile
+    const profileParts: string[] = [];
+    if (settings.name) profileParts.push(`- **Name**: ${settings.name.trim()}`);
+    if (settings.role) profileParts.push(`- **Role**: ${settings.role.trim()}`);
+    if (settings.profile) profileParts.push(`- **About**: ${settings.profile.trim()}`);
+    
+    if (profileParts.length > 0) {
+      sections.push(`## User Profile\n\n${profileParts.join('\n')}`);
     }
     
-    // Return empty string if no instructions
-    if (instructions.length === 0) {
-      return '';
-    }
-    
-   return `
-## User Profile
-
-This is the profile of the user you are chatting with:
-
-${instructions.join('\n')}
-`.trim();
+    return sections.join('\n\n');
   };
 
   return (
-    <ProfileContext.Provider value={{ settings, updateSettings, generateInstructions }}>
+    <ProfileContext.Provider value={{ settings, updateSettings, generateInstructions, isLoaded }}>
       {children}
     </ProfileContext.Provider>
   );

@@ -1,22 +1,32 @@
-import { useRef } from 'react';
-import { WavStreamPlayer, WavRecorder } from 'wavtools';
-import { AttachmentType } from '../types/chat';
-import type { Message, Tool } from '../types/chat';
+import { useRef, useEffect } from 'react';
+import { AudioStreamPlayer } from '../lib/AudioStreamPlayer';
+import { AudioRecorder } from '../lib/AudioRecorder';
+import { float32ToPcm16 } from '../lib/audio';
+import { serializeToolResultForApi } from '../lib/utils';
+import { getTextFromContent } from '../types/chat';
+import type { Message, Tool, TextContent, ImageContent, AudioContent, FileContent } from '../types/chat';
 
-/**
- * Hook to manage OpenAI Realtime voice streaming via WebSockets with PCM16.
- */
 export function useVoiceWebSockets(
   onUser: (text: string) => void,
   onAssistant: (text: string) => void
 ) {
   const wsRef = useRef<WebSocket | null>(null);
-  const wavPlayerRef = useRef<WavStreamPlayer | null>(null);
-  const wavRecorderRef = useRef<WavRecorder | null>(null);
+  const wavPlayerRef = useRef<AudioStreamPlayer | null>(null);
+  const wavRecorderRef = useRef<AudioRecorder | null>(null);
   // current track ID for audio playback; bump after interrupt to allow restart
   const trackIdRef = useRef<string>(crypto.randomUUID());
 
   const isActiveRef = useRef(false);
+  
+  // Use refs to always have the latest callbacks
+  const onUserRef = useRef(onUser);
+  const onAssistantRef = useRef(onAssistant);
+  
+  // Keep refs updated with latest callbacks
+  useEffect(() => {
+    onUserRef.current = onUser;
+    onAssistantRef.current = onAssistant;
+  }, [onUser, onAssistant]);
 
   const start = async (
     realtimeModel: string = "gpt-realtime",
@@ -29,13 +39,13 @@ export function useVoiceWebSockets(
     isActiveRef.current = true;
 
     try {
-      // Initialize WavStreamPlayer for audio playback
-      const player = new WavStreamPlayer({ sampleRate: 24000 });
+      // Initialize AudioStreamPlayer for audio playback
+      const player = new AudioStreamPlayer({ sampleRate: 24000 });
       await player.connect();
       wavPlayerRef.current = player;
 
-      // Initialize WavRecorder for audio input
-      const recorder = new WavRecorder({ sampleRate: 24000 });
+      // Initialize AudioRecorder for audio input
+      const recorder = new AudioRecorder({ sampleRate: 24000 });
       await recorder.begin();
       wavRecorderRef.current = recorder;
 
@@ -65,11 +75,9 @@ export function useVoiceWebSockets(
                   type: 'audio/pcm',
                   rate: 24000,
                 },
-
-                noise_reduction: {
-                  type: 'near_field'
+                transcription: {
+                  model: transcribeModel,
                 },
-
                 turn_detection: {
                   type: 'server_vad',
                   create_response: true,
@@ -77,20 +85,14 @@ export function useVoiceWebSockets(
                   silence_duration_ms: 700,
                   threshold: 0.7,
                 },
-
-                transcription: {
-                  model: transcribeModel,
-                }
               },
-
               output: {
                 format: {
                   type: 'audio/pcm',
                   rate: 24000,
                 },
-
                 voice: 'alloy',
-              }
+              },
             },
 
             ...(tools && tools.length > 0 && {
@@ -116,24 +118,15 @@ export function useVoiceWebSockets(
             }> = [];
 
             // Add main message content
-            if (message.content) {
+            const messageText = getTextFromContent(message.content);
+            if (messageText) {
               content.push({
                 type: message.role === 'user' ? 'input_text' : 'text',
-                text: message.content
+                text: messageText
               });
             }
 
-            // Add text attachments
-            if (message.attachments) {
-              message.attachments
-                .filter(a => a.type === AttachmentType.Text)
-                .forEach(attachment => {
-                  content.push({
-                    type: message.role === 'user' ? 'input_text' : 'text',
-                    text: `// ${attachment.name}\n${attachment.data}`
-                  });
-                });
-            }
+            // Note: Images and files in content are not sent over voice WebSocket
 
             const conversationItem = {
               type: 'conversation.item.create',
@@ -213,7 +206,7 @@ export function useVoiceWebSockets(
             console.log('Transcription completed:', msg.transcript);
 
             if (msg.transcript?.trim()) {
-              onUser(msg.transcript);
+              onUserRef.current(msg.transcript);
             }
             break;
 
@@ -243,7 +236,10 @@ export function useVoiceWebSockets(
                 try {
                   const args = JSON.parse(msg.item.arguments);
                   const result = await tool.function(args);
-                  output = result;
+                  // Serialize result, stripping binary data from images/audio/files
+                  output = typeof result === 'string' 
+                    ? result 
+                    : serializeToolResultForApi(result as (TextContent | ImageContent | AudioContent | FileContent)[]);
                   console.log('Function result:', result);
                 } catch (error) {
                   console.error('Error executing tool:', error);
@@ -283,7 +279,7 @@ export function useVoiceWebSockets(
             console.log('Response complete:', msg.response);
 
             if (msg.response?.output?.[0]?.content?.[0]?.transcript) {
-              onAssistant(msg.response.output[0].content[0].transcript);
+              onAssistantRef.current(msg.response.output[0].content[0].transcript);
             }
             break;
 
@@ -369,21 +365,10 @@ export function useVoiceWebSockets(
 
 
   // Convert Float32Array of audio data to base64-encoded PCM16
-  const floatTo16BitPCM = (float32Array: Float32Array) => {
-    const buffer = new ArrayBuffer(float32Array.length * 2);
-    const view = new DataView(buffer);
-    let offset = 0;
-    for (let i = 0; i < float32Array.length; i++, offset += 2) {
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-    }
-    return buffer;
-  };
-
   const base64EncodeAudio = (float32Array: Float32Array) => {
-    const arrayBuffer = floatTo16BitPCM(float32Array);
+    const pcm16 = float32ToPcm16(float32Array);
     let binary = '';
-    const bytes = new Uint8Array(arrayBuffer);
+    const bytes = new Uint8Array(pcm16.buffer);
     const chunkSize = 0x8000; // 32KB chunk size
     for (let i = 0; i < bytes.length; i += chunkSize) {
       const chunk = bytes.subarray(i, i + chunkSize);

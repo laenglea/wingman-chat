@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { ReactNode } from "react";
 import { getConfig } from "../config";
 import { downloadFromUrl } from "../lib/utils";
@@ -25,26 +25,18 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
   const [translatedFileName, setTranslatedFileName] = useState<string | null>(null);
   const [lastTranslatedText, setLastTranslatedText] = useState(""); // Track what was last translated
   const [error, setError] = useState<string | null>(null);
-
-  // Refs for stable references
-  const sourceTextRef = useRef(sourceText);
-  const targetLangRef = useRef(targetLang);
-
-  // Update refs when state changes
-  useEffect(() => {
-    sourceTextRef.current = sourceText;
-  }, [sourceText]);
-
-  useEffect(() => {
-    targetLangRef.current = targetLang;
-  }, [targetLang]);
+  
+  // Track previous tone/style for detecting changes (using state for adjust-during-render pattern)
+  const [prevTone, setPrevTone] = useState(tone);
+  const [prevStyle, setPrevStyle] = useState(style);
+  const [shouldRetranslate, setShouldRetranslate] = useState(false);
 
   // Derived state
   const selectedLanguage = supportedLanguages().find(l => l.code === targetLang);
 
-  // Actions with stable references
+  // Translation action
   const performTranslate = useCallback(async (langCode?: string, textToTranslate?: string, toneToUse?: string, styleToUse?: string) => {
-    const langToUse = langCode ?? targetLangRef.current;
+    const langToUse = langCode ?? targetLang;
     const toneValue = toneToUse ?? tone;
     const styleValue = styleToUse ?? style;
     
@@ -96,7 +88,7 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     }
     
     // Handle text translation
-    const textToUse = textToTranslate ?? sourceTextRef.current;
+    const textToUse = textToTranslate ?? sourceText;
 
     if (!textToUse.trim()) {
       setTranslatedText("");
@@ -111,7 +103,7 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
       if (typeof result === 'string') {
         // Apply tone/style rewriting if either is not empty
         if (toneValue || styleValue) {
-          const rewrittenResult = await client.rewriteText(config.translator.model || '', result, langToUse, toneValue, styleValue);
+          const rewrittenResult = await client.rewriteText(config.translator?.model || '', result, langToUse, toneValue, styleValue);
           setTranslatedText(rewrittenResult);
         } else {
           setTranslatedText(result);
@@ -125,7 +117,7 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [client, selectedFile, tone, style, config.translator.model]);
+  }, [client, selectedFile, tone, style, config.translator?.model, targetLang, sourceText]);
 
   const handleReset = useCallback(() => {
     setSourceText("");
@@ -152,10 +144,10 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     setLastTranslatedText("");
     
     // Automatically translate with new language if there's source text (but not if file is selected)
-    if (sourceTextRef.current.trim() && !selectedFile) {
-      await performTranslate(newLangCode, sourceTextRef.current, tone, style);
+    if (sourceText.trim() && !selectedFile) {
+      await performTranslate(newLangCode, sourceText, tone, style);
     }
-  }, [performTranslate, selectedFile, tone, style]);
+  }, [performTranslate, selectedFile, tone, style, sourceText]);
 
   // Auto-translate effect (1 second delay) - only if text hasn't been translated yet
   useEffect(() => {
@@ -166,14 +158,26 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [sourceText, targetLang, tone, style, performTranslate, selectedFile, lastTranslatedText]);
+  }, [sourceText, targetLang, performTranslate, selectedFile, lastTranslatedText, tone, style]);
 
-  // Auto-rewrite when tone or style changes (if there's already translated text)
+  // Detect tone/style changes during render and schedule re-translation
+  // Using "adjust state during render" pattern
+  if (tone !== prevTone || style !== prevStyle) {
+    setPrevTone(tone);
+    setPrevStyle(style);
+    // Schedule re-translation if we have translated text
+    if (lastTranslatedText && !selectedFile && !isLoading) {
+      setShouldRetranslate(true);
+    }
+  }
+
+  // Handle the re-translation in a separate effect (triggered by state flag)
   useEffect(() => {
-    if (sourceText.trim() && !selectedFile && lastTranslatedText) {
+    if (shouldRetranslate) {
+      setShouldRetranslate(false);
       performTranslate(targetLang, sourceText, tone, style);
     }
-  }, [tone, style, targetLang, sourceText, selectedFile, lastTranslatedText, performTranslate]);
+  }, [shouldRetranslate, performTranslate, targetLang, sourceText, tone, style]);
 
   const selectFile = useCallback((file: File) => {
     setSelectedFile(file);
@@ -198,6 +202,14 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
   const handleSetSourceText = useCallback((text: string) => {
     setSourceText(text);
     setError(null); // Clear any errors when changing source text
+    
+    // If source text is cleared, also clear the translated text
+    if (!text.trim()) {
+      setTranslatedText("");
+      setLastTranslatedText("");
+      return;
+    }
+    
     // If user is changing the source text, clear the tracking so auto-translate can work
     if (text !== lastTranslatedText) {
       setLastTranslatedText("");

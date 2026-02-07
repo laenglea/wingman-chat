@@ -1,5 +1,99 @@
+import { docxToMarkdown } from './docx';
+import { pptxToMarkdown } from './pptx';
+import { xlsxToCsv } from './xlsx';
+
 // Artifact kind type
 export type ArtifactKind = 'text' | 'code' | 'svg' | 'html' | 'csv' | 'mermaid' | 'markdown';
+
+// Re-export HTML transformation utilities
+export { transformHtmlForPreview, type TransformResult } from './artifactsHtml';
+
+// Result type for processed files
+export interface ProcessedFile {
+  path: string;
+  content: string;
+  contentType: string;
+}
+
+// Process an uploaded file, converting XLSX to CSV and DOCX to Markdown when detected
+export async function processUploadedFile(file: File): Promise<ProcessedFile[]> {
+  const fileName = file.name.toLowerCase();
+
+  // Handle XLSX files -> convert to CSV
+  const isXlsx = fileName.endsWith('.xlsx') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+  if (isXlsx) {
+    try {
+      const results = await xlsxToCsv(file);
+      const baseName = file.name.replace(/\.xlsx$/i, '');
+
+      return results.map((result) => {
+        // For single sheet, use simple filename; for multiple sheets, include sheet name
+        const csvPath = results.length === 1
+          ? `/${baseName}.csv`
+          : `/${baseName}_${result.sheetName}.csv`;
+
+        return {
+          path: csvPath,
+          content: result.csv,
+          contentType: 'text/csv'
+        };
+      });
+    } catch (error) {
+      console.error(`Error converting XLSX file ${file.name}:`, error);
+      // Fall through to default text handling on error
+    }
+  }
+
+  // Handle DOCX files -> extract to Markdown
+  const isDocx = fileName.endsWith('.docx') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+  if (isDocx) {
+    try {
+      const markdown = await docxToMarkdown(file);
+      const baseName = file.name.replace(/\.docx$/i, '');
+
+      return [{
+        path: `/${baseName}.md`,
+        content: markdown,
+        contentType: 'text/markdown'
+      }];
+    } catch (error) {
+      console.error(`Error converting DOCX file ${file.name}:`, error);
+      // Fall through to default text handling on error
+    }
+  }
+
+  // Handle PPTX files -> extract to Markdown
+  const isPptx = fileName.endsWith('.pptx') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+
+  if (isPptx) {
+    try {
+      const markdown = await pptxToMarkdown(file);
+      const baseName = file.name.replace(/\.pptx$/i, '');
+
+      return [{
+        path: `/${baseName}.md`,
+        content: markdown,
+        contentType: 'text/markdown'
+      }];
+    } catch (error) {
+      console.error(`Error converting PPTX file ${file.name}:`, error);
+      // Fall through to default text handling on error
+    }
+  }
+
+  // Default: read as text
+  const content = await file.text();
+  return [{
+    path: `/${file.name}`,
+    content,
+    contentType: file.type || 'text/plain'
+  }];
+}
 
 // Helper function to get the language/extension from a file path
 export function artifactLanguage(path: string): string {

@@ -1,6 +1,5 @@
-import { Bridge } from "./lib/bridge";
 import { Client } from "./lib/client";
-import type { Model } from "./types/chat";
+import type { MCP, Model } from "./types/chat";
 
 interface backgroundConfig {
   url: string;
@@ -14,55 +13,93 @@ interface config {
   title: string;
   disclaimer: string;
 
+  tools: toolConfig[];
   models: modelConfig[];
+
   backgrounds?: backgroundPackConfig;
-  
+
   tts?: ttsConfig;
   stt?: sttConfig;
 
+  workflow?: workflowConfig;
+  recorder?: recorderConfig;
+
   voice?: voiceConfig;
   vision?: visionConfig;
-  
-  image?: imageConfig;
-  
+
+  text?: textConfig;
+
   bridge?: bridgeConfig;
   internet?: internetConfig;
-  
+
+  renderer?: rendererConfig;
+  extractor?: extractorConfig;
+  interpreter?: interpreterConfig;
+
   artifacts?: artifactsConfig;
-  repository?: repositoryConfig;  
+  repository?: repositoryConfig;
   translator?: translatorConfig;
+  researcher?: researcherConfig;
+
+  chat?: chatConfig;
 }
 
 interface modelConfig {
   id: string;
-  name: string;
 
-  model?: string;
+  name: string;
   description?: string;
 
-  mcp: string[];
+  effort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+  summary?: 'auto' | 'concise' | 'detailed';
+  verbosity?: 'low' | 'medium' | 'high';
+
+  tools?: {
+    enabled: string[];
+    disabled: string[];
+  };
+
   prompts?: string[];
 }
 
+interface toolConfig {
+  id: string;
+
+  url: string;
+
+  name: string;
+  description: string;
+}
+
 interface ttsConfig {
-  enabled: boolean;
+  model?: string;
 }
 
 interface sttConfig {
-   enabled: boolean;
+  model?: string;
 }
 
+type workflowConfig = object;
+
+type recorderConfig = object;
+
 interface voiceConfig {
-  enabled: boolean;
+  model?: string;
+  transcriber?: string;
+}
+
+interface textConfig {
+  files: string[];
 }
 
 interface visionConfig {
-  enabled: boolean;
+  files: string[];
 }
 
-interface imageConfig {
-  enabled: boolean;
-  model?: string
+interface rendererConfig {
+  model?: string;
+  disclaimer?: string;
+  elicitation?: boolean;
 }
 
 interface bridgeConfig {
@@ -70,26 +107,41 @@ interface bridgeConfig {
 }
 
 interface internetConfig {
-  enabled: boolean;
+  scraper?: string;
+  searcher?: string;
+  researcher?: string;
+  elicitation?: boolean;
+}
+
+type interpreterConfig = object;
+
+interface extractorConfig {
+  model?: string;
+  files: string[];
 }
 
 interface repositoryConfig {
-  enabled: boolean;
   embedder?: string;
   extractor?: string;
 
   context_pages?: number;
 }
 
-interface artifactsConfig {
-  enabled: boolean;
-}
+type artifactsConfig = object;
 
 interface translatorConfig {
-  enabled: boolean;
-  model?: string
+  model?: string;
   files: string[];
+
   languages: string[];
+}
+
+interface researcherConfig {
+  model?: string;
+}
+
+interface chatConfig {
+  retentionDays?: number;
 }
 
 interface Config {
@@ -98,22 +150,33 @@ interface Config {
 
   client: Client;
 
+  mcps: MCP[];
   models: Model[];
 
-  tts: boolean;
-  stt: boolean;
-  
-  voice: boolean;
-  vision: boolean;
+  tts: ttsConfig | null;
+  stt: sttConfig | null;
 
-  image: imageConfig;
-  
-  bridge: Bridge;
+  workflow: workflowConfig | null;
+  recorder: recorderConfig | null;
 
-  internet: internetConfig;
-  artifacts: artifactsConfig;
-  repository: repositoryConfig;  
-  translator: translatorConfig; 
+  voice: voiceConfig | null;
+  vision: visionConfig | null;
+
+  text: textConfig | null;
+  extractor: extractorConfig | null;
+
+  bridge: bridgeConfig | null;
+  internet: internetConfig | null;
+
+  renderer: rendererConfig | null;
+  interpreter: interpreterConfig | null;
+
+  artifacts: artifactsConfig | null;
+  repository: repositoryConfig | null;
+  translator: translatorConfig | null;
+  researcher: researcherConfig | null;
+
+  chat: chatConfig | null;
 
   backgrounds: backgroundPackConfig;
 }
@@ -128,81 +191,143 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       throw new Error(`failed to load config.json: ${resp.statusText}`);
     }
 
-    const cfg : config = await resp.json();
-
-    const bridgeUrl = cfg.bridge?.url ?? ""
+    const cfg: config = await resp.json();
 
     const client = new Client();
-    const bridge = Bridge.create(bridgeUrl);
 
     config = {
-      title : cfg.title,
+      title: cfg.title,
       disclaimer: cfg.disclaimer,
-      
+
       client: client,
 
-      models: cfg.models?.map((model) => {
-        return {
-          id: model.id,
+      mcps:
+        cfg.tools?.map((mcp) => {
+          return {
+            id: mcp.id,
 
-          name: model.name,
-          description: model.description,
+            name: mcp.name,
+            description: mcp.description,
 
-          prompts: model.prompts,
+            url:
+              mcp.url ??
+              new URL(
+                `/api/v1/mcp/${mcp.id}`,
+                window.location.origin,
+              ).toString(),
+          };
+        }) ?? [],
 
-          mcpServer: model.mcp && model.mcp.length > 0 ? new URL(`/api/v1/mcp/${model.mcp[0]}`, window.location.origin).toString() : undefined,
-        };
-      }) ?? [],
+      models:
+        cfg.models?.map((model) => {
+          return {
+            id: model.id,
 
-      tts: cfg.tts?.enabled ?? false,
-      stt: cfg.stt?.enabled ?? false,
-      
-      voice: cfg.voice?.enabled ?? false,
-      vision: cfg.vision?.enabled ?? false,
-      
-      image: cfg.image ?? {
-        enabled: false,
-      },
-      
-      bridge: bridge,
+            name: model.name,
+            description: model.description,
 
-      internet: cfg.internet ?? {
-        enabled: false,
-      },
+            effort: model.effort,
+            summary: model.summary,
+            verbosity: model.verbosity,
 
-      repository: cfg.repository ?? {
-        enabled: false
-      },
+            prompts: model.prompts,
 
-      artifacts: cfg.artifacts ?? {
-        enabled: false
-      },
-      
-      translator: cfg.translator ?? {
-        enabled: true,
+            tools: model.tools,
+          };
+        }) ?? [],
 
-        files: [
-          // ".txt",
-          // ".md",
-          // ".pdf",
-          // ".docx",
-          // ".pptx",
-          // ".xlsx",
+      tts: cfg.tts ?? null,
+      stt: cfg.stt ?? null,
+
+      workflow: cfg.workflow ?? null,
+      recorder: cfg.recorder ?? null,
+
+      voice: cfg.voice ?? null,
+
+      vision: cfg.vision
+        ? {
+            files: cfg.vision.files ?? [
+              "image/jpeg",
+              "image/png",
+              "image/gif",
+              "image/webp",
+            ],
+          }
+        : null,
+
+      text: {
+        files: cfg.text?.files ?? [
+          "text/csv",
+          "text/markdown",
+          "text/plain",
+          "application/json",
+          "application/sql",
+          "application/toml",
+          "application/x-yaml",
+          "application/xml",
+          "text/css",
+          "text/html",
+          "text/xml",
+          "text/yaml",
+
+          ".c",
+          ".cpp",
+          ".cs",
+          ".go",
+          ".html",
+          ".java",
+          ".js",
+          ".kt",
+          ".md",
+          ".py",
+          ".rs",
+          ".ts",
         ],
-        
-        languages: [
-          "en",
-          "de",
-          "fr",
-          "it",
-          "es",
-        ],
       },
+
+      extractor: cfg.extractor
+        ? {
+            files: cfg.extractor.files ?? [
+              "application/pdf",
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+              ".msg",
+              ".eml",
+            ],
+          }
+        : null,
+
+      bridge: cfg.bridge ?? null,
+      internet: cfg.internet ?? null,
+      renderer: cfg.renderer ?? null,
+      interpreter: cfg.interpreter ?? null,
+      repository: cfg.repository ?? null,
+      artifacts: cfg.artifacts ?? null,
+
+      translator: cfg.translator
+        ? {
+            model: cfg.translator.model,
+            files: cfg.translator.files ?? [],
+            languages: cfg.translator.languages ?? [
+              "en",
+              "de",
+              "fr",
+              "it",
+              "es",
+            ],
+          }
+        : null,
+
+      researcher: cfg.researcher ?? null,
+
+      chat: cfg.chat ?? null,
 
       backgrounds: cfg.backgrounds ?? {},
-    }
+    };
 
-    if (config.repository.enabled && !config.repository.context_pages) {
+    if (config.repository && !config.repository.context_pages) {
       config.repository.context_pages = 150;
     }
 

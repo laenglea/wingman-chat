@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { Chat, Message, Model, Tool } from "../types/chat";
+import type { Chat, Message, Model, PendingElicitation, ElicitationResult } from "../types/chat";
 
 export interface ChatContextType {
   // Models
@@ -14,17 +14,20 @@ export interface ChatContextType {
   isResponding: boolean;
 
   // Chat actions
-  createChat: () => Chat;
+  createChat: () => Promise<Chat>;
   selectChat: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
-  updateChat: (chatId: string, updater: (chat: Chat) => Partial<Chat>) => void;
+  updateChat: (chatId: string, updater: (chat: Chat) => Partial<Chat>, options?: { preserveDates?: boolean }) => void;
 
-  addMessage: (message: Message) => void;
-  sendMessage: (message: Message, tools?: Tool[]) => Promise<void>;
+  addMessage: (message: Message) => Promise<void>;
+  sendMessage: (message: Message, historyOverride?: Message[]) => Promise<void>;
 
-  // MCP state
-  mcpConnected: boolean | null; // null = no MCP server, false = connecting, true = connected
-  mcpTools: Tool[]; // Available MCP tools
+  // Tool providers state (from global ToolsContext)
+  isInitializing: boolean | null; // null = no providers, true = initializing, false = all ready
+
+  // Elicitation state
+  pendingElicitation: PendingElicitation | null;
+  resolveElicitation: (result: ElicitationResult) => void;
 }
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined);

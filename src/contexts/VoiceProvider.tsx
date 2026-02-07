@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useVoiceWebSockets } from "../hooks/useVoiceWebSockets";
 import { useChat } from "../hooks/useChat";
 import { useChatContext } from "../hooks/useChatContext";
@@ -13,21 +13,18 @@ interface VoiceProviderProps {
 
 export function VoiceProvider({ children }: VoiceProviderProps) {
   const [isListening, setIsListening] = useState(false);
-  const [isAvailable, setIsAvailable] = useState(false);
+  const config = getConfig();
+  const [isAvailable] = useState(() => {
+    try {
+      return !!config.voice;
+    } catch (error) {
+      console.warn('Failed to get voice config:', error);
+      return false;
+    }
+  });
   const { addMessage, messages, chat, models, model: selectedModel } = useChat();
   const model = chat?.model ?? selectedModel ?? models[0];
   const { tools: chatTools, instructions: chatInstructions } = useChatContext('voice', model);
-
-  // Check voice availability from config
-  useEffect(() => {
-    try {
-      const config = getConfig();
-      setIsAvailable(config.voice);
-    } catch (error) {
-      console.warn('Failed to get voice config:', error);
-      setIsAvailable(false);
-    }
-  }, []);
 
   const onUserTranscript = useCallback((text: string) => {
     let content = text;
@@ -56,7 +53,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
     console.log('User transcript:', { original: text, processed: content });
 
     if (content.trim()) {
-      addMessage({ role: Role.User, content });
+      addMessage({ role: Role.User, content: [{ type: 'text', text: content }] });
     }
   }, [addMessage]);
 
@@ -87,7 +84,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
     console.log('Assistant transcript:', { original: text, processed: content });
 
     if (content.trim()) {
-      addMessage({ role: Role.Assistant, content });
+      addMessage({ role: Role.Assistant, content: [{ type: 'text', text: content }] });
     }
   }, [addMessage]);
 
@@ -100,7 +97,9 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const startVoice = useCallback(async () => {
     try {
-      await start(undefined, undefined, chatInstructions, messages, chatTools);
+      const realtimeModel = config.voice?.model;
+      const transcribeModel = config.voice?.transcriber ?? config.stt?.model;
+      await start(realtimeModel, transcribeModel, chatInstructions(), messages, await chatTools());
       setIsListening(true);
     } catch (error) {
       console.error('Failed to start voice mode:', error);
@@ -112,7 +111,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
         alert('Failed to start voice mode. Please check your microphone permissions and try again.');
       }
     }
-  }, [chatInstructions, chatTools, start, messages]);
+  }, [chatInstructions, chatTools, start, messages, config.voice?.model, config.voice?.transcriber, config.stt?.model]);
 
   const value: VoiceContextType = {
     isAvailable,

@@ -1,46 +1,45 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { Tool as MCPTool, ContentBlock } from "@modelcontextprotocol/sdk/types.js";
-import type { Tool } from '../types/chat';
+import { StreamableHTTPClientTransport as ClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { CallToolResult, ContentBlock as MCPContentBlock, ResourceContents as MCPResourceContents, Tool as MCPTool } from "@modelcontextprotocol/sdk/types.js";
+import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { Tool, ToolContext, ToolProvider, TextContent, ImageContent, AudioContent, FileContent } from '../types/chat';
+import { Rocket } from "lucide-react";
 
-/**
- * Process MCP content blocks into a string response
- */
-function processContent(content: ContentBlock[]): string {
-  if (!content || content.length === 0) {
-    return "no content";
-  }
+export class MCPClient implements ToolProvider {
+  readonly id: string;
+  readonly url: string;
 
-  if (content.every(item => item.type === "text")) {
-    return content
-      .map(item => item.text)
-      .filter(text => text.trim() !== "")
-      .join("\n\n");
-  }
+  readonly name: string;
+  readonly description?: string;
+  
+  readonly icon = Rocket;
 
-  if (content.length === 1) {
-    return JSON.stringify(content[0]);
-  }
+  readonly headers?: Record<string, string>;
 
-  return JSON.stringify(content);
-}
-
-/**
- * Simple MCP Client
- * Handles connection to a single MCP server
- */
-export class MCPClient {
   private client: Client | null = null;
-  private tools: MCPTool[] = [];
-  private serverUrl: string;
+  
+  private pingInterval: ReturnType<typeof setInterval> | undefined;
 
-  constructor(serverUrl: string) {
-    this.serverUrl = serverUrl;
+  instructions?: string;
+
+  tools: Tool[] = [];
+  uiResources: Map<string, MCPResourceContents> = new Map();
+
+  constructor(
+    id: string, 
+    url: string, 
+    name: string, 
+    description: string,
+    headers?: Record<string, string>
+  ) {
+    this.id = id;
+    this.url = url;
+    
+    this.name = name;
+    this.description = description;
+    this.headers = headers;
   }
-
-  /**
-   * Connect to the MCP server
-   */
+  
   async connect(): Promise<void> {
     if (this.client) {
       await this.disconnect();
@@ -52,28 +51,44 @@ export class MCPClient {
         initialReconnectionDelay: 1000,
         reconnectionDelayGrowFactor: 1.5,
         maxRetries: -1,
-      }
+      },
+      requestInit: this.headers ? { headers: this.headers } : undefined,
     };
 
-    const transport = new StreamableHTTPClientTransport(new URL(this.serverUrl), opts);
+    const url = new URL(this.url);
+    const transport = new ClientTransport(url, opts);
 
-    this.client = new Client({
+    const client = new Client({
       name: 'Wingman Chat',
       version: '1.0.0'
     });
 
-    await this.client.connect(transport);
+    // Setup error and close handlers
+    client.onclose = () => {
+      console.warn('MCP client connection closed');
+      //this.handleDisconnect();
+    };
 
-    const toolsResponse = await this.client.listTools();
-    this.tools = toolsResponse.tools || [];
+    client.onerror = (error) => {
+      console.error('MCP client connection error:', error);
+      //this.handleDisconnect();
+    };
 
-    console.log(`Connected to MCP server ${this.serverUrl}, found ${this.tools.length} tools`);
+    await client.connect(transport);
+
+    console.log('MCP client connected');
+    
+    this.client = client;
+    
+    // Load and store tools and instructions after connection
+    await this.loadToolsAndInstructions();
+
+    this.startPing();
   }
-
-  /**
-   * Disconnect from the MCP server
-   */
+  
   async disconnect(): Promise<void> {
+    this.stopPing();
+    
     if (this.client) {
       try {
         await this.client.close();
@@ -82,65 +97,207 @@ export class MCPClient {
       }
       this.client = null;
       this.tools = [];
+      this.uiResources.clear();
+      this.instructions = undefined;
     }
   }
-
-  /**
-   * Check if connected
-   */
-  isConnected(): boolean {
-    return this.client !== null;
+  
+  private handleDisconnect(): void {
+    this.stopPing();
+    this.client = null;
+    this.tools = [];
+    this.uiResources.clear();
+    this.instructions = undefined;
   }
-
-  /**
-   * Get available tools
-   */
-  getTools(): MCPTool[] {
-    return this.tools;
-  }
-
-  /**
-   * Call an MCP tool
-   */
-  async callTool(toolName: string, args: Record<string, unknown>): Promise<string> {
+  
+  private async loadToolsAndInstructions(): Promise<void> {
     if (!this.client) {
-      throw new Error('MCP client not connected');
+      return;
     }
 
     try {
-      console.log('Calling MCP tool:', toolName, args);
-      const result = await this.client.callTool({
-        name: toolName,
-        arguments: args
-      });
+      // Load instructions
+      this.instructions = this.client.getInstructions();
       
-      // Process the content from the result
-      if (result && result.content) {
-        return processContent(result.content as ContentBlock[]);
-      }
+      // Load tools
+      const toolsResponse = await this.client.listTools();
+      const tools = toolsResponse.tools || [];
+
+      this.tools = tools.map((tool) => ({
+        name: tool.name,
+
+        description: tool.description || "",
+        parameters: tool.inputSchema || {},
+
+        function: async (args: Record<string, unknown>, context?: ToolContext) => {
+          if (!this.client) {
+            throw new Error('MCP client not connected');
+          }
+
+          const result = await this.client.callTool({
+            name: tool.name,
+            arguments: args
+          });
+          
+          // Handle both current and compatibility result formats
+          // Compatibility format has toolResult field, current has content field
+          const normalizedResult: CallToolResult = 'toolResult' in result
+            ? (result.toolResult as CallToolResult) 
+            : (result as CallToolResult);
+          
+          const resource = this.uiResources.get(tool.name);
+          
+          if (resource && context?.render) {
+            await this.renderToolUI(tool.name, resource, normalizedResult, context);
+            return [{ type: 'text' as const, text: "The tool result has been rendered in an interactive UI component and is now visible to the user." }];
+          }
+          
+          return processContent(normalizedResult.content as MCPContentBlock[]);
+        },
+      }));
       
-      return "no result";
+      // Load resources for tools that have ui/resourceUri meta field
+      await this.loadUIResources(tools);
     } catch (error) {
-      console.error(`Error calling MCP tool ${toolName}:`, error);
-      throw error;
+      console.error('Error loading tools and instructions:', error);
     }
   }
-
-  /**
-   * Convert MCP tools to our Tool format
-   */
-  getChatTools(): Tool[] {
-    if (!this.isConnected()) {
-      return [];
+  
+  private async renderToolUI(
+    toolName: string,
+    resource: MCPResourceContents,
+    result: CallToolResult,
+    context: ToolContext
+  ): Promise<void> {
+    const iframe = await context.render!();
+    
+    const bridge = new AppBridge(
+      this.client!,
+      { name: "Wingman Chat", version: "1.0.0" },
+      { openLinks: {}, serverTools: {}, logging: {} }
+    );
+    
+    const transport = new PostMessageTransport(
+      iframe.contentWindow!,
+      iframe.contentWindow!,
+    );
+    
+    bridge.oninitialized = () => {
+      console.log("Guest UI initialized for tool:", toolName);
+      bridge.sendToolResult(result);
+    };
+    
+    await bridge.connect(transport);
+    
+    const htmlContent = 'text' in resource
+      ? (resource.text as string)
+      : 'blob' in resource
+        ? atob(resource.blob as string)
+        : '<html><body>No content available</body></html>';
+    
+    iframe.contentWindow!.document.open();
+    iframe.contentWindow!.document.writeln(htmlContent);
+    iframe.contentWindow!.document.close();
+  }
+  
+  private async loadUIResources(tools: MCPTool[]): Promise<void> {
+    if (!this.client) {
+      return;
     }
 
-    return this.tools.map((tool) => ({
-      name: tool.name,
-      description: tool.description || "",
-      parameters: tool.inputSchema || {},
-      function: async (args: Record<string, unknown>) => {
-        return this.callTool(tool.name, args);
-      },
-    }));
+    // Collect unique resource URIs and their associated tool names
+    const uriToTools = new Map<string, string[]>();
+    
+    for (const tool of tools) {
+      let resourceUri: string | undefined = undefined;
+
+      if (tool._meta?.ui && typeof tool._meta.ui === 'object' && 'resourceUri' in tool._meta.ui) {
+        resourceUri = (tool._meta.ui as Record<string, unknown>).resourceUri as string | undefined;
+      } else if (tool._meta && typeof tool._meta === 'object' && 'ui/resourceUri' in tool._meta) {
+        resourceUri = (tool._meta['ui/resourceUri'] as string) || undefined;
+      }
+
+      if (resourceUri) {
+        const toolNames = uriToTools.get(resourceUri) || [];
+        toolNames.push(tool.name);
+        uriToTools.set(resourceUri, toolNames);
+      }
+    }
+
+    // Load resources in parallel
+    await Promise.all(
+      Array.from(uriToTools.entries()).map(async ([uri, toolNames]) => {
+        try {
+          const result = await this.client!.readResource({ uri });
+          const content = result.contents[0];
+
+          if (content) {
+            for (const toolName of toolNames) {
+              this.uiResources.set(toolName, content);
+            }
+          }
+        } catch (error) {
+          console.error(`Error loading resource ${uri}:`, error);
+        }
+      })
+    );
   }
+  
+  private startPing(): void {
+    // Clear any existing interval
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+    }
+
+    // Ping every 30 seconds
+    this.pingInterval = setInterval(async () => {
+      if (this.client) {
+        try {
+          await this.client.ping();
+        } catch (error) {
+          console.error('MCP client ping failed:', error);
+          this.handleDisconnect();
+        }
+      } else {
+        this.stopPing();
+      }
+    }, 20000);
+  }
+  
+  private stopPing(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = undefined;
+    }
+  }
+  
+  isConnected(): boolean {
+    return this.client !== null;
+  }
+}
+
+type ToolResultContent = TextContent | ImageContent | AudioContent | FileContent;
+
+function processContent(input: MCPContentBlock[]): ToolResultContent[] {
+  if (!input?.length) {
+    return [{ type: 'text' as const, text: 'no content' }];
+  }
+
+  const result = input
+    .map((block): ToolResultContent | null => {
+      if (block.type === "text") {
+        return { type: "text" as const, text: block.text || "" };
+      }
+
+      if (block.type === "image") {
+        const mimeType = block.mimeType || "image/png";
+        const data = `data:${mimeType};base64,${block.data || ""}`;
+        return { type: "image" as const, data };
+      }
+
+      return null;
+    })
+    .filter((c): c is ToolResultContent => c !== null);
+
+  return result.length ? result : [{ type: 'text' as const, text: JSON.stringify(input.length === 1 ? input[0] : input) }];
 }

@@ -2,8 +2,70 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Hide scrollbar utility */
+@layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
+
 :root {
   --viewport-height: 100dvh;
+}
+
+/* Global scrollbar: thin and only visible while interacting (iOS-like) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  -webkit-overflow-scrolling: touch;
+  overflow-anchor: none;
+}
+
+*::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+}
+
+*:hover,
+*:focus-visible,
+*:active {
+  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+}
+
+*:hover::-webkit-scrollbar-thumb,
+*:focus-visible::-webkit-scrollbar-thumb,
+*:active::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+.dark *:hover,
+.dark *:focus-visible,
+.dark *:active {
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+.dark *:hover::-webkit-scrollbar-thumb,
+.dark *:focus-visible::-webkit-scrollbar-thumb,
+.dark *:active::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.35);
+}
+
+/* Prevent horizontal-only scroll containers from blocking vertical page scroll */
+.overflow-x-auto {
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  overflow-y: visible !important;
 }
 
 html, body {
@@ -36,143 +98,23 @@ body {
   outline: none !important;
 }
 
-[role="button"] {
-  cursor: pointer !important;
-}
-
-[role="button"]:disabled {
-  cursor: not-allowed !important;
-}
-
-/* Headless UI Button and MenuButton components */
+button,
+[role="button"],
 button[data-headlessui-state],
 [data-headlessui-state=""] {
   cursor: pointer;
 }
 
+button:disabled,
+[role="button"]:disabled,
 button[data-headlessui-state]:disabled,
 [data-headlessui-state]:disabled {
   cursor: not-allowed;
 }
 
-.nav-header {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.1);
-}
-
-.dark .nav-header {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-}
-
 .max-content-width {
   max-width: 900px;
   margin: 0 auto;
-}
-
-.sidebar {
-  @apply bg-neutral-100 dark:bg-neutral-900 dark:text-neutral-200;
-}
-
-.sidebar-scroll {
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: none;
-  overflow-anchor: none;
-  
-  /* Firefox - hidden by default, visible on hover */
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-.sidebar-scroll:hover {
-  scrollbar-color: rgba(0, 0, 0, 0.3) transparent;
-}
-
-.dark .sidebar-scroll:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
-}
-
-/* Webkit browsers - hidden by default, visible on hover */
-.sidebar-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 4px;
-}
-
-.sidebar-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.3);
-}
-
-.dark .sidebar-scroll:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.3);
-}
-
-/* Hide scrollbars completely */
-.hide-scrollbar {
-  -ms-overflow-style: none;  /* Internet Explorer 10+ */
-  scrollbar-width: none;  /* Firefox */
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;  /* Safari and Chrome */
-}
-
-.sidebar-item-base {
-  @apply p-1.5 sm:p-2 hover:text-neutral-600 dark:hover:text-neutral-300 rounded cursor-pointer transition-all duration-200;
-}
-
-.sidebar-item-hidden {
-  opacity: 0;
-  transform: translateX(30px);
-}
-
-.sidebar-item-animate {
-  opacity: 0;
-  transform: translateX(30px);
-  animation: slideInFromRight 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  animation-delay: calc(0.05s + (var(--item-index, 0) * 0.03s));
-}
-
-.sidebar-item-selected {
-  @apply p-1.5 sm:p-2 text-neutral-900 dark:text-neutral-100 focus:outline-none;
-}
-
-.chat-bubble {
-  @apply text-neutral-900 dark:text-neutral-200
-}
-
-.chat-bubble-user {
-  @apply bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-200;
-}
-
-.chat-bubble-assistant {
-  @apply bg-neutral-200 dark:bg-neutral-900 dark:text-neutral-200;
-}
-
-.chat-message-actions {
-  @apply transition-opacity duration-200;
-}
-
-.group:hover .chat-message-actions {
-  @apply opacity-100;
-}
-
-.chat-input-container {
-  contain: layout style;
-  will-change: height;
-}
-
-.chat-input-attachment {
-  @apply p-2 text-white dark:text-neutral-200 hover:text-gray-300 bg-neutral-800 dark:bg-neutral-700 rounded cursor-default;
-}
-
-.typewriter-cursor {
-  animation: blink 1s infinite;
 }
 
 .typewriter-text {
@@ -187,93 +129,11 @@ button[data-headlessui-state]:disabled,
   content: '';
 }
 
-@keyframes slideInFromRight {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideInFromLeft {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideOutToLeft {
-  from {
-    transform: translateX(0) scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(-100%) scale(0.95);
-    opacity: 0;
-  }
-}
-
-@keyframes backdropFadeIn {
-  from {
-    opacity: 0;
-    backdrop-filter: blur(0px);
-  }
-  to {
-    opacity: 1;
-    backdrop-filter: blur(4px);
-  }
-}
-
-@keyframes backdropFadeOut {
-  from {
-    opacity: 1;
-    backdrop-filter: blur(4px);
-  }
-  to {
-    opacity: 0;
-    backdrop-filter: blur(0px);
-  }
-}
-
-@keyframes blink {
-  0%, 50% {
-    opacity: 1;
-  }
-  51%, 100% {
-    opacity: 0;
-  }
-}
-
 @keyframes typing {
   from { 
     width: 0;
   }
   to { 
     width: 100%;
-  }
-}
-
-@media (max-width: 767px) {
-  .mobile-sidebar-enter {
-    animation: slideInFromLeft 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  }
-  
-  .mobile-sidebar-exit {
-    animation: slideOutToLeft 0.3s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards;
-  }
-  
-  .mobile-backdrop-enter {
-    animation: backdropFadeIn 0.3s ease-out forwards;
-  }
-  
-  .mobile-backdrop-exit {
-    animation: backdropFadeOut 0.25s ease-in forwards;
   }
 }
