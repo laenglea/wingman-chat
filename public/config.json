@@ -29,23 +29,22 @@
 
     "internet": {
         "enabled": true,
-        "elicitation": true
-    },
-
-    "interpreter": {
-        "enabled": true
+        "elicitation": true,
+        "searcher": "web",
+        "scraper": "web",
+        "researcher": "web"
     },
 
     "workflow": {
         "enabled": true
     },
 
-    "recorder": {
+    "notebook": {
         "enabled": true
     },
 
     "bridge": {
-        "url": "http://localhost:4200"
+        "url": "http://localhost:4242"
     },
 
     "models1": [
