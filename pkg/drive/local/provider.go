@@ -2,6 +2,7 @@ package local
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -22,7 +23,7 @@ type Provider struct {
 
 func New(root string) (*Provider, error) {
 	dir, err := filepath.Abs(root)
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -34,12 +35,32 @@ func New(root string) (*Provider, error) {
 	return p, nil
 }
 
+const idPrefix = "b64:"
+
+func encodeID(path string) string {
+	return idPrefix + base64.RawURLEncoding.EncodeToString([]byte(path))
+}
+
+func decodeID(id string) (string, bool) {
+	encoded, ok := strings.CutPrefix(id, idPrefix)
+	if !ok {
+		return "", false
+	}
+
+	b, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", false
+	}
+
+	return string(b), true
+}
+
 func (p *Provider) resolve(path string) (string, error) {
-	if path == "" {
+	if path == "" || path == "/" {
 		return p.root, nil
 	}
 
-	cleaned := filepath.Clean(path)
+	cleaned := filepath.Clean(strings.TrimPrefix(path, "/"))
 	full := filepath.Join(p.root, cleaned)
 
 	abs, err := filepath.Abs(full)
@@ -54,7 +75,15 @@ func (p *Provider) resolve(path string) (string, error) {
 	return abs, nil
 }
 
-func (p *Provider) List(_ context.Context, path string) ([]drive.Entry, error) {
+func (p *Provider) List(_ context.Context, id string) ([]drive.Entry, error) {
+	path := ""
+
+	if decoded, ok := decodeID(id); ok {
+		path = decoded
+	} else if id != "" {
+		path = id
+	}
+
 	resolved, err := p.resolve(path)
 	if err != nil {
 		return nil, err
@@ -83,9 +112,11 @@ func (p *Provider) List(_ context.Context, path string) ([]drive.Entry, error) {
 			continue
 		}
 
+		rel := filepath.Join(path, e.Name())
+
 		entry := drive.Entry{
+			ID:   encodeID(rel),
 			Name: e.Name(),
-			Path: filepath.Join(path, e.Name()),
 		}
 
 		if e.IsDir() {
@@ -107,6 +138,10 @@ func (p *Provider) List(_ context.Context, path string) ([]drive.Entry, error) {
 }
 
 func (p *Provider) Open(_ context.Context, path string) (io.ReadCloser, string, int64, error) {
+	if decoded, ok := decodeID(path); ok {
+		path = decoded
+	}
+
 	resolved, err := p.resolve(path)
 	if err != nil {
 		return nil, "", 0, err
