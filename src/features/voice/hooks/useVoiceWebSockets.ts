@@ -67,6 +67,14 @@ export function useVoiceWebSockets(onUser: (text: string) => void, onAssistant: 
 
             ...(instructions && { instructions: instructions }),
 
+            truncation: {
+              type: "retention_ratio",
+              retention_ratio: 0.8,
+              token_limits: {
+                post_instructions: 8000,
+              },
+            },
+
             audio: {
               input: {
                 format: {
@@ -76,12 +84,14 @@ export function useVoiceWebSockets(onUser: (text: string) => void, onAssistant: 
                 transcription: {
                   model: transcribeModel,
                 },
+                noise_reduction: {
+                  type: "far_field",
+                },
                 turn_detection: {
-                  type: "server_vad",
+                  type: "semantic_vad",
+                  eagerness: "auto",
                   create_response: true,
-                  prefix_padding_ms: 300,
-                  silence_duration_ms: 700,
-                  threshold: 0.7,
+                  interrupt_response: true,
                 },
               },
               output: {
@@ -373,6 +383,17 @@ export function useVoiceWebSockets(onUser: (text: string) => void, onAssistant: 
       console.error("Audio playback error:", err);
     }
   };
+
+  // Keep a ref to stop so the unmount effect doesn't need it as a dependency
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
+
+  // Clean up all resources on unmount
+  useEffect(() => {
+    return () => {
+      void stopRef.current();
+    };
+  }, []);
 
   return { start, stop };
 }
