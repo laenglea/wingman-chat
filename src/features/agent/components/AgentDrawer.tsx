@@ -221,9 +221,9 @@ export function AgentDrawer() {
                       className="group relative cursor-pointer select-none py-2 pl-3 pr-4 rounded-lg text-neutral-900 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700/80 flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <Bot size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
                         {isEditing ? (
                           <div className="flex items-center gap-1 flex-1">
+                            <Bot size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
                             <input
                               ref={inlineEditInputRef}
                               type="text"
@@ -262,6 +262,7 @@ export function AgentDrawer() {
                             onClick={() => handleAgentSelect(agent)}
                             className="flex items-center gap-2 flex-1 text-left min-w-0"
                           >
+                            <Bot size={16} className="text-neutral-600 dark:text-neutral-400 shrink-0" />
                             <span className={`block truncate text-sm ${isCurrent ? "font-semibold" : "font-normal"}`}>
                               {agent.name}
                             </span>
