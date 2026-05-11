@@ -1,6 +1,5 @@
 import JSZip from "jszip";
-import { artifactKind } from "@/features/artifacts/lib/artifacts";
-import { contentToZipValue } from "@/shared/lib/fileContent";
+import { contentToBlob, contentToZipValue } from "@/shared/lib/fileContent";
 import * as opfs from "@/shared/lib/opfs";
 import { normalizeArtifactPath } from "@/shared/lib/sandbox";
 import { downloadBlob, getFileName } from "@/shared/lib/utils";
@@ -387,14 +386,7 @@ export class FileSystemManager implements FileSystem {
       throw new Error(`File not found: ${path}`);
     }
 
-    const kind = artifactKind(file.path, file.contentType);
-    if (kind === "image" || kind === "binary") {
-      const resp = await fetch(file.content);
-      const blob = await resp.blob();
-      downloadBlob(blob, getFileName(file.path));
-    } else {
-      const blob = new Blob([file.content], { type: file.contentType || "text/plain" });
-      downloadBlob(blob, getFileName(file.path));
-    }
+    const blob = contentToBlob(file.content, file.contentType);
+    downloadBlob(blob, getFileName(file.path));
   }
 }
