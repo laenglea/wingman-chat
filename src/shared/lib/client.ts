@@ -1,6 +1,8 @@
 import mime from "mime";
 import OpenAI from "openai";
+import { APIError } from "openai/error";
 import { zodTextFormat } from "openai/helpers/zod";
+import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { z } from "zod/v3";
 import instructionsSummarizeTitle from "@/features/chat/prompts/chat-title.txt?raw";
 import instructionsConvertCsv from "@/features/chat/prompts/convert-csv.txt?raw";
@@ -18,7 +20,6 @@ import type {
   ModelType,
   ReasoningContent,
   Tool,
-  ToolCallContent,
   ToolResultContent,
 } from "@/shared/types/chat";
 import { Role } from "@/shared/types/chat";
@@ -26,6 +27,41 @@ import { isAbortError } from "./errors";
 import { modelName, modelType } from "./models";
 import { traceGenAI } from "./otel";
 import { serializeToolResultForApi, simplifyMarkdown } from "./utils";
+
+/**
+ * Detect Responses API errors caused by a compaction item the current
+ * deployment can't verify. Compaction blobs are encrypted with provider/
+ * deployment-specific keys, so a model swap or cross-Azure-resource replay
+ * fails verification.
+ */
+function isCompactionHistoryError(error: unknown): boolean {
+  const body = error instanceof APIError ? (error.error as { message?: string } | undefined) : undefined;
+  const msg = body?.message?.trim() || (error instanceof Error ? error.message : String(error));
+  return (
+    /encrypted[_ ]content.*(?:could not|cannot|failed to)\s*be\s*(?:verified|decrypted|parsed|read|decoded)/i.test(
+      msg,
+    ) || /type ['"]compaction['"].*provided without/i.test(msg)
+  );
+}
+
+/**
+ * Drop unpaired `function_call` / `function_call_output` items (interrupted
+ * tool execution or partial histories). The Responses API rejects orphans
+ * with `provided without its required following item`.
+ */
+function dropOrphanFunctionCalls(items: ResponseInputItem[]): ResponseInputItem[] {
+  const issuedIds = new Set<string>();
+  const completedIds = new Set<string>();
+  for (const item of items) {
+    if (item.type === "function_call") issuedIds.add(item.call_id);
+    else if (item.type === "function_call_output") completedIds.add(item.call_id);
+  }
+  return items.filter((item) => {
+    if (item.type === "function_call") return completedIds.has(item.call_id);
+    if (item.type === "function_call_output") return issuedIds.has(item.call_id);
+    return true;
+  });
+}
 
 function expandToSentences(text: string, start: number, end: number): string {
   const sentenceBoundaries = /[.!?]+\s*|\n+/g;
@@ -102,8 +138,6 @@ export class Client {
       "chat",
       model,
       async () => {
-        input = this.sanitizeMessages(input);
-
         const items: OpenAI.Responses.ResponseInputItem[] = [];
 
         for (const m of input) {
@@ -159,27 +193,9 @@ export class Client {
             }
 
             case Role.Assistant: {
-              // TODO: Re-enable reasoning items once encrypted_content verification is fixed server-side
-              // Temporarily skip sending reasoning items back to API to avoid invalid_encrypted_content errors
-              // const reasoningParts = m.content.filter((p): p is ReasoningContent => p.type === 'reasoning' && !!p.signature);
-              // for (const rp of reasoningParts) {
-              //   const reasoningItem: Record<string, unknown> = {
-              //     id: rp.id,
-              //     type: "reasoning",
-              //
-              //     encrypted_content: rp.signature,
-              //   };
-              //
-              //   if (rp.summary) {
-              //     reasoningItem.summary = [{ type: "summary_text", text: rp.summary }];
-              //   }
-              //
-              //   if (rp.text) {
-              //     reasoningItem.content = [{ type: "reasoning_text", text: rp.text }];
-              //   }
-              //
-              //   items.push(reasoningItem as unknown as OpenAI.Responses.ResponseInputItem);
-              // }
+              // Reasoning items are intentionally not replayed back to the API.
+              // encrypted_content is provider+key-specific and breaks on model
+              // swaps and across Azure deployments/subscriptions.
 
               let bufferedText = "";
 
@@ -219,7 +235,7 @@ export class Client {
                     type: "compaction",
                     id: part.id,
                     encrypted_content: part.encrypted_content,
-                  } as unknown as OpenAI.Responses.ResponseInputItem);
+                  });
                 }
               }
 
@@ -230,151 +246,164 @@ export class Client {
           }
         }
 
-        // Track streaming content parts
-        const contentParts: Content[] = [];
-        let currentType: "reasoning" | "text" | null = null;
+        const attemptStream = async (inputItems: OpenAI.Responses.ResponseInputItem[]) => {
+          // Track streaming content parts (fresh per attempt so retries don't
+          // mix partial content from a rejected stream into the final result).
+          const contentParts: Content[] = [];
+          let currentType: "reasoning" | "text" | null = null;
 
-        // Helper to append text content
-        const appendText = (delta: string) => {
-          if (currentType === "text" && contentParts.length > 0) {
-            const lastPart = contentParts[contentParts.length - 1];
-            if (lastPart.type === "text") {
-              lastPart.text += delta;
-            }
-          } else {
-            contentParts.push({ type: "text", text: delta });
-            currentType = "text";
-          }
-          handler?.([...contentParts]);
-        };
-
-        // Helper to append reasoning content (text or summary)
-        const appendReasoning = (id: string, delta: string, summary?: string) => {
-          let reasoningPart = contentParts.find((p): p is ReasoningContent => p.type === "reasoning");
-          if (!reasoningPart) {
-            reasoningPart = { type: "reasoning", id, text: "" };
-            contentParts.unshift(reasoningPart); // Reasoning goes first
-          }
-          if (summary) {
-            reasoningPart.summary = (reasoningPart.summary || "") + summary;
-          }
-          if (delta) {
-            reasoningPart.text += delta;
-          }
-          currentType = "reasoning";
-          handler?.([...contentParts]);
-        };
-
-        const runner = this.oai.responses
-          .stream({
-            model: model,
-            store: false,
-            truncation: "auto",
-            tools: this.toTools(tools),
-            input: items,
-            instructions: instructions,
-            ...(options?.effort
-              ? {
-                  include: ["reasoning.encrypted_content"],
-                  reasoning: {
-                    effort: options.effort,
-                    summary: options.summary ?? "auto",
-                  },
-                }
-              : {}),
-            ...(options?.verbosity
-              ? {
-                  text: { verbosity: options.verbosity },
-                }
-              : {}),
-            ...(options?.compactThreshold
-              ? {
-                  context_management: [{ type: "compaction" as const, compact_threshold: options.compactThreshold }],
-                }
-              : {}),
-          })
-          .on("response.reasoning_summary_text.delta", (event) => {
-            appendReasoning(event.item_id, "", event.delta);
-          })
-          .on("response.reasoning_text.delta", (event) => {
-            appendReasoning(event.item_id, event.delta);
-          })
-          .on("response.output_text.delta", (event) => {
-            appendText(event.delta);
-          })
-          .on("response.output_item.done", (event) => {
-            if (event.item.type === "function_call") {
-              contentParts.push({
-                type: "tool_call",
-                id: event.item.call_id,
-                name: event.item.name,
-                arguments: event.item.arguments,
-              });
-              currentType = null;
-              handler?.([...contentParts]);
-            } else if (event.item.type === "reasoning") {
-              // Capture encrypted_content signature for multi-turn conversations
-              const encryptedContent = (event.item as { encrypted_content?: string }).encrypted_content;
-              if (encryptedContent) {
-                // Find the reasoning part and add the signature
-                const reasoningPart = contentParts.find((p) => p.type === "reasoning");
-                if (reasoningPart && reasoningPart.type === "reasoning") {
-                  reasoningPart.signature = encryptedContent;
-                  handler?.([...contentParts]);
-                }
+          // Helper to append text content
+          const appendText = (delta: string) => {
+            if (currentType === "text" && contentParts.length > 0) {
+              const lastPart = contentParts[contentParts.length - 1];
+              if (lastPart.type === "text") {
+                lastPart.text += delta;
               }
-            } else if (event.item.type === "compaction") {
-              const compactionItem = event.item as { id: string; encrypted_content: string };
-              console.log("[Compaction] Context compacted", {
-                id: compactionItem.id,
-                bytes: compactionItem.encrypted_content.length,
-              });
-              contentParts.push({
-                type: "compaction",
-                id: compactionItem.id,
-                encrypted_content: compactionItem.encrypted_content,
-              });
-              handler?.([...contentParts]);
+            } else {
+              contentParts.push({ type: "text", text: delta });
+              currentType = "text";
             }
+            handler?.([...contentParts]);
+          };
+
+          // Helper to append reasoning content (text or summary)
+          const appendReasoning = (id: string, delta: string, summary?: string) => {
+            let reasoningPart = contentParts.find((p): p is ReasoningContent => p.type === "reasoning");
+            if (!reasoningPart) {
+              reasoningPart = { type: "reasoning", id, text: "" };
+              contentParts.unshift(reasoningPart); // Reasoning goes first
+            }
+            if (summary) {
+              reasoningPart.summary = (reasoningPart.summary || "") + summary;
+            }
+            if (delta) {
+              reasoningPart.text += delta;
+            }
+            currentType = "reasoning";
+            handler?.([...contentParts]);
+          };
+
+          const runner = this.oai.responses
+            .stream({
+              model: model,
+              store: false,
+              truncation: "auto",
+              tools: this.toTools(tools),
+              input: inputItems,
+              instructions: instructions,
+              ...(options?.effort
+                ? {
+                    reasoning: {
+                      effort: options.effort,
+                      summary: options.summary ?? "auto",
+                    },
+                  }
+                : {}),
+              ...(options?.verbosity
+                ? {
+                    text: { verbosity: options.verbosity },
+                  }
+                : {}),
+              ...(options?.compactThreshold
+                ? {
+                    context_management: [{ type: "compaction" as const, compact_threshold: options.compactThreshold }],
+                  }
+                : {}),
+            })
+            .on("response.reasoning_summary_text.delta", (event) => {
+              appendReasoning(event.item_id, "", event.delta);
+            })
+            .on("response.reasoning_text.delta", (event) => {
+              appendReasoning(event.item_id, event.delta);
+            })
+            .on("response.output_text.delta", (event) => {
+              appendText(event.delta);
+            })
+            .on("response.output_item.done", (event) => {
+              if (event.item.type === "function_call") {
+                contentParts.push({
+                  type: "tool_call",
+                  id: event.item.call_id,
+                  name: event.item.name,
+                  arguments: event.item.arguments,
+                });
+                currentType = null;
+                handler?.([...contentParts]);
+              } else if (event.item.type === "compaction") {
+                console.log("[Compaction] Context compacted", {
+                  id: event.item.id,
+                  bytes: event.item.encrypted_content.length,
+                });
+                contentParts.push({
+                  type: "compaction",
+                  id: event.item.id,
+                  encrypted_content: event.item.encrypted_content,
+                });
+                handler?.([...contentParts]);
+              }
+            });
+
+          // If a signal was provided, wire it up to abort the runner. Handle
+          // the already-aborted case explicitly — addEventListener on a
+          // signal that has already fired never invokes the listener.
+          if (options?.signal) {
+            if (options.signal.aborted) {
+              runner.abort();
+            } else {
+              options.signal.addEventListener("abort", () => runner.abort(), { once: true });
+            }
+          }
+
+          // Attach an error listener so mid-stream errors don't surface as
+          // unhandled EventEmitter errors. The same error will also reject
+          // `finalResponse()` below, which is where we actually handle it.
+          runner.on("error", () => {
+            /* handled via finalResponse() rejection */
           });
 
-        // If a signal was provided, wire it up to abort the runner
-        if (options?.signal) {
-          options.signal.addEventListener("abort", () => runner.abort(), { once: true });
-        }
+          try {
+            const finalResponse = await runner.finalResponse();
 
-        // Attach an error listener so mid-stream errors don't surface as
-        // unhandled EventEmitter errors. The same error will also reject
-        // `finalResponse()` below, which is where we actually handle it.
-        runner.on("error", () => {
-          /* handled via finalResponse() rejection */
-        });
-
-        try {
-          const finalResponse = await runner.finalResponse();
-
-          return {
-            result: { role: Role.Assistant, content: contentParts } as Message,
-            response: {
-              id: finalResponse.id,
-              model: finalResponse.model,
-              inputTokens: finalResponse.usage?.input_tokens,
-              cachedInputTokens: finalResponse.usage?.input_tokens_details?.cached_tokens,
-              outputTokens: finalResponse.usage?.output_tokens,
-              reasoningTokens: finalResponse.usage?.output_tokens_details?.reasoning_tokens,
-            },
-          };
-        } catch (error) {
-          // On abort (either via our signal or runner.abort()), return the
-          // partial content accumulated so far as a successful result.
-          if (options?.signal?.aborted || isAbortError(error)) {
             return {
               result: { role: Role.Assistant, content: contentParts } as Message,
-              response: { id: "", model },
+              response: {
+                id: finalResponse.id,
+                model: finalResponse.model,
+                inputTokens: finalResponse.usage?.input_tokens,
+                cachedInputTokens: finalResponse.usage?.input_tokens_details?.cached_tokens,
+                outputTokens: finalResponse.usage?.output_tokens,
+                reasoningTokens: finalResponse.usage?.output_tokens_details?.reasoning_tokens,
+              },
             };
-          }
+          } catch (error) {
+            // On abort (either via our signal or runner.abort()), return the
+            // partial content accumulated so far as a successful result.
+            if (options?.signal?.aborted || isAbortError(error)) {
+              return {
+                result: { role: Role.Assistant, content: contentParts } as Message,
+                response: { id: "", model },
+              };
+            }
 
-          throw error;
+            throw error;
+          }
+        };
+
+        const baseItems = dropOrphanFunctionCalls(items);
+
+        try {
+          return await attemptStream(baseItems);
+        } catch (error) {
+          if (!isCompactionHistoryError(error)) throw error;
+          // Compaction blob can't be verified by the current deployment (model
+          // swap, different Azure resource). Strip and retry once.
+          const stripped = baseItems.filter((item) => (item as { type?: string }).type !== "compaction");
+          if (stripped.length === baseItems.length) throw error;
+          console.warn("[Recovery] Retrying after compaction history error", {
+            removedItems: baseItems.length - stripped.length,
+          });
+          handler?.([]);
+          return await attemptStream(stripped);
         }
       },
       { effort: options?.effort, verbosity: options?.verbosity, toolCount: tools?.length },
@@ -655,45 +684,6 @@ export class Client {
       strict: false,
       parameters: tool.parameters,
     }));
-  }
-
-  private sanitizeMessages(messages: Message[]): Message[] {
-    // Extract tool result IDs from all messages
-    const toolResultIds = new Set(
-      messages.flatMap((m) =>
-        m.content.filter((p): p is ToolResultContent => p.type === "tool_result").map((p) => p.id),
-      ),
-    );
-
-    // Find tool calls that have matching results
-    const validToolCallIds = new Set(
-      messages.flatMap((m) =>
-        m.content
-          .filter((p): p is ToolCallContent => p.type === "tool_call" && toolResultIds.has(p.id))
-          .map((p) => p.id),
-      ),
-    );
-
-    return messages.filter((m) => {
-      const toolCalls = m.content.filter((p): p is ToolCallContent => p.type === "tool_call");
-      const toolResults = m.content.filter((p): p is ToolResultContent => p.type === "tool_result");
-
-      // If message has tool calls, all must have valid results
-      if (toolCalls.length > 0) {
-        return toolCalls.every((tc) => validToolCallIds.has(tc.id));
-      }
-
-      // If message has tool results, all must match valid tool calls
-      if (toolResults.length > 0) {
-        return toolResults.every((tr) => validToolCallIds.has(tr.id));
-      }
-
-      // Keep messages with meaningful content (text, images, files)
-      const hasContent = m.content.some(
-        (p) => (p.type === "text" && p.text.trim()) || p.type === "image" || p.type === "file",
-      );
-      return hasContent;
-    });
   }
 
   async optimizeSkill(

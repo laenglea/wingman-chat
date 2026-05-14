@@ -92,7 +92,6 @@ export type ReasoningContent = {
   id: string;
   text: string;
   summary?: string;
-  signature?: string; // Encrypted reasoning content for multi-turn conversations
 };
 
 export type ToolCallContent = {
