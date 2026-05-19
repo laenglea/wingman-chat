@@ -66,32 +66,38 @@ function generateId(): string {
 
 const filenameSchema = z.object({ filename: z.string() }).strict();
 
-/**
- * Treat caller-supplied names that are empty or look like UI placeholders
- * as "no real name yet" so we can suggest one based on content.
- */
+/** Placeholders the UI passes when the user didn't provide a real name. */
+export const PLACEHOLDER_SOURCE_NAMES = {
+  pastedText: "Pasted text",
+  fieldRecording: "Field Recording",
+} as const;
+
 function isPlaceholderName(name: string): boolean {
   const trimmed = name.trim().toLowerCase();
-  return !trimmed || trimmed === "pasted text" || trimmed === "field recording";
+  if (!trimmed) return true;
+  return Object.values(PLACEHOLDER_SOURCE_NAMES).some((p) => p.toLowerCase() === trimmed);
 }
 
 function fallbackNameFromText(text: string): string {
   return text.trim().replace(/\s+/g, " ").split(" ").slice(0, 6).join(" ").slice(0, 50);
 }
 
-/**
- * Append " (n)" before the extension until the path is unique among `existing`.
- * Used so concurrent "Pasted text" entries (or filename collisions on import)
- * don't silently overwrite each other.
- */
+const EXT_RE = /^[a-z0-9]{1,5}$/i;
+
+/** Split a path into `{prefix, stem, ext}` using the same extension rule as `withDefaultExtension`. */
+function splitPath(path: string): { prefix: string; stem: string; ext: string } {
+  const slash = path.lastIndexOf("/");
+  const prefix = slash >= 0 ? path.slice(0, slash + 1) : "";
+  const last = slash >= 0 ? path.slice(slash + 1) : path;
+  const dot = last.lastIndexOf(".");
+  const hasExt = dot > 0 && EXT_RE.test(last.slice(dot + 1));
+  return hasExt ? { prefix, stem: last.slice(0, dot), ext: last.slice(dot) } : { prefix, stem: last, ext: "" };
+}
+
+/** Append " (n)" before the extension until the path is unique among `existing`. */
 function uniquePath(path: string, existing: Set<string>): string {
   if (!existing.has(path)) return path;
-  const slash = path.lastIndexOf("/");
-  const last = slash >= 0 ? path.slice(slash + 1) : path;
-  const prefix = slash >= 0 ? path.slice(0, slash + 1) : "";
-  const dot = last.lastIndexOf(".");
-  const stem = dot > 0 ? last.slice(0, dot) : last;
-  const ext = dot > 0 ? last.slice(dot) : "";
+  const { prefix, stem, ext } = splitPath(path);
   let i = 2;
   while (existing.has(`${prefix}${stem} (${i})${ext}`)) i++;
   return `${prefix}${stem} (${i})${ext}`;
@@ -255,6 +261,12 @@ export function useNotebook(notebookId?: string) {
     [client, config],
   );
 
+  const reservePath = useCallback(
+    (path: string, extra?: Iterable<string>): string =>
+      uniquePath(path, new Set([...sourcesRef.current.map((s) => s.path), ...(extra ?? [])])),
+    [],
+  );
+
   const addSearchResult = useCallback(
     async (query: string, _mode: "web" | "research", content: string) => {
       const nb = await ensureNotebook();
@@ -265,14 +277,13 @@ export function useNotebook(notebookId?: string) {
       } catch {
         path = generateId();
       }
-      path = store.withDefaultExtension(path, "md");
-      path = uniquePath(path, new Set(sourcesRef.current.map((s) => s.path)));
+      path = reservePath(store.withDefaultExtension(path, "md"));
 
       const source: File = { path, content };
       await store.addSource(nb.id, source);
       setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
-    [ensureNotebook],
+    [ensureNotebook, reservePath],
   );
 
   const addFileSource = useCallback(
@@ -285,7 +296,7 @@ export function useNotebook(notebookId?: string) {
       } catch {
         path = generateId();
       }
-      path = uniquePath(path, new Set(sourcesRef.current.map((s) => s.path)));
+      path = reservePath(path);
 
       // Images are stored verbatim as binary sources (data URLs) — we don't
       // try to extract text from them. Models with vision can read the content
@@ -313,7 +324,7 @@ export function useNotebook(notebookId?: string) {
       store.touchNotebook(nb.id);
       setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
-    [ensureNotebook],
+    [ensureNotebook, reservePath],
   );
 
   const suggestSourceFilename = useCallback(
@@ -346,16 +357,14 @@ export function useNotebook(notebookId?: string) {
     async (name: string, text: string, audioUrl?: string): Promise<string> => {
       const nb = await ensureNotebook();
 
-      const displayName = (await suggestSourceFilename(name, text)) || name || "Pasted text";
+      const displayName = (await suggestSourceFilename(name, text)) || name || PLACEHOLDER_SOURCE_NAMES.pastedText;
       let basePath: string;
       try {
         basePath = store.normalizeSourcePath(displayName) || generateId();
       } catch {
         basePath = generateId();
       }
-      let textPath = store.withDefaultExtension(basePath, "md");
-      const existing = new Set(sourcesRef.current.map((s) => s.path));
-      textPath = uniquePath(textPath, existing);
+      const textPath = reservePath(store.withDefaultExtension(basePath, "md"));
 
       const textSource: File = { path: textPath, content: text };
       await store.addSource(nb.id, textSource);
@@ -365,8 +374,7 @@ export function useNotebook(notebookId?: string) {
       // filesystem like any other binary artifact.
       if (audioUrl) {
         const stem = textPath.replace(/\.[a-z0-9]{1,5}$/i, "");
-        let audioPath = store.withDefaultExtension(stem, "wav");
-        audioPath = uniquePath(audioPath, new Set([...existing, textPath]));
+        const audioPath = reservePath(store.withDefaultExtension(stem, "wav"), [textPath]);
         const audioSource: File = {
           path: audioPath,
           content: audioUrl,
@@ -382,7 +390,7 @@ export function useNotebook(notebookId?: string) {
       });
       return textSource.path;
     },
-    [ensureNotebook, suggestSourceFilename],
+    [ensureNotebook, reservePath, suggestSourceFilename],
   );
 
   const scrapeWeb = useCallback(
@@ -410,14 +418,13 @@ export function useNotebook(notebookId?: string) {
       } catch {
         path = generateId();
       }
-      path = store.withDefaultExtension(path, "md");
-      path = uniquePath(path, new Set(sourcesRef.current.map((s) => s.path)));
+      path = reservePath(store.withDefaultExtension(path, "md"));
 
       const source: File = { path, content };
       await store.addSource(nb.id, source);
       setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
-    [ensureNotebook],
+    [ensureNotebook, reservePath],
   );
 
   const deleteSource = useCallback(
@@ -435,10 +442,6 @@ export function useNotebook(notebookId?: string) {
       const trimmed = rawNewPath.trim();
       if (!trimmed) throw new Error("Name cannot be empty");
 
-      // Preserve the original extension if the user didn't supply one.
-      const dot = oldPath.lastIndexOf(".");
-      const oldExt = dot > 0 ? oldPath.slice(dot + 1) : "";
-
       let newPath: string;
       try {
         newPath = store.normalizeSourcePath(trimmed);
@@ -446,7 +449,10 @@ export function useNotebook(notebookId?: string) {
         throw new Error(err instanceof Error ? err.message : "Invalid name");
       }
       if (!newPath) throw new Error("Name cannot be empty");
-      if (oldExt) newPath = store.withDefaultExtension(newPath, oldExt);
+
+      // Preserve the original extension if the user didn't supply one.
+      const oldExt = splitPath(oldPath).ext;
+      if (oldExt) newPath = store.withDefaultExtension(newPath, oldExt.slice(1));
       if (newPath === oldPath) return;
 
       const current = sourcesRef.current.find((s) => s.path === oldPath);
