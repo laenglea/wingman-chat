@@ -14,17 +14,19 @@ export function SlideViewer({ output, onRefine }: SlideViewerProps) {
   const isGenerating = output.status === "generating";
   const slideCount = slides.length;
 
-  const [activeIndex, setActiveIndex] = useState(1);
+  const [slideState, setSlideState] = useState<{ outputId: string; index: number }>({ outputId: output.id, index: 1 });
+  const activeIndex = slideState.outputId === output.id ? slideState.index : 1;
+  const setActiveIndex = useCallback(
+    (value: number | ((i: number) => number)) =>
+      setSlideState((s) => ({
+        outputId: output.id,
+        index: typeof value === "function" ? value(s.outputId === output.id ? s.index : 1) : value,
+      })),
+    [output.id],
+  );
   const [refinePrompt, setRefinePrompt] = useState("");
   const [isRefining, setIsRefining] = useState(false);
   const [refineError, setRefineError] = useState<string | null>(null);
-
-  // Derived-state pattern: reset to slide 1 when the viewed output changes.
-  const [prevOutputId, setPrevOutputId] = useState(output.id);
-  if (prevOutputId !== output.id) {
-    setPrevOutputId(output.id);
-    setActiveIndex(1);
-  }
 
   const thumbnails = useSlideThumbnails(isHtml ? slides : undefined);
 
@@ -35,7 +37,7 @@ export function SlideViewer({ output, onRefine }: SlideViewerProps) {
       setActiveIndex(slideCount);
     }
     prevSlideCount.current = slideCount;
-  }, [slideCount, isGenerating]);
+  }, [slideCount, isGenerating, setActiveIndex]);
 
   // Auto-scroll thumbnail bar to keep latest visible during generation.
   const thumbBarRef = useRef<HTMLDivElement>(null);
