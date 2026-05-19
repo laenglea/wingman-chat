@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Loader2, SparklesIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { refineSlide } from "../lib/slide-refine";
 import type { NotebookOutput } from "../types/notebook";
 

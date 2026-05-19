@@ -38,6 +38,7 @@ import {
   type TextContent,
   type Tool,
   type ToolContext,
+  type ToolIcon,
   type ToolProvider,
 } from "@/shared/types/chat";
 import type { ElicitationSchema } from "@/shared/types/elicitation";
@@ -329,7 +330,7 @@ export class MCPClient implements ToolProvider {
       this.tools = tools
         .filter((tool) => !isToolVisibilityAppOnly(tool))
         .map((tool) => {
-          const icon = pickIcon(tool.icons as McpIcon[] | undefined) ?? this.icon;
+          const icon = pickIcon(tool.icons as McpIcon[] | undefined) ?? (typeof this.icon === "string" ? this.icon : undefined);
           return {
             name: tool.name,
             icon,
