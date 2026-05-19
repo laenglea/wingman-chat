@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { fitIframeToContainer } from "@/shared/lib/iframeResizer";
 import { useApp } from "@/shell/hooks/useApp";
 
@@ -7,9 +7,11 @@ export function AppDrawer() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Register the iframe with the context when it's available
-  useEffect(() => {
+  // useLayoutEffect ensures the iframe is registered before any useEffect fires.
+  // Cleanup deregisters it on unmount so the context never holds a stale ref.
+  useLayoutEffect(() => {
     registerIframe(iframeRef.current);
+    return () => registerIframe(null);
   }, [registerIframe]);
 
   // Keep the iframe sized to fill the available container space

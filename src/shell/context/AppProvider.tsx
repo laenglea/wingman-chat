@@ -53,6 +53,12 @@ export function AppProvider({ children }: AppProviderProps) {
 
   const registerIframe = useCallback((iframe: HTMLIFrameElement | null) => {
     iframeRef.current = iframe;
+    if (iframe === null) {
+      // Discard stale bridge cleanup — the bridge uses postMessage to the iframe
+      // window, so it can't complete once the iframe is gone. Keeping it would
+      // cause renderApp() to hang waiting for a response from the destroyed window.
+      activeCleanupRef.current = null;
+    }
   }, []);
 
   const getIframe = useCallback(() => {

@@ -40,6 +40,8 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
 
   const getInitialDisplayMode = (): AppDisplayMode => {
     if (appDisplayModes.length === 1 && appDisplayModes[0] === "fullscreen") return "fullscreen";
+    // Restore fullscreen if this app was active in the drawer (e.g. tab switch).
+    if (showAppDrawer && activeAppKey === appKey) return "fullscreen";
     return "inline";
   };
 
