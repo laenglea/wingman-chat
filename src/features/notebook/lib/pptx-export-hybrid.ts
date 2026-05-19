@@ -13,6 +13,7 @@
  * No LLM needed — fast, deterministic export.
  */
 
+import JSZip from "jszip";
 import { downloadFromUrl } from "@/shared/lib/utils";
 import { renderSlideToJpegDataUrl } from "./html-slide-export";
 import { type ParsedElement, type ParsedParagraph, type ParsedSlide, parseSlideHtml } from "./pptx-static-parser";
@@ -38,7 +39,6 @@ export async function downloadHtmlSlidesAsHybridPptx(
   slug: string,
   onProgress?: ExportProgress,
 ): Promise<void> {
-  const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
   const slideCount = htmlSlides.length;
 

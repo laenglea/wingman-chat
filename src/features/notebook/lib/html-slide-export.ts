@@ -15,6 +15,7 @@
  * Editable PPTX export is handled by pptx-export-hybrid.ts.
  */
 
+import JSZip from "jszip";
 import { downloadFromUrl } from "@/shared/lib/utils";
 import { addPptxBoilerplate, CANVAS_H, CANVAS_W, SLIDE_CX, SLIDE_CY } from "./pptx-utils";
 
@@ -811,7 +812,6 @@ export async function downloadHtmlSlidesAsPdf(htmlSlides: string[], slug: string
 // ── PNG export (ZIP) ─────────────────────────────────────────────────────────
 
 export async function downloadHtmlSlidesAsPng(htmlSlides: string[], slug: string) {
-  const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
 
   for (let i = 0; i < htmlSlides.length; i++) {
@@ -829,7 +829,6 @@ export async function downloadHtmlSlidesAsPng(htmlSlides: string[], slug: string
 // ── Image-based PPTX export ─────────────────────────────────────────────────
 
 export async function downloadHtmlSlidesAsPptx(htmlSlides: string[], slug: string) {
-  const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
   const slideCount = htmlSlides.length;
 
