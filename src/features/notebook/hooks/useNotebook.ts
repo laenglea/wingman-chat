@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
 import { getConfig } from "@/shared/config";
 import { run } from "@/shared/lib/agent";
 import { convertFileToText } from "@/shared/lib/convert";
@@ -61,6 +62,39 @@ export function getArchitectureStyles() {
 
 function generateId(): string {
   return crypto.randomUUID();
+}
+
+const filenameSchema = z.object({ filename: z.string() }).strict();
+
+/**
+ * Treat caller-supplied names that are empty or look like UI placeholders
+ * as "no real name yet" so we can suggest one based on content.
+ */
+function isPlaceholderName(name: string): boolean {
+  const trimmed = name.trim().toLowerCase();
+  return !trimmed || trimmed === "pasted text" || trimmed === "field recording";
+}
+
+function fallbackNameFromText(text: string): string {
+  return text.trim().replace(/\s+/g, " ").split(" ").slice(0, 6).join(" ").slice(0, 50);
+}
+
+/**
+ * Append " (n)" before the extension until the path is unique among `existing`.
+ * Used so concurrent "Pasted text" entries (or filename collisions on import)
+ * don't silently overwrite each other.
+ */
+function uniquePath(path: string, existing: Set<string>): string {
+  if (!existing.has(path)) return path;
+  const slash = path.lastIndexOf("/");
+  const last = slash >= 0 ? path.slice(slash + 1) : path;
+  const prefix = slash >= 0 ? path.slice(0, slash + 1) : "";
+  const dot = last.lastIndexOf(".");
+  const stem = dot > 0 ? last.slice(0, dot) : last;
+  const ext = dot > 0 ? last.slice(dot) : "";
+  let i = 2;
+  while (existing.has(`${prefix}${stem} (${i})${ext}`)) i++;
+  return `${prefix}${stem} (${i})${ext}`;
 }
 
 export function useNotebook(notebookId?: string) {
@@ -232,6 +266,7 @@ export function useNotebook(notebookId?: string) {
         path = generateId();
       }
       path = store.withDefaultExtension(path, "md");
+      path = uniquePath(path, new Set(sourcesRef.current.map((s) => s.path)));
 
       const source: File = { path, content };
       await store.addSource(nb.id, source);
@@ -250,6 +285,7 @@ export function useNotebook(notebookId?: string) {
       } catch {
         path = generateId();
       }
+      path = uniquePath(path, new Set(sourcesRef.current.map((s) => s.path)));
 
       // Images are stored verbatim as binary sources (data URLs) — we don't
       // try to extract text from them. Models with vision can read the content
@@ -280,18 +316,46 @@ export function useNotebook(notebookId?: string) {
     [ensureNotebook],
   );
 
+  const suggestSourceFilename = useCallback(
+    async (name: string, text: string): Promise<string> => {
+      if (!isPlaceholderName(name)) return name;
+
+      const fallback = fallbackNameFromText(text);
+      if (!text.trim()) return fallback || name;
+
+      try {
+        const result = await client.parse(
+          getModel(),
+          "You are naming a text snippet that will be saved as a file in a research notebook. " +
+            "Produce a short, descriptive title (3-7 words) that captures the topic. " +
+            "Use plain Title Case with spaces — no extension, no quotes, no path separators.",
+          text.slice(0, 1500),
+          filenameSchema,
+          "source_filename",
+        );
+        const suggested = result?.filename?.trim().replace(/[\\/]/g, " ").slice(0, 80) ?? "";
+        return suggested || fallback || name;
+      } catch {
+        return fallback || name;
+      }
+    },
+    [client, getModel],
+  );
+
   const addTextSource = useCallback(
     async (name: string, text: string, audioUrl?: string): Promise<string> => {
       const nb = await ensureNotebook();
 
-      const displayName = name || "Pasted text";
+      const displayName = (await suggestSourceFilename(name, text)) || name || "Pasted text";
       let basePath: string;
       try {
         basePath = store.normalizeSourcePath(displayName) || generateId();
       } catch {
         basePath = generateId();
       }
-      const textPath = store.withDefaultExtension(basePath, "md");
+      let textPath = store.withDefaultExtension(basePath, "md");
+      const existing = new Set(sourcesRef.current.map((s) => s.path));
+      textPath = uniquePath(textPath, existing);
 
       const textSource: File = { path: textPath, content: text };
       await store.addSource(nb.id, textSource);
@@ -301,7 +365,8 @@ export function useNotebook(notebookId?: string) {
       // filesystem like any other binary artifact.
       if (audioUrl) {
         const stem = textPath.replace(/\.[a-z0-9]{1,5}$/i, "");
-        const audioPath = store.withDefaultExtension(stem, "wav");
+        let audioPath = store.withDefaultExtension(stem, "wav");
+        audioPath = uniquePath(audioPath, new Set([...existing, textPath]));
         const audioSource: File = {
           path: audioPath,
           content: audioUrl,
@@ -317,7 +382,7 @@ export function useNotebook(notebookId?: string) {
       });
       return textSource.path;
     },
-    [ensureNotebook],
+    [ensureNotebook, suggestSourceFilename],
   );
 
   const scrapeWeb = useCallback(
@@ -346,6 +411,7 @@ export function useNotebook(notebookId?: string) {
         path = generateId();
       }
       path = store.withDefaultExtension(path, "md");
+      path = uniquePath(path, new Set(sourcesRef.current.map((s) => s.path)));
 
       const source: File = { path, content };
       await store.addSource(nb.id, source);
@@ -359,6 +425,44 @@ export function useNotebook(notebookId?: string) {
       if (!notebook) return;
       await store.removeSource(notebook.id, path);
       setSources((prev) => prev.filter((s) => s.path !== path));
+    },
+    [notebook],
+  );
+
+  const renameSource = useCallback(
+    async (oldPath: string, rawNewPath: string) => {
+      if (!notebook) return;
+      const trimmed = rawNewPath.trim();
+      if (!trimmed) throw new Error("Name cannot be empty");
+
+      // Preserve the original extension if the user didn't supply one.
+      const dot = oldPath.lastIndexOf(".");
+      const oldExt = dot > 0 ? oldPath.slice(dot + 1) : "";
+
+      let newPath: string;
+      try {
+        newPath = store.normalizeSourcePath(trimmed);
+      } catch (err) {
+        throw new Error(err instanceof Error ? err.message : "Invalid name");
+      }
+      if (!newPath) throw new Error("Name cannot be empty");
+      if (oldExt) newPath = store.withDefaultExtension(newPath, oldExt);
+      if (newPath === oldPath) return;
+
+      const current = sourcesRef.current.find((s) => s.path === oldPath);
+      if (!current) throw new Error("Source not found");
+
+      if (sourcesRef.current.some((s) => s.path === newPath)) {
+        throw new Error(`A source named "${newPath}" already exists`);
+      }
+
+      const renamed: File = current.contentType
+        ? { path: newPath, content: current.content, contentType: current.contentType }
+        : { path: newPath, content: current.content };
+
+      await store.addSource(notebook.id, renamed);
+      await store.removeSource(notebook.id, oldPath);
+      setSources((prev) => prev.map((s) => (s.path === oldPath ? renamed : s)));
     },
     [notebook],
   );
@@ -558,6 +662,7 @@ export function useNotebook(notebookId?: string) {
     addFileSource,
     addTextSource,
     deleteSource,
+    renameSource,
     writeSource,
 
     sendMessage,

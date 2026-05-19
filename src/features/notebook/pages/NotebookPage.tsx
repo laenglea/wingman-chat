@@ -63,6 +63,7 @@ export function NotebookPage() {
     addFileSource,
     addTextSource,
     deleteSource,
+    renameSource,
     writeSource,
     sendMessage,
     generateOutput,
@@ -279,6 +280,7 @@ export function NotebookPage() {
                 onFileAdd={addFileSource}
                 onTextAdd={addTextSource}
                 onDeleteSource={deleteSource}
+                onRenameSource={renameSource}
                 onUpdateSource={writeSource}
               />
             )}
@@ -516,6 +518,7 @@ export function NotebookPage() {
               onFileAdd={addFileSource}
               onTextAdd={addTextSource}
               onDeleteSource={deleteSource}
+              onRenameSource={renameSource}
               onUpdateSource={writeSource}
             />
           )}

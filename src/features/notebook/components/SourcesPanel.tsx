@@ -1,6 +1,7 @@
 import { Dialog, Transition } from "@headlessui/react";
 import {
   ArrowRight,
+  Check,
   Download,
   FileText,
   Globe,
@@ -11,6 +12,7 @@ import {
   Mic,
   MoreHorizontal,
   Pencil,
+  PencilLine,
   Plus,
   Search,
   Trash2,
@@ -41,6 +43,7 @@ interface SourcesPanelProps {
   onFileAdd: (file: globalThis.File) => Promise<void>;
   onTextAdd: (name: string, text: string, audioUrl?: string) => Promise<string>;
   onDeleteSource: (sourceId: string) => void;
+  onRenameSource: (oldPath: string, newPath: string) => Promise<void>;
   onUpdateSource: (path: string, content: string, contentType?: string) => Promise<void>;
 }
 
@@ -54,6 +57,7 @@ export function SourcesPanel({
   onFileAdd,
   onTextAdd,
   onDeleteSource,
+  onRenameSource,
   onUpdateSource,
 }: SourcesPanelProps) {
   const config = getConfig();
@@ -159,6 +163,7 @@ export function SourcesPanel({
                 key={source.path}
                 source={source}
                 onDelete={() => onDeleteSource(source.path)}
+                onRename={(newPath) => onRenameSource(source.path, newPath)}
                 onUpdate={(content) => onUpdateSource(source.path, content, source.contentType)}
               />
             ))}
@@ -679,8 +684,26 @@ function WebScrapeOverlay({
 
 // ── Text Input Overlay ──────────────────────────────────────────────────
 
-function TextInputOverlay({ onAdd, onClose }: { onAdd: (name: string, text: string) => void; onClose: () => void }) {
+function TextInputOverlay({
+  onAdd,
+  onClose,
+}: {
+  onAdd: (name: string, text: string) => Promise<void>;
+  onClose: () => void;
+}) {
   const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      await onAdd("Pasted text", trimmed);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Transition appear show as={Fragment}>
@@ -731,7 +754,8 @@ function TextInputOverlay({ onAdd, onClose }: { onAdd: (name: string, text: stri
                     placeholder="Paste or type text here..."
                     rows={10}
                     autoFocus
-                    className="w-full px-3 py-2 text-sm rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y transition-colors"
+                    disabled={saving}
+                    className="w-full px-3 py-2 text-sm rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y transition-colors disabled:opacity-60"
                   />
                 </div>
 
@@ -740,17 +764,19 @@ function TextInputOverlay({ onAdd, onClose }: { onAdd: (name: string, text: stri
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-3 py-1.5 text-xs font-medium rounded-md text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors"
+                    disabled={saving}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 disabled:opacity-40 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={() => onAdd("Pasted text", text.trim())}
-                    disabled={!text.trim()}
-                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    onClick={handleAdd}
+                    disabled={!text.trim() || saving}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    Add
+                    {saving && <Loader2 size={12} className="animate-spin" />}
+                    {saving ? "Adding..." : "Add"}
                   </button>
                 </div>
               </Dialog.Panel>
@@ -783,21 +809,38 @@ function basename(path: string): string {
 function SourceItem({
   source,
   onDelete,
+  onRename,
   onUpdate,
 }: {
   source: File;
   onDelete: () => void;
+  onRename: (newPath: string) => Promise<void>;
   onUpdate: (content: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
   const Icon = sourceIcon(source);
   const binary = isBinarySource(source);
   const isAudio = source.contentType?.startsWith("audio/") ?? false;
   const isImage = source.contentType?.startsWith("image/") ?? false;
   const editable = !binary;
+
+  // Focus + select the stem when entering rename mode.
+  useEffect(() => {
+    if (!renaming) return;
+    const input = renameInputRef.current;
+    if (!input) return;
+    input.focus();
+    const dot = renameValue.lastIndexOf(".");
+    if (dot > 0) input.setSelectionRange(0, dot);
+    else input.select();
+  }, [renaming, renameValue]);
 
   const handleDownload = () => {
     if (binary) {
@@ -808,44 +851,126 @@ function SourceItem({
     }
   };
 
+  const startRename = () => {
+    setRenameValue(source.path);
+    setRenameError(null);
+    setRenaming(true);
+  };
+
+  const cancelRename = () => {
+    setRenaming(false);
+    setRenameValue("");
+    setRenameError(null);
+  };
+
+  const saveRename = async () => {
+    const next = renameValue.trim();
+    if (!next || next === source.path) {
+      cancelRename();
+      return;
+    }
+    try {
+      await onRename(next);
+      setRenaming(false);
+      setRenameValue("");
+      setRenameError(null);
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : "Rename failed");
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center gap-1.5 rounded-lg pl-1 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-        <button
-          type="button"
-          onClick={() => {
-            if (editable) setEditOpen(true);
-            else setExpanded(!expanded);
-          }}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-        >
-          <div className="hidden @[10rem]/sources:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
-            <Icon size={12} className="text-neutral-500" />
+        {renaming ? (
+          <div className="flex flex-1 items-center gap-1 min-w-0">
+            <div className="hidden @[10rem]/sources:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
+              <Icon size={12} className="text-neutral-500" />
+            </div>
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={(e) => {
+                setRenameValue(e.target.value);
+                if (renameError) setRenameError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void saveRename();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelRename();
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 min-w-0 text-xs bg-transparent border-0 border-b border-slate-500 rounded-none px-1 py-0 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:border-slate-600 dark:focus:border-slate-400"
+            />
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                void saveRename();
+              }}
+              className="shrink-0 p-1 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 rounded transition-colors"
+              title="Save"
+            >
+              <Check size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                cancelRename();
+              }}
+              className="shrink-0 p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 rounded transition-colors"
+              title="Cancel"
+            >
+              <X size={12} />
+            </button>
           </div>
-          <span className="flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300" title={source.path}>
-            {source.path}
-          </span>
-        </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                if (editable) setEditOpen(true);
+                else setExpanded(!expanded);
+              }}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+            >
+              <div className="hidden @[10rem]/sources:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
+                <Icon size={12} className="text-neutral-500" />
+              </div>
+              <span className="flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300" title={source.path}>
+                {source.path}
+              </span>
+            </button>
 
-        <button
-          type="button"
-          title="Actions"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (menuOpen) {
-              setMenuOpen(false);
-              setMenuPos(null);
-            } else {
-              const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-              setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-              setMenuOpen(true);
-            }
-          }}
-          className="shrink-0 p-1 rounded-md text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
-        >
-          <MoreHorizontal size={13} />
-        </button>
+            <button
+              type="button"
+              title="Actions"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (menuOpen) {
+                  setMenuOpen(false);
+                  setMenuPos(null);
+                } else {
+                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                  setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                  setMenuOpen(true);
+                }
+              }}
+              className="shrink-0 p-1 rounded-md text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+            >
+              <MoreHorizontal size={13} />
+            </button>
+          </>
+        )}
       </div>
+
+      {renaming && renameError && <p className="ml-8.5 mr-2 -mt-0.5 mb-1 text-[10px] text-red-500">{renameError}</p>}
 
       {expanded && !editable && (
         <div className="ml-8.5 mr-2 mb-1 px-2.5 py-2 rounded-md bg-neutral-50 dark:bg-neutral-800/40 max-h-64 overflow-y-auto">
@@ -893,6 +1018,18 @@ function SourceItem({
                   Edit
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setMenuPos(null);
+                  startRename();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <PencilLine size={13} className="text-neutral-400 shrink-0" />
+                Rename
+              </button>
               <button
                 type="button"
                 onClick={() => {
