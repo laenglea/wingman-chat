@@ -330,7 +330,8 @@ export class MCPClient implements ToolProvider {
       this.tools = tools
         .filter((tool) => !isToolVisibilityAppOnly(tool))
         .map((tool) => {
-          const icon = pickIcon(tool.icons as McpIcon[] | undefined) ?? (typeof this.icon === "string" ? this.icon : undefined);
+          const icon =
+            pickIcon(tool.icons as McpIcon[] | undefined) ?? (typeof this.icon === "string" ? this.icon : undefined);
           return {
             name: tool.name,
             icon,
