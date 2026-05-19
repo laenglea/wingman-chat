@@ -558,6 +558,7 @@ export function useNotebook(notebookId?: string) {
     addFileSource,
     addTextSource,
     deleteSource,
+    writeSource,
 
     sendMessage,
 

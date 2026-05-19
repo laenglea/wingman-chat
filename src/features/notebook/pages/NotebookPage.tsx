@@ -63,6 +63,7 @@ export function NotebookPage() {
     addFileSource,
     addTextSource,
     deleteSource,
+    writeSource,
     sendMessage,
     generateOutput,
     updateOutput,
@@ -278,6 +279,7 @@ export function NotebookPage() {
                 onFileAdd={addFileSource}
                 onTextAdd={addTextSource}
                 onDeleteSource={deleteSource}
+                onUpdateSource={writeSource}
               />
             )}
           </ResizablePanel>
@@ -514,6 +516,7 @@ export function NotebookPage() {
               onFileAdd={addFileSource}
               onTextAdd={addTextSource}
               onDeleteSource={deleteSource}
+              onUpdateSource={writeSource}
             />
           )}
         </div>

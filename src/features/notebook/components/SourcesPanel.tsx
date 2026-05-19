@@ -10,6 +10,7 @@ import {
   Loader2,
   Mic,
   MoreHorizontal,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -24,7 +25,7 @@ import { getConfig } from "@/shared/config";
 import { useDropZone } from "@/shared/hooks/useDropZone";
 import { acceptTypes } from "@/shared/lib/convert";
 import { getDriveContentUrl } from "@/shared/lib/drives";
-import { downloadFromUrl } from "@/shared/lib/utils";
+import { downloadBlob, downloadFromUrl } from "@/shared/lib/utils";
 import type { File } from "@/shared/types/file";
 import { DrivePicker, type SelectedFile } from "@/shared/ui/DrivePicker";
 import { Markdown } from "@/shared/ui/Markdown";
@@ -40,6 +41,7 @@ interface SourcesPanelProps {
   onFileAdd: (file: globalThis.File) => Promise<void>;
   onTextAdd: (name: string, text: string, audioUrl?: string) => Promise<string>;
   onDeleteSource: (sourceId: string) => void;
+  onUpdateSource: (path: string, content: string, contentType?: string) => Promise<void>;
 }
 
 export function SourcesPanel({
@@ -52,6 +54,7 @@ export function SourcesPanel({
   onFileAdd,
   onTextAdd,
   onDeleteSource,
+  onUpdateSource,
 }: SourcesPanelProps) {
   const config = getConfig();
   const acceptFilter = acceptTypes().join(",");
@@ -152,7 +155,12 @@ export function SourcesPanel({
 
             {/* Source items */}
             {sources.map((source) => (
-              <SourceItem key={source.path} source={source} onDelete={() => onDeleteSource(source.path)} />
+              <SourceItem
+                key={source.path}
+                source={source}
+                onDelete={() => onDeleteSource(source.path)}
+                onUpdate={(content) => onUpdateSource(source.path, content, source.contentType)}
+              />
             ))}
           </div>
         )}
@@ -772,21 +780,43 @@ function basename(path: string): string {
   return slash >= 0 ? path.slice(slash + 1) : path;
 }
 
-function SourceItem({ source, onDelete }: { source: File; onDelete: () => void }) {
+function SourceItem({
+  source,
+  onDelete,
+  onUpdate,
+}: {
+  source: File;
+  onDelete: () => void;
+  onUpdate: (content: string) => Promise<void>;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const Icon = sourceIcon(source);
   const binary = isBinarySource(source);
   const isAudio = source.contentType?.startsWith("audio/") ?? false;
   const isImage = source.contentType?.startsWith("image/") ?? false;
+  const editable = !binary;
+
+  const handleDownload = () => {
+    if (binary) {
+      downloadFromUrl(source.content, basename(source.path));
+    } else {
+      const blob = new Blob([source.content], { type: source.contentType || "text/plain" });
+      downloadBlob(blob, basename(source.path));
+    }
+  };
 
   return (
     <div>
       <div className="flex items-center gap-1.5 rounded-lg pl-1 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
         <button
           type="button"
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => {
+            if (editable) setEditOpen(true);
+            else setExpanded(!expanded);
+          }}
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
         >
           <div className="hidden @[10rem]/sources:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
@@ -817,7 +847,7 @@ function SourceItem({ source, onDelete }: { source: File; onDelete: () => void }
         </button>
       </div>
 
-      {expanded && (
+      {expanded && !editable && (
         <div className="ml-8.5 mr-2 mb-1 px-2.5 py-2 rounded-md bg-neutral-50 dark:bg-neutral-800/40 max-h-64 overflow-y-auto">
           {isAudio ? (
             // biome-ignore lint/a11y/useMediaCaption: user-recorded audio, no captions available
@@ -826,9 +856,7 @@ function SourceItem({ source, onDelete }: { source: File; onDelete: () => void }
             <img src={source.content} alt={source.path} className="max-w-full max-h-60 rounded" />
           ) : (
             <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400 whitespace-pre-wrap">
-              {binary
-                ? `(${source.contentType ?? "binary"} content)`
-                : `${source.content.slice(0, 2000)}${source.content.length > 2000 ? "..." : ""}`}
+              ({source.contentType ?? "binary"} content)
             </p>
           )}
         </div>
@@ -851,20 +879,32 @@ function SourceItem({ source, onDelete }: { source: File; onDelete: () => void }
               className="fixed z-50 min-w-30 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-xl shadow-black/20 dark:shadow-black/60 py-1 overflow-hidden"
               style={{ top: menuPos.top, right: menuPos.right }}
             >
-              {binary && (
+              {editable && (
                 <button
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
                     setMenuPos(null);
-                    downloadFromUrl(source.content, basename(source.path));
+                    setEditOpen(true);
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
                 >
-                  <Download size={13} className="text-neutral-400 shrink-0" />
-                  Download
+                  <Pencil size={13} className="text-neutral-400 shrink-0" />
+                  Edit
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setMenuPos(null);
+                  handleDownload();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <Download size={13} className="text-neutral-400 shrink-0" />
+                Download
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -881,6 +921,130 @@ function SourceItem({ source, onDelete }: { source: File; onDelete: () => void }
           </>,
           document.body,
         )}
+
+      {editOpen && (
+        <SourceEditOverlay
+          source={source}
+          onSave={async (content) => {
+            await onUpdate(content);
+            setEditOpen(false);
+          }}
+          onClose={() => setEditOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+// ── Source Edit Overlay ─────────────────────────────────────────────────
+
+function SourceEditOverlay({
+  source,
+  onSave,
+  onClose,
+}: {
+  source: File;
+  onSave: (content: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(source.content);
+  const [saving, setSaving] = useState(false);
+
+  const dirty = value !== source.content;
+
+  const handleSave = async () => {
+    if (!dirty || saving) return;
+    setSaving(true);
+    try {
+      await onSave(value);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSave();
+    }
+  };
+
+  return (
+    <Transition appear show as={Fragment}>
+      <Dialog as="div" className="relative z-80" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/40 dark:bg-black/60" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl shadow-xl transition-all">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-200/60 dark:border-neutral-800/60">
+                  <Dialog.Title
+                    className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate"
+                    title={source.path}
+                  >
+                    {source.path}
+                  </Dialog.Title>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="p-1 rounded-md text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="px-5 py-3.5">
+                  <textarea
+                    value={value}
+                    onChange={(e) => setValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    rows={16}
+                    autoFocus
+                    className="w-full px-3 py-2 text-sm font-mono rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y min-h-50 backdrop-blur-sm transition-colors"
+                  />
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 px-5 py-3 border-t border-neutral-200/60 dark:border-neutral-800/60 bg-neutral-50/50 dark:bg-neutral-900/30">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={!dirty || saving}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
+        </div>
+      </Dialog>
+    </Transition>
   );
 }
