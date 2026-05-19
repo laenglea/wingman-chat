@@ -105,9 +105,8 @@ function createComponents(
   scopeId: string,
   isStreaming: boolean,
   resolveAsset: (url: string) => string | undefined,
+  blockCounterRef: { current: number },
 ): Partial<Components> {
-  let blockIndex = 0;
-
   return {
     pre: ({ children }) => {
       return <>{children}</>;
@@ -327,7 +326,7 @@ function createComponents(
         );
       }
 
-      const blockId = `${scopeId}:code:${blockIndex++}`;
+      const blockId = `${scopeId}:code:${blockCounterRef.current++}`;
 
       if (!match) {
         return <CodeRenderer key={blockId} code={text} language="text" blockId={blockId} isStreaming={isStreaming} />;
@@ -500,6 +499,7 @@ function createMarkdownProcessor(
   scopeId: string,
   isStreaming: boolean,
   resolveAsset: (url: string) => string | undefined,
+  blockCounterRef: { current: number },
 ) {
   return unified()
     .use(remarkParse)
@@ -512,7 +512,7 @@ function createMarkdownProcessor(
     .use(rehypeNotoEmoji)
     .use(rehypeReact, {
       ...baseRehypeReactOptions,
-      components: createComponents(scopeId, isStreaming, resolveAsset),
+      components: createComponents(scopeId, isStreaming, resolveAsset, blockCounterRef),
     });
 }
 
@@ -539,6 +539,7 @@ const NonMemoizedMarkdown = ({ children, isStreaming = false, fs, basePath }: Ma
   const lastFlushRef = useRef(0);
   const timerRef = useRef<number>(undefined);
   const scopeIdRef = useRef<string | null>(null);
+  const blockCounterRef = useRef(0);
 
   if (!scopeIdRef.current) {
     scopeIdRef.current = `markdown-${markdownInstanceCounter++}`;
@@ -547,7 +548,7 @@ const NonMemoizedMarkdown = ({ children, isStreaming = false, fs, basePath }: Ma
   const resolveAsset = useAssetUrlResolver(fs, basePath);
 
   const processor = useMemo(
-    () => createMarkdownProcessor(scopeIdRef.current ?? "markdown", isStreaming, resolveAsset),
+    () => createMarkdownProcessor(scopeIdRef.current ?? "markdown", isStreaming, resolveAsset, blockCounterRef),
     [isStreaming, resolveAsset],
   );
 
@@ -573,6 +574,10 @@ const NonMemoizedMarkdown = ({ children, isStreaming = false, fs, basePath }: Ma
   const input = useDeferredValue(isStreaming ? throttled : children);
   if (!input) return null;
 
+  // Reset block counter before each processSync so code block keys are
+  // stable across re-renders (code:0, code:1, …), preventing CodeRenderer
+  // from unmounting/remounting on every streaming update.
+  blockCounterRef.current = 0;
   return processor.processSync(preprocessMarkdown(input, isStreaming)).result;
 };
 

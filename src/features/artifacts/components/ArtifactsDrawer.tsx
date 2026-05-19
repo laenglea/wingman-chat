@@ -1,15 +1,17 @@
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import {
+  Check,
   ChevronDown,
   Code,
   Download,
   Eye,
   File as FileIcon2,
+  Files,
   Loader2,
-  PanelRightClose,
   PanelRightOpen,
   Play,
   Shapes,
+  Terminal,
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -30,6 +32,7 @@ import { CsvEditor } from "@/shared/ui/editors/CsvEditor";
 import { HtmlEditor } from "@/shared/ui/editors/HtmlEditor";
 import { JsEditor } from "@/shared/ui/editors/JsEditor";
 import { MarkdownEditor } from "@/shared/ui/editors/MarkdownEditor";
+import { OfficeMarkdownEditor } from "@/shared/ui/editors/OfficeMarkdownEditor";
 import { PdfEditor } from "@/shared/ui/editors/PdfEditor";
 import { PythonEditor } from "@/shared/ui/editors/PythonEditor";
 import { SvgEditor } from "@/shared/ui/editors/SvgEditor";
@@ -37,7 +40,6 @@ import { TextEditor } from "@/shared/ui/editors/TextEditor";
 import { FileIcon } from "@/shared/ui/FileIcon";
 import { ResizablePanel, ResizablePanelGroup } from "@/shared/ui/Resizable";
 import { ArtifactsBrowser } from "./ArtifactsBrowser";
-
 
 export function ArtifactsDrawer() {
   const config = getConfig();
@@ -54,6 +56,8 @@ export function ArtifactsDrawer() {
   const filePickerRef = useRef<HTMLDivElement>(null);
   const [terminalMounted, setTerminalMounted] = useState(false);
   const [showFilesBrowser, setShowFilesBrowser] = useState(false);
+  const viewSliderRef = useRef<HTMLDivElement>(null);
+  const [viewSliderStyle, setViewSliderStyle] = useState({ left: 0, width: 0 });
   const dragCounterRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -339,7 +343,8 @@ export function ArtifactsDrawer() {
             <Shapes size={28} className="text-neutral-300 dark:text-neutral-600 mb-3 mx-auto" />
             <h3 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-1">No artifacts yet</h3>
             <p className="text-xs text-neutral-400 dark:text-neutral-500 leading-relaxed mb-4">
-              Files, code, and documents created in the conversation will appear here. You can also run Python or shell commands directly.
+              Files, code, and documents created in the conversation will appear here. You can also run Python or shell
+              commands directly.
             </p>
             <ul className="space-y-1.5 text-left mb-5">
               {[
@@ -394,9 +399,22 @@ export function ArtifactsDrawer() {
         );
       case "pdf":
         return <PdfEditor key={editorKey} content={activeFileData.content} />;
+      case "docx":
+      case "pptx":
+      case "xlsx":
+        return (
+          <OfficeMarkdownEditor
+            key={editorKey}
+            path={activeFileData.path}
+            content={activeFileData.content}
+            contentType={activeFileData.contentType}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+          />
+        );
       case "binary":
         return (
-          <div className="h-full flex items-center justify-center p-8 bg-neutral-50 dark:bg-neutral-900/60">
+          <div className="h-full flex items-center justify-center p-8">
             <div className="max-w-md text-center">
               <FileIcon2 size={32} className="mx-auto mb-4 text-neutral-300 dark:text-neutral-600" />
               <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100 mb-2">Binary File</h3>
@@ -486,13 +504,42 @@ export function ArtifactsDrawer() {
     }
   };
 
-  // Check if current file supports preview mode
+  // Update slider position whenever viewMode changes or the switcher mounts (activeFile change)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: activeFile triggers remeasurement when preview/code buttons appear or disappear
+  useEffect(() => {
+    const measure = () => {
+      const container = viewSliderRef.current;
+      if (!container) return;
+      const active = container.querySelector<HTMLElement>(`[data-view="${viewMode}"]`);
+      if (!active) return;
+      const cr = container.getBoundingClientRect();
+      const br = active.getBoundingClientRect();
+      setViewSliderStyle({ left: br.left - cr.left, width: br.width });
+    };
+    // Run immediately, then also after a paint in case the container just mounted
+    measure();
+    const id = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(id);
+  }, [viewMode, activeFile]);
+
+  // Check if current file supports preview mode.
+  // Office binaries are deliberately excluded — their "code" view is the
+  // derived markdown, which isn't useful to inspect or edit.
   const supportsPreview = () => {
     if (!activeFile) return false;
     const kind = activeFileData
       ? artifactKind(activeFileData.path, activeFileData.contentType)
       : artifactKind(activeFile);
     return ["html", "svg", "csv", "markdown"].includes(kind);
+  };
+
+  // Office binaries (docx/pptx/xlsx) are previewed via extracted markdown —
+  // not a fidelity-preserving render. Surface that to the user so they don't
+  // think the formatting is gone; downloading still gives the real file.
+  const isTextOnlyPreview = () => {
+    if (!activeFileData) return false;
+    const kind = artifactKind(activeFileData.path, activeFileData.contentType);
+    return kind === "docx" || kind === "pptx" || kind === "xlsx";
   };
 
   // Handle run button click
@@ -505,7 +552,7 @@ export function ArtifactsDrawer() {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: File drag-and-drop requires drag events on the drawer surface.
     <div
-      className="h-full flex flex-col overflow-hidden animate-in fade-in duration-200 relative bg-white/80 dark:bg-neutral-950/90 backdrop-blur-md pt-2 md:pt-0"
+      className="h-full flex flex-col overflow-hidden animate-in fade-in duration-200 relative pt-2 md:pt-0"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -536,12 +583,12 @@ export function ArtifactsDrawer() {
         }}
       />
 
-      {/* Outer horizontal layout: left (topbar + content) | right (file browser, full height) */}
+      {/* Outer horizontal split: left = top bar + editor + terminal; right = files browser (full height) */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
-        {/* Left column: top bar + editor/terminal stack */}
-        <ResizablePanel defaultSize={80} minSize={200} className="flex flex-col min-h-0">
-          {/* Top Bar with File Title and Actions */}
-          <div className={cn("shrink-0 h-10 flex items-center px-2 gap-1", chat?.id && files.length > 0 && "border-b border-black/10 dark:border-white/10")}>
+        {/* Left column: top bar + vertical editor/terminal split */}
+        <ResizablePanel defaultSize={75} minSize={200} className="h-full flex flex-col overflow-hidden">
+          {/* Top bar — lives inside the left column so the files browser spans full drawer height */}
+          <div className="@container shrink-0 h-10 flex items-center px-2 gap-1">
             {/* File title */}
             <div className="flex-1 flex items-center min-w-0 px-1 gap-1.5 relative" ref={filePickerRef}>
               {activeFile && (
@@ -555,7 +602,7 @@ export function ArtifactsDrawer() {
                       : "cursor-default pointer-events-none",
                   )}
                 >
-                  <FileIcon name={activeFile} />
+                  <FileIcon name={activeFile} className="shrink-0 @[18rem]:inline hidden" />
                   <span
                     className="text-xs font-medium truncate text-neutral-600 dark:text-neutral-400"
                     title={getFileName(activeFile)}
@@ -573,17 +620,42 @@ export function ArtifactsDrawer() {
                   )}
                 </button>
               )}
+              {/* Hint: office binaries are previewed as extracted text */}
+              {isTextOnlyPreview() && (
+                <span
+                  className="shrink-0 text-[10px] uppercase tracking-wide font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-200/60 dark:bg-neutral-800/60 rounded px-1.5 py-0.5"
+                  title="Office documents are previewed as extracted text. Download the file for the original formatting."
+                >
+                  Text preview
+                </span>
+              )}
               {/* View mode segmented control — inline after filename */}
               {supportsPreview() && (
-                <div className="relative flex items-center gap-0.5 bg-neutral-200/50 dark:bg-neutral-800/50 backdrop-blur-sm rounded-full p-0.5 ring-1 ring-black/5 dark:ring-white/5 shrink-0 ml-2">
+                <div
+                  ref={viewSliderRef}
+                  className="relative flex items-center gap-0.5 bg-neutral-200/50 dark:bg-neutral-800/50 backdrop-blur-sm rounded-full p-0.5 ring-1 ring-black/5 dark:ring-white/5 shrink-0 ml-2"
+                >
+                  {/* Animated slider background */}
+                  {viewSliderStyle.width > 0 && (
+                    <div
+                      className="absolute bg-white dark:bg-neutral-950 rounded-full shadow-sm ring-1 ring-black/5 dark:ring-white/10 transition-[left,width] duration-300 ease-out"
+                      style={{
+                        left: `${viewSliderStyle.left}px`,
+                        width: `${viewSliderStyle.width}px`,
+                        height: "calc(100% - 4px)",
+                        top: "2px",
+                      }}
+                    />
+                  )}
                   <button
                     type="button"
+                    data-view="preview"
                     onClick={() => setViewMode("preview")}
                     title="Preview"
                     className={cn(
                       "relative z-10 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200 text-xs",
                       viewMode === "preview"
-                        ? "bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 shadow-sm ring-1 ring-black/5 dark:ring-white/10"
+                        ? "text-neutral-900 dark:text-neutral-50"
                         : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200",
                     )}
                   >
@@ -591,12 +663,13 @@ export function ArtifactsDrawer() {
                   </button>
                   <button
                     type="button"
+                    data-view="code"
                     onClick={() => setViewMode("code")}
                     title="Code"
                     className={cn(
                       "relative z-10 flex items-center justify-center w-5 h-5 rounded-full transition-colors duration-200 text-xs",
                       viewMode === "code"
-                        ? "bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-50 shadow-sm ring-1 ring-black/5 dark:ring-white/10"
+                        ? "text-neutral-900 dark:text-neutral-50"
                         : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200",
                     )}
                   >
@@ -605,9 +678,7 @@ export function ArtifactsDrawer() {
                 </div>
               )}
               {showFilePicker && files.length > 1 && (
-                <div
-                  className="absolute top-full left-0 mt-1 z-50 min-w-48 max-w-72 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-lg shadow-lg overflow-hidden py-1"
-                >
+                <div className="absolute top-full left-0 mt-1 z-50 min-w-48 max-w-72 bg-white dark:bg-neutral-900 border border-black/10 dark:border-white/10 rounded-lg shadow-lg overflow-hidden py-1">
                   {files.map((f) => (
                     <button
                       key={f.path}
@@ -621,8 +692,10 @@ export function ArtifactsDrawer() {
                         f.path === activeFile && "font-medium",
                       )}
                     >
-                      <FileIcon name={f.path} />
-                      <span className="truncate" title={f.path}>{getFileName(f.path)}</span>
+                      <FileIcon name={f.path} className="shrink-0" />
+                      <span className="truncate" title={f.path}>
+                        {getFileName(f.path)}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -647,7 +720,8 @@ export function ArtifactsDrawer() {
                   )}
 
                   {/* Download dropdown */}
-                  {activeFileData && fs && (
+                  {activeFileData &&
+                    fs &&
                     (() => {
                       const isMarkdown = artifactKind(activeFileData.path, activeFileData.contentType) === "markdown";
                       if (!isMarkdown) {
@@ -665,7 +739,7 @@ export function ArtifactsDrawer() {
                             title={`Download ${getFileName(activeFileData.path)}`}
                           >
                             <Download size={13} />
-                            Download
+                            <span className="@[18rem]:inline hidden">Download</span>
                           </button>
                         );
                       }
@@ -676,7 +750,7 @@ export function ArtifactsDrawer() {
                             title="Download"
                           >
                             <Download size={13} />
-                            Download
+                            <span className="@[18rem]:inline hidden">Download</span>
                           </MenuButton>
                           <MenuItems
                             modal={false}
@@ -714,80 +788,101 @@ export function ArtifactsDrawer() {
                                 }}
                                 className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 data-focus:bg-neutral-100 dark:data-focus:bg-neutral-800 transition-colors"
                               >
-                                <img src="/icons/file-word.svg" alt="Word" width={12} height={12} className="dark:invert" />
+                                <img
+                                  src="/icons/file-word.svg"
+                                  alt="Word"
+                                  width={12}
+                                  height={12}
+                                  className="dark:invert"
+                                />
                                 Download as Word
                               </button>
                             </MenuItem>
                           </MenuItems>
                         </Menu>
                       );
-                    })()
-                  )}
+                    })()}
                 </div>
 
                 {chat?.id && <div className="w-px h-4 bg-black/10 dark:bg-white/10 mx-0.5" />}
               </>
             )}
 
-            {/* Workspace action group: files */}
+            {/* Workspace action group: panels dropdown */}
             {chat?.id && (
-              <div className="flex items-center gap-0.5">
-                {/* Files browser toggle — only when files exist */}
-                {files.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowFilesBrowser((v) => !v)}
-                    className={cn(
-                      "p-1.5 rounded transition-all duration-150 ease-out",
-                      showFilesBrowser
-                        ? "text-neutral-700 dark:text-neutral-200 bg-black/5 dark:bg-white/5"
-                        : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5",
-                    )}
-                    title={showFilesBrowser ? "Hide files" : "Show files"}
-                  >
-                    {showFilesBrowser ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
-                  </button>
-                )}
-              </div>
+              <Menu as="div" className="relative">
+                <MenuButton
+                  className="flex items-center gap-0.5 p-1.5 rounded transition-all duration-150 ease-out text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5"
+                  title="Toggle panels"
+                >
+                  <PanelRightOpen size={14} />
+                  <ChevronDown size={10} className="opacity-60" />
+                </MenuButton>
+                <MenuItems
+                  modal={false}
+                  transition
+                  anchor="bottom end"
+                  className="mt-1 origin-top-right rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-lg py-1 z-50 min-w-40 transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0"
+                >
+                  {files.length > 0 && (
+                    <MenuItem>
+                      <button
+                        type="button"
+                        onClick={() => setShowFilesBrowser((v) => !v)}
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <Files size={12} className="shrink-0 text-neutral-400" />
+                        <span className="flex-1 text-left">Files</span>
+                        {showFilesBrowser && (
+                          <Check size={11} className="shrink-0 text-neutral-500 dark:text-neutral-400" />
+                        )}
+                      </button>
+                    </MenuItem>
+                  )}
+                  <MenuItem>
+                    <button
+                      type="button"
+                      onClick={toggleTerminal}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                    >
+                      <Terminal size={12} className="shrink-0 text-neutral-400" />
+                      <span className="flex-1 text-left">Terminal</span>
+                      {showTerminal && <Check size={11} className="shrink-0 text-neutral-500 dark:text-neutral-400" />}
+                    </button>
+                  </MenuItem>
+                </MenuItems>
+              </Menu>
             )}
           </div>
 
-          {/* Editor + Terminal stacked vertically, terminal spans full left-column width */}
-          <div className="flex-1 overflow-hidden min-h-0">
-            <ResizablePanelGroup orientation="vertical" className="h-full">
-              {/* Editor area */}
-              <ResizablePanel defaultSize={70} minSize={20}>
-                <div
-                  className={cn(
-                    "h-full overflow-hidden relative z-0",
-                  )}
-                >
-                  {renderEditor()}
+          {/* Vertical split: editor on top, terminal on bottom */}
+          <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0">
+            <ResizablePanel defaultSize={70} minSize={20} className="h-full overflow-hidden relative z-0">
+              {renderEditor()}
+            </ResizablePanel>
+
+            {/* Terminal — spans only the left column, below the editor */}
+            {terminalMounted && showTerminal && (
+              <ResizablePanel defaultSize={30} minSize={80}>
+                <div className="h-full relative z-10 border-t border-black/10 dark:border-white/10 shadow-[0_-8px_20px_-2px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_20px_-2px_rgba(0,0,0,0.5)]">
+                  <BashEditor key="terminal" visible={showTerminal} />
                 </div>
               </ResizablePanel>
-
-              {/* Terminal panel — full width of left column */}
-              {terminalMounted && showTerminal && (
-                <ResizablePanel defaultSize={30} minSize={80}>
-                  <div className="h-full relative z-10 border-t border-black/10 dark:border-white/10 shadow-[0_-8px_20px_-2px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_20px_-2px_rgba(0,0,0,0.5)]">
-                    <BashEditor key="terminal" visible={showTerminal} />
-                  </div>
-                </ResizablePanel>
-              )}
-            </ResizablePanelGroup>
-            {/* Keep terminal mounted but hidden when closed */}
-            {terminalMounted && !showTerminal && (
-              <div className="hidden">
-                <BashEditor key="terminal" visible={false} />
-              </div>
             )}
-          </div>
+          </ResizablePanelGroup>
+
+          {/* Keep terminal mounted but hidden when closed */}
+          {terminalMounted && !showTerminal && (
+            <div className="hidden">
+              <BashEditor key="terminal" visible={false} />
+            </div>
+          )}
         </ResizablePanel>
 
-        {/* Right column: File browser spanning full drawer height (including alongside top bar) */}
+        {/* Files browser — right panel spanning full drawer height (including header and over terminal) */}
         {files.length > 0 && fs && showFilesBrowser && (
           <ResizablePanel defaultSize={25} minSize={120}>
-            <div className="h-full overflow-hidden border-l border-black/10 dark:border-white/10 bg-neutral-50/80 dark:bg-neutral-900/60 shadow-[-8px_0_20px_-2px_rgba(0,0,0,0.12)] dark:shadow-[-8px_0_20px_-2px_rgba(0,0,0,0.5)]">
+            <div className="h-full overflow-hidden border-l border-black/10 dark:border-white/10">
               <ArtifactsBrowser
                 fs={fs}
                 files={files}
@@ -812,13 +907,12 @@ export function ArtifactsDrawer() {
                     console.error("Failed to download file:", error);
                   }
                 }}
-                showTerminal={showTerminal}
-                onToggleTerminal={toggleTerminal}
               />
             </div>
           </ResizablePanel>
         )}
       </ResizablePanelGroup>
+
       {activeDrive && (
         <DrivePicker
           isOpen={!!activeDrive}

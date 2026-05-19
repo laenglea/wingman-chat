@@ -1,14 +1,13 @@
 import mime from "mime";
 import OpenAI from "openai";
-import { APIError } from "openai/error";
 import { zodTextFormat } from "openai/helpers/zod";
-import type { ResponseInputItem } from "openai/resources/responses/responses";
 import { z } from "zod/v3";
-import instructionsSummarizeTitle from "@/features/chat/prompts/chat-title.txt?raw";
+import instructionsSummarizeChat from "@/features/chat/prompts/chat-title.txt?raw";
 import instructionsConvertCsv from "@/features/chat/prompts/convert-csv.txt?raw";
 import instructionsConvertMd from "@/features/chat/prompts/convert-md.txt?raw";
 import instructionsRewriteSelection from "@/features/chat/prompts/rewrite-selection.txt?raw";
 import instructionsRewriteText from "@/features/chat/prompts/rewrite-text.txt?raw";
+import instructionsSummarizeHistory from "@/features/chat/prompts/summarize-history.txt?raw";
 import type { SearchResult } from "@/features/research/types/search";
 import instructionsOptimizeSkill from "@/prompts/skill-optimizer.txt?raw";
 import type {
@@ -26,42 +25,8 @@ import { Role } from "@/shared/types/chat";
 import { isAbortError } from "./errors";
 import { modelName, modelType } from "./models";
 import { traceGenAI } from "./otel";
+import { dropOrphanFunctionCalls } from "./recovery";
 import { serializeToolResultForApi, simplifyMarkdown } from "./utils";
-
-/**
- * Detect Responses API errors caused by a compaction item the current
- * deployment can't verify. Compaction blobs are encrypted with provider/
- * deployment-specific keys, so a model swap or cross-Azure-resource replay
- * fails verification.
- */
-function isCompactionHistoryError(error: unknown): boolean {
-  const body = error instanceof APIError ? (error.error as { message?: string } | undefined) : undefined;
-  const msg = body?.message?.trim() || (error instanceof Error ? error.message : String(error));
-  return (
-    /encrypted[_ ]content.*(?:could not|cannot|failed to)\s*be\s*(?:verified|decrypted|parsed|read|decoded)/i.test(
-      msg,
-    ) || /type ['"]compaction['"].*provided without/i.test(msg)
-  );
-}
-
-/**
- * Drop unpaired `function_call` / `function_call_output` items (interrupted
- * tool execution or partial histories). The Responses API rejects orphans
- * with `provided without its required following item`.
- */
-function dropOrphanFunctionCalls(items: ResponseInputItem[]): ResponseInputItem[] {
-  const issuedIds = new Set<string>();
-  const completedIds = new Set<string>();
-  for (const item of items) {
-    if (item.type === "function_call") issuedIds.add(item.call_id);
-    else if (item.type === "function_call_output") completedIds.add(item.call_id);
-  }
-  return items.filter((item) => {
-    if (item.type === "function_call") return completedIds.has(item.call_id);
-    if (item.type === "function_call_output") return issuedIds.has(item.call_id);
-    return true;
-  });
-}
 
 function expandToSentences(text: string, start: number, end: number): string {
   const sentenceBoundaries = /[.!?]+\s*|\n+/g;
@@ -130,7 +95,6 @@ export class Client {
       effort?: "none" | "minimal" | "low" | "medium" | "high";
       summary?: "auto" | "concise" | "detailed";
       verbosity?: "low" | "medium" | "high";
-      compactThreshold?: number;
       signal?: AbortSignal;
     },
   ): Promise<Message> {
@@ -229,12 +193,15 @@ export class Client {
                   });
                 }
 
-                if (part.type === "compaction") {
+                if (part.type === "summary") {
+                  // Replay client-side summary as assistant text. The wrapper
+                  // tells the model the prior context was condensed and to
+                  // continue naturally without referencing the summary itself.
                   flushAssistantText();
                   items.push({
-                    type: "compaction",
-                    id: part.id,
-                    encrypted_content: part.encrypted_content,
+                    type: "message",
+                    role: "assistant",
+                    content: `[Earlier conversation condensed to save context. Continue naturally without referencing this summary.]\n\n${part.text}`,
                   });
                 }
               }
@@ -246,180 +213,161 @@ export class Client {
           }
         }
 
-        const attemptStream = async (inputItems: OpenAI.Responses.ResponseInputItem[]) => {
-          // Track streaming content parts (fresh per attempt so retries don't
-          // mix partial content from a rejected stream into the final result).
-          const contentParts: Content[] = [];
-          let currentType: "reasoning" | "text" | null = null;
+        const contentParts: Content[] = [];
 
-          // Helper to append text content
-          const appendText = (delta: string) => {
-            if (currentType === "text" && contentParts.length > 0) {
-              const lastPart = contentParts[contentParts.length - 1];
-              if (lastPart.type === "text") {
-                lastPart.text += delta;
-              }
-            } else {
-              contentParts.push({ type: "text", text: delta });
-              currentType = "text";
-            }
-            handler?.([...contentParts]);
-          };
-
-          // Helper to append reasoning content (text or summary)
-          const appendReasoning = (id: string, delta: string, summary?: string) => {
-            let reasoningPart = contentParts.find((p): p is ReasoningContent => p.type === "reasoning");
-            if (!reasoningPart) {
-              reasoningPart = { type: "reasoning", id, text: "" };
-              contentParts.unshift(reasoningPart); // Reasoning goes first
-            }
-            if (summary) {
-              reasoningPart.summary = (reasoningPart.summary || "") + summary;
-            }
-            if (delta) {
-              reasoningPart.text += delta;
-            }
-            currentType = "reasoning";
-            handler?.([...contentParts]);
-          };
-
-          const runner = this.oai.responses
-            .stream({
-              model: model,
-              store: false,
-              truncation: "auto",
-              tools: this.toTools(tools),
-              input: inputItems,
-              instructions: instructions,
-              ...(options?.effort
-                ? {
-                    reasoning: {
-                      effort: options.effort,
-                      summary: options.summary ?? "auto",
-                    },
-                  }
-                : {}),
-              ...(options?.verbosity
-                ? {
-                    text: { verbosity: options.verbosity },
-                  }
-                : {}),
-              ...(options?.compactThreshold
-                ? {
-                    context_management: [{ type: "compaction" as const, compact_threshold: options.compactThreshold }],
-                  }
-                : {}),
-            })
-            .on("response.reasoning_summary_text.delta", (event) => {
-              appendReasoning(event.item_id, "", event.delta);
-            })
-            .on("response.reasoning_text.delta", (event) => {
-              appendReasoning(event.item_id, event.delta);
-            })
-            .on("response.output_text.delta", (event) => {
-              appendText(event.delta);
-            })
-            .on("response.output_item.done", (event) => {
-              if (event.item.type === "function_call") {
-                contentParts.push({
-                  type: "tool_call",
-                  id: event.item.call_id,
-                  name: event.item.name,
-                  arguments: event.item.arguments,
-                });
-                currentType = null;
-                handler?.([...contentParts]);
-              } else if (event.item.type === "compaction") {
-                console.log("[Compaction] Context compacted", {
-                  id: event.item.id,
-                  bytes: event.item.encrypted_content.length,
-                });
-                contentParts.push({
-                  type: "compaction",
-                  id: event.item.id,
-                  encrypted_content: event.item.encrypted_content,
-                });
-                handler?.([...contentParts]);
-              }
-            });
-
-          // If a signal was provided, wire it up to abort the runner. Handle
-          // the already-aborted case explicitly — addEventListener on a
-          // signal that has already fired never invokes the listener.
-          if (options?.signal) {
-            if (options.signal.aborted) {
-              runner.abort();
-            } else {
-              options.signal.addEventListener("abort", () => runner.abort(), { once: true });
-            }
+        // Get-or-create the single reasoning part (always at index 0).
+        const ensureReasoning = (id: string): ReasoningContent => {
+          let part = contentParts.find((p): p is ReasoningContent => p.type === "reasoning");
+          if (!part) {
+            part = { type: "reasoning", id, text: "" };
+            contentParts.unshift(part);
           }
-
-          // Attach an error listener so mid-stream errors don't surface as
-          // unhandled EventEmitter errors. The same error will also reject
-          // `finalResponse()` below, which is where we actually handle it.
-          runner.on("error", () => {
-            /* handled via finalResponse() rejection */
-          });
-
-          try {
-            const finalResponse = await runner.finalResponse();
-
-            return {
-              result: { role: Role.Assistant, content: contentParts } as Message,
-              response: {
-                id: finalResponse.id,
-                model: finalResponse.model,
-                inputTokens: finalResponse.usage?.input_tokens,
-                cachedInputTokens: finalResponse.usage?.input_tokens_details?.cached_tokens,
-                outputTokens: finalResponse.usage?.output_tokens,
-                reasoningTokens: finalResponse.usage?.output_tokens_details?.reasoning_tokens,
-              },
-            };
-          } catch (error) {
-            // On abort (either via our signal or runner.abort()), return the
-            // partial content accumulated so far as a successful result.
-            if (options?.signal?.aborted || isAbortError(error)) {
-              return {
-                result: { role: Role.Assistant, content: contentParts } as Message,
-                response: { id: "", model },
-              };
-            }
-
-            throw error;
-          }
+          return part;
         };
 
-        const baseItems = dropOrphanFunctionCalls(items);
+        const emit = () => handler?.([...contentParts]);
+
+        const runner = this.oai.responses
+          .stream({
+            model: model,
+            store: false,
+            truncation: "auto",
+            tools: this.toTools(tools),
+            input: dropOrphanFunctionCalls(items),
+            instructions: instructions,
+            ...(options?.effort
+              ? {
+                  reasoning: {
+                    effort: options.effort,
+                    summary: options.summary ?? "auto",
+                  },
+                }
+              : {}),
+            ...(options?.verbosity
+              ? {
+                  text: { verbosity: options.verbosity },
+                }
+              : {}),
+          })
+          .on("response.reasoning_summary_text.delta", (event) => {
+            const r = ensureReasoning(event.item_id);
+            r.summary = (r.summary ?? "") + event.delta;
+            emit();
+          })
+          .on("response.reasoning_text.delta", (event) => {
+            ensureReasoning(event.item_id).text += event.delta;
+            emit();
+          })
+          .on("response.output_text.delta", (event) => {
+            const last = contentParts[contentParts.length - 1];
+            if (last?.type === "text") {
+              last.text += event.delta;
+            } else {
+              contentParts.push({ type: "text", text: event.delta });
+            }
+            emit();
+          })
+          .on("response.output_item.done", (event) => {
+            if (event.item.type === "function_call") {
+              contentParts.push({
+                type: "tool_call",
+                id: event.item.call_id,
+                name: event.item.name,
+                arguments: event.item.arguments,
+              });
+              emit();
+            }
+          });
+
+        // Wire abort. Handle the already-aborted case explicitly —
+        // addEventListener on a signal that has already fired never invokes.
+        if (options?.signal) {
+          if (options.signal.aborted) {
+            runner.abort();
+          } else {
+            options.signal.addEventListener("abort", () => runner.abort(), { once: true });
+          }
+        }
+
+        // Attach an error listener so mid-stream errors don't surface as
+        // unhandled EventEmitter errors. The same error rejects
+        // `finalResponse()` below, where we actually handle it.
+        runner.on("error", () => {});
+
+        const assistant: Message = { role: Role.Assistant, content: contentParts };
 
         try {
-          return await attemptStream(baseItems);
+          const finalResponse = await runner.finalResponse();
+          return {
+            result: assistant,
+            response: {
+              id: finalResponse.id,
+              model: finalResponse.model,
+              inputTokens: finalResponse.usage?.input_tokens,
+              cachedInputTokens: finalResponse.usage?.input_tokens_details?.cached_tokens,
+              outputTokens: finalResponse.usage?.output_tokens,
+              reasoningTokens: finalResponse.usage?.output_tokens_details?.reasoning_tokens,
+            },
+          };
         } catch (error) {
-          if (!isCompactionHistoryError(error)) throw error;
-          // Compaction blob can't be verified by the current deployment (model
-          // swap, different Azure resource). Strip and retry once.
-          const stripped = baseItems.filter((item) => (item as { type?: string }).type !== "compaction");
-          if (stripped.length === baseItems.length) throw error;
-          console.warn("[Recovery] Retrying after compaction history error", {
-            removedItems: baseItems.length - stripped.length,
-          });
-          handler?.([]);
-          return await attemptStream(stripped);
+          // On abort (our signal or runner.abort()), return partial content
+          // as a successful result.
+          if (options?.signal?.aborted || isAbortError(error)) {
+            return { result: assistant, response: { id: "", model } };
+          }
+          throw error;
         }
       },
       { effort: options?.effort, verbosity: options?.verbosity, toolCount: tools?.length },
     ); // end traceGenAI
   }
 
-  async summarizeTitle(model: string, input: Message[]): Promise<string | null> {
+  async summarizeChat(
+    model: string,
+    input: Message[],
+    categories: Array<{ id: string; description: string }> = [],
+  ): Promise<{ title: string | null; categories: string[] }> {
     const history = input.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    const ids = categories.map((c) => c.id);
+    const schema =
+      ids.length > 0
+        ? z
+            .object({
+              title: z.string(),
+              categories: z.array(z.enum(ids as [string, ...string[]])),
+            })
+            .strict()
+        : z
+            .object({
+              title: z.string(),
+              categories: z.array(z.string()),
+            })
+            .strict();
     const result = await this.parse(
       model,
-      instructionsSummarizeTitle,
-      JSON.stringify(history),
-      z.object({ title: z.string() }).strict(),
-      "summarize_title",
+      instructionsSummarizeChat,
+      JSON.stringify({ categories, history }),
+      schema,
+      "summarize_chat",
     );
-    return result?.title ?? null;
+    return { title: result?.title ?? null, categories: result?.categories ?? [] };
+  }
+
+  /**
+   * Summarize a conversation history into a single dense text block.
+   * Used to condense older messages when the context window fills up.
+   * Returns plain text — caller wraps it into a SummaryContent part.
+   */
+  async summarizeHistory(model: string, input: Message[]): Promise<string> {
+    const history = input.map((m) => ({ role: m.role, content: m.content }));
+    const result = await this.parse(
+      model,
+      instructionsSummarizeHistory,
+      JSON.stringify({ history }),
+      z.object({ summary: z.string() }).strict(),
+      "summarize_history",
+    );
+    return result?.summary ?? "";
   }
 
   async convertCSV(model: string, text: string): Promise<string> {

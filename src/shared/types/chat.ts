@@ -76,6 +76,8 @@ export interface RenderedAppHandle {
 }
 
 export interface ToolContext {
+  model?: string;
+  signal?: AbortSignal;
   content?(): Content[];
   elicit?(elicitation: Elicitation): Promise<ElicitationResult>;
   onElicitationComplete?(elicitationId: string): void;
@@ -110,10 +112,9 @@ export type ToolResultContent = {
   result: (TextContent | ImageContent | AudioContent | FileContent)[];
 };
 
-export type CompactionContent = {
-  type: "compaction";
-  id: string;
-  encrypted_content: string;
+export type SummaryContent = {
+  type: "summary";
+  text: string;
 };
 
 // Content is the union of all content types used in messages
@@ -125,7 +126,7 @@ export type Content =
   | ReasoningContent
   | ToolCallContent
   | ToolResultContent
-  | CompactionContent;
+  | SummaryContent;
 
 export type TextContent = {
   type: "text";

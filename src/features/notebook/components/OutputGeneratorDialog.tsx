@@ -2,6 +2,8 @@ import { Listbox, Transition, TransitionChild } from "@headlessui/react";
 import {
   AudioLines,
   BarChart3,
+  BookMarked,
+  Boxes,
   Check,
   ChevronsUpDown,
   Image as ImageIcon,
@@ -9,12 +11,20 @@ import {
   Presentation,
   Sparkles,
   Table2,
+  Workflow,
   X,
 } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { getConfig } from "@/shared/config";
 import type { BuildInstructionsOptions, Style } from "../lib/styles";
-import { infographicStyles, podcastStyles, reportStyles, slideStyles } from "../lib/styles";
+import {
+  architectureStyles,
+  infographicStyles,
+  podcastStyles,
+  processStyles,
+  reportStyles,
+  slideStyles,
+} from "../lib/styles";
 import type { OutputType } from "../types/notebook";
 
 // ── Types ──────────────────────────────────────────────────────────────
@@ -73,7 +83,8 @@ const TYPE_META: Record<
     icon: typeof Presentation;
     title: string;
     placeholder: string;
-    styles: { getAll(): Style[] };
+    /** Style registry, if this output type has user-pickable styles. */
+    styles?: { getAll(): Style[] };
     /** Show large description cards instead of compact tiles. */
     descriptionCards?: boolean;
   }
@@ -105,13 +116,33 @@ const TYPE_META: Record<
     placeholder: "Describe the infographic you want to create…",
     styles: infographicStyles,
   },
+  process: {
+    icon: Workflow,
+    title: "Generate Process Diagram",
+    placeholder: "Audience, scope, controls to highlight (e.g. SOX, KYC, ITGC change-management gates)…",
+    styles: processStyles,
+    descriptionCards: true,
+  },
+  architecture: {
+    icon: Boxes,
+    title: "Generate Architecture Diagram",
+    placeholder: "Target audience + constraints (e.g. cloud provider, regulatory scope, scale, pattern preference)…",
+    styles: architectureStyles,
+    descriptionCards: true,
+  },
+  "data-catalog": {
+    icon: BookMarked,
+    title: "Generate Data Catalog",
+    placeholder: "Scope + audience (e.g. trading book; BCBS 239 review; classify PII; align to FIBO)…",
+    // No style picker — the catalog generation populates all four sections.
+  },
 };
 
 // ── Component ──────────────────────────────────────────────────────────
 
 export function OutputGeneratorDialog({ open, type, onClose, onGenerate }: OutputGeneratorDialogProps) {
   const meta = TYPE_META[type];
-  const styles = useMemo(() => meta?.styles.getAll() ?? [], [meta]);
+  const styles = useMemo(() => meta?.styles?.getAll() ?? [], [meta]);
   const languages = useMemo(resolveLanguages, []);
   const allLanguages = useMemo(() => [AUTO_LANGUAGE, ...languages], [languages]);
 

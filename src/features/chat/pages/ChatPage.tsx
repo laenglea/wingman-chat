@@ -1,10 +1,11 @@
 import { useMatch, useNavigate } from "@tanstack/react-router";
-import { AppWindow, ArrowDown, BotMessageSquare, ChevronLeft, ChevronRight, Info, Plus as PlusIcon, Shapes } from "lucide-react";
+import { AppWindow, ArrowDown, BotMessageSquare, ChevronLeft, Info, Plus as PlusIcon, Shapes } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AgentDrawer } from "@/features/agent/components/AgentDrawer";
 import { useAgents } from "@/features/agent/hooks/useAgents";
 import { ArtifactsDrawer } from "@/features/artifacts/components/ArtifactsDrawer";
 import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
+import { ChatConsentBackdrop, ChatConsentBanner } from "@/features/chat/components/ChatConsentOverlay";
 import { ChatInput } from "@/features/chat/components/ChatInput";
 import { ChatMessage } from "@/features/chat/components/ChatMessage";
 import { ChatSidebar } from "@/features/chat/components/ChatSidebar";
@@ -146,7 +147,12 @@ export function ChatPage() {
   }, [chat?.id, navigate, routeChatId]);
 
   const { layoutMode } = useLayout();
-  const { isAvailable: artifactsAvailable, showArtifactsDrawer, toggleArtifactsDrawer, setShowArtifactsDrawer } = useArtifacts();
+  const {
+    isAvailable: artifactsAvailable,
+    showArtifactsDrawer,
+    toggleArtifactsDrawer,
+    setShowArtifactsDrawer,
+  } = useArtifacts();
   const { showAgentDrawer, setShowAgentDrawer, toggleAgentDrawer } = useAgents();
   const { showAppDrawer, hasAppContent, toggleAppDrawer, setShowAppDrawer } = useApp();
 
@@ -201,61 +207,85 @@ export function ChatPage() {
   const appResizingRef = useRef(false);
   const [isAppResizing, setIsAppResizing] = useState(false);
 
-  const handleAppResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    appResizingRef.current = true;
-    setIsAppResizing(true);
-    document.body.classList.add("resizing");
-    // Capture the agent drawer state at drag start — it won't change mid-drag.
-    // 20rem (320px) agent panel + 0.75rem (12px) agent gap + 0.75rem (12px) app gap = 344px
-    const agentOffset = showAgentDrawer ? 344 : 12;
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!appResizingRef.current) return;
-      const vw = window.innerWidth;
-      const minChatPx = 400;
-      const panelRightEdge = vw - agentOffset;
-      const newWidthPx = Math.min(panelRightEdge - minChatPx, panelRightEdge - ev.clientX);
-      const newVw = Math.max(20, (newWidthPx / vw) * 100);
-      setAppWidthVw(newVw);
-    };
-    const onMouseUp = () => {
-      appResizingRef.current = false;
-      setIsAppResizing(false);
-      document.body.classList.remove("resizing");
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-  }, [showAgentDrawer]);
+  const handleAppResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      appResizingRef.current = true;
+      setIsAppResizing(true);
+      document.body.classList.add("resizing");
+      // Capture the agent drawer state at drag start — it won't change mid-drag.
+      // 20rem (320px) agent panel + 0.75rem (12px) agent gap + 0.75rem (12px) app gap = 344px.
+      // When the agent drawer is hidden the app drawer is flush to the right (right: 0),
+      // so there is no offset to account for.
+      const agentOffset = showAgentDrawer ? 344 : 0;
+      const CLOSE_THRESHOLD_PX = 120;
+      let currentWidthVw = appWidthVw;
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!appResizingRef.current) return;
+        const vw = window.innerWidth;
+        const minChatPx = 400;
+        const panelRightEdge = vw - agentOffset;
+        const newWidthPx = Math.min(panelRightEdge - minChatPx, panelRightEdge - ev.clientX);
+        const newVw = Math.max(0, (newWidthPx / vw) * 100);
+        currentWidthVw = newVw;
+        setAppWidthVw(newVw);
+      };
+      const onMouseUp = () => {
+        appResizingRef.current = false;
+        setIsAppResizing(false);
+        document.body.classList.remove("resizing");
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        if ((currentWidthVw / 100) * window.innerWidth < CLOSE_THRESHOLD_PX) {
+          setShowAppDrawer(false);
+          setTimeout(() => setAppWidthVw(DEFAULT_APP_WIDTH_VW), 300);
+        }
+      };
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    },
+    [showAgentDrawer, appWidthVw, setShowAppDrawer],
+  );
 
-  const handleArtifactsResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    artifactsResizingRef.current = true;
-    setIsArtifactsResizing(true);
-    document.body.classList.add("resizing");
-    // Capture the agent drawer state at drag start — it won't change mid-drag.
-    // 20rem (320px) agent panel + 0.75rem (12px) agent gap + 0.75rem (12px) artifacts gap = 344px
-    const agentOffset = showAgentDrawer ? 344 : 12;
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!artifactsResizingRef.current) return;
-      const vw = window.innerWidth;
-      const minChatPx = 400;
-      const panelRightEdge = vw - agentOffset;
-      const newWidthPx = Math.min(panelRightEdge - minChatPx, panelRightEdge - ev.clientX);
-      const newVw = Math.max(20, (newWidthPx / vw) * 100);
-      setArtifactsWidthVw(newVw);
-    };
-    const onMouseUp = () => {
-      artifactsResizingRef.current = false;
-      setIsArtifactsResizing(false);
-      document.body.classList.remove("resizing");
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-  }, [showAgentDrawer]);
+  const handleArtifactsResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      artifactsResizingRef.current = true;
+      setIsArtifactsResizing(true);
+      document.body.classList.add("resizing");
+      // Capture the agent drawer state at drag start — it won't change mid-drag.
+      // 20rem (320px) agent panel + 0.75rem (12px) agent gap + 0.75rem (12px) artifacts gap = 344px.
+      // When the agent drawer is hidden the artifacts drawer is flush to the right (right: 0),
+      // so there is no offset to account for.
+      const agentOffset = showAgentDrawer ? 344 : 0;
+      const CLOSE_THRESHOLD_PX = 220;
+      let currentWidthVw = artifactsWidthVw;
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!artifactsResizingRef.current) return;
+        const vw = window.innerWidth;
+        const minChatPx = 400;
+        const panelRightEdge = vw - agentOffset;
+        const newWidthPx = Math.min(panelRightEdge - minChatPx, panelRightEdge - ev.clientX);
+        const newVw = Math.max(0, (newWidthPx / vw) * 100);
+        currentWidthVw = newVw;
+        setArtifactsWidthVw(newVw);
+      };
+      const onMouseUp = () => {
+        artifactsResizingRef.current = false;
+        setIsArtifactsResizing(false);
+        document.body.classList.remove("resizing");
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        if ((currentWidthVw / 100) * window.innerWidth < CLOSE_THRESHOLD_PX) {
+          setShowArtifactsDrawer(false);
+          setTimeout(() => setArtifactsWidthVw(DEFAULT_ARTIFACTS_WIDTH_VW), 300);
+        }
+      };
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    },
+    [showAgentDrawer, artifactsWidthVw, setShowArtifactsDrawer],
+  );
 
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent, showSidebar } = useSidebar();
@@ -464,9 +494,7 @@ export function ChatPage() {
       <BackgroundImage opacity={messages.length === 0 ? 80 : 0} />
 
       <div
-        className={`flex-1 flex flex-col overflow-hidden relative ${isArtifactsResizing || isAppResizing ? "" : "transition-all duration-500 ease-in-out"} ${showAgentDrawer && !showAppDrawer && !showArtifactsDrawer
-          ? "md:mr-83"
-          : ""
+        className={`flex-1 flex flex-col overflow-hidden relative ${isArtifactsResizing || isAppResizing ? "" : "transition-all duration-500 ease-in-out"} ${showAgentDrawer && !showAppDrawer && !showArtifactsDrawer ? "md:mr-83" : ""
           }`}
         style={
           !isMobile && showAppDrawer
@@ -535,20 +563,14 @@ export function ChatPage() {
             </button>
           )}
         </main>
+        <ChatConsentBackdrop />
       </div>
 
       <footer
         className={cn(
           "fixed bottom-0 left-0 md:px-3 md:pb-4 pointer-events-none z-20 transition-[left,right] duration-500 ease-in-out",
-          showSidebar &&
-          chats.length > 0 &&
-          !showAgentDrawer &&
-          !showAppDrawer &&
-          !showArtifactsDrawer &&
-          "md:left-59",
-          showAgentDrawer && !showAppDrawer && !showArtifactsDrawer
-            ? "right-0 md:right-83"
-            : "right-0",
+          showSidebar && chats.length > 0 && !showAgentDrawer && !showAppDrawer && !showArtifactsDrawer && "md:left-59",
+          showAgentDrawer && !showAppDrawer && !showArtifactsDrawer ? "right-0 md:right-83" : "right-0",
         )}
         style={
           !isMobile && showAppDrawer
@@ -566,7 +588,7 @@ export function ChatPage() {
       >
         <div
           className={cn(
-            "relative pointer-events-auto md:max-w-4xl mx-auto transition-transform duration-500 ease-in-out",
+            "relative md:max-w-4xl mx-auto transition-transform duration-500 ease-in-out",
             messages.length === 0 &&
             !showAppDrawer &&
             !showAgentDrawer &&
@@ -574,15 +596,18 @@ export function ChatPage() {
             "md:translate-y-[calc(50%-33.333vh)]",
           )}
         >
-          <ChatInput />
+          <div className="pointer-events-auto">
+            <ChatInput />
+          </div>
         </div>
+        <ChatConsentBanner />
       </footer>
 
       {/* Artifacts drawer - right side */}
       {shouldRenderArtifactsDrawer && (
         <div
           className={cn(
-            "transform fixed right-0 md:right-3 md:top-18 md:bottom-4 max-w-none z-20",
+            "transform fixed right-0 md:top-14 md:bottom-0 max-w-none z-20",
             !isArtifactsResizing && "transition-all duration-300 ease-out",
             isMobile ? "w-full" : "",
             isArtifactsDrawerAnimating ? "translate-x-0 opacity-100" : "translate-x-full opacity-0",
@@ -615,7 +640,7 @@ export function ChatPage() {
               </div>
             </button>
           )}
-          <div className="h-full md:rounded-lg md:border md:border-neutral-200/60 md:dark:border-neutral-700/60 md:shadow-sm overflow-hidden">
+          <div className="h-full border-l border-black/10 dark:border-white/10 overflow-hidden">
             <ArtifactsDrawer />
           </div>
         </div>
@@ -641,7 +666,7 @@ export function ChatPage() {
       {/* Always render so iframe is available, but hide when not active */}
       <div
         className={cn(
-          "w-full transform fixed right-0 md:right-3 md:top-18 md:bottom-4 max-w-none z-20",
+          "w-full transform fixed right-0 md:right-3 md:top-14 md:bottom-4 max-w-none z-20",
           !isAppResizing && "transition-all duration-300 ease-out",
           shouldRenderAppDrawer && isAppDrawerAnimating
             ? "translate-x-0 opacity-100"
@@ -675,7 +700,7 @@ export function ChatPage() {
             </div>
           </button>
         )}
-        <div className="h-full md:rounded-lg md:border md:border-neutral-200/60 md:dark:border-neutral-700/60 md:shadow-sm overflow-hidden flex flex-col">
+        <div className="h-full border-l border-black/10 dark:border-white/10 overflow-hidden flex flex-col">
           {/* Mobile close bar */}
           <div className="flex md:hidden items-center h-10 px-2 mt-4 border-b border-neutral-200/60 dark:border-neutral-700/60 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm">
             <button
@@ -691,15 +716,6 @@ export function ChatPage() {
             <AppDrawer />
           </div>
         </div>
-        {/* Flag tab on the left edge to close the drawer */}
-        <button
-          type="button"
-          onClick={toggleAppDrawer}
-          className="hidden md:flex absolute left-0 top-6 -translate-x-full items-center justify-center w-5 h-12 rounded-l-md bg-white/90 dark:bg-neutral-800/90 border border-r-0 border-neutral-200/60 dark:border-neutral-700/60 shadow-sm text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
-          title="Close panel"
-        >
-          <ChevronRight size={14} />
-        </button>
       </div>
     </div>
   );
