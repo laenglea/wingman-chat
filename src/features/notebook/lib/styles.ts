@@ -26,6 +26,7 @@ import studioQuizInstructions from "../prompts/studio-quiz.txt?raw";
 import studioReportInstructions from "../prompts/studio-report.txt?raw";
 import studioSlideInstructions from "../prompts/studio-slide-deck.txt?raw";
 import studioSlideImageInstructions from "../prompts/studio-slide-images.txt?raw";
+import studioSlideOnePagerInstructions from "../prompts/studio-slide-one-pager.txt?raw";
 import type { OutputType } from "../types/notebook";
 
 // ── Public prompt exports ──────────────────────────────────────────────
@@ -378,6 +379,7 @@ export async function buildInstructions(
   options?: BuildInstructionsOptions,
 ): Promise<string> {
   let prompt: string;
+  const isOnePager = type === "slides" && options?.slideCount === 1 && options?.slideMode !== "images";
 
   if (type === "slides" && options?.slideMode === "images") {
     prompt = studioSlideImageInstructions;
@@ -387,7 +389,7 @@ export async function buildInstructions(
     prompt += `\n\n${styleText}\n`;
   } else {
     const meta = OUTPUT_META[type];
-    prompt = meta.template;
+    prompt = isOnePager ? studioSlideOnePagerInstructions : meta.template;
 
     if (type === "slides") {
       prompt = prompt.replace("{{COMMON_RULES}}", slideCommonRules);
@@ -406,10 +408,10 @@ export async function buildInstructions(
       `- Write **all output text in ${options.language}** (titles, body copy, labels, captions, speaker lines). This overrides any language used in the source material.`,
     );
   }
-  if (type === "slides" && options?.slideCount && options.slideCount > 0) {
+  if (type === "slides" && options?.slideCount && options.slideCount > 0 && !isOnePager) {
     const n = Math.round(options.slideCount);
     overrides.push(
-      `- Produce **exactly ${n} slides**. This overrides any slide count mentioned elsewhere in the instructions (e.g. "8–12 slides"). Plan the deck arc to fit this exact length.`,
+      `- Produce **exactly ${n} ${n === 1 ? "slide" : "slides"}**. This overrides any slide count mentioned elsewhere in the instructions (e.g. "8–12 slides"). Plan the deck arc to fit this exact length.`,
     );
   }
   if (options?.instructions) {
