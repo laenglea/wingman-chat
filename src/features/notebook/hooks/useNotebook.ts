@@ -573,18 +573,20 @@ export function useNotebook(notebookId?: string) {
       setOutputs((prev) => [output, ...prev]);
 
       const notebookId = notebook.id;
-      const ctx: GenerateContext = {
-        client,
-        model: getModel(),
-        instructions: buildInstructions(type, styleId, options),
-        sourceTools: createSourceTools(() => sourcesRef.current),
-        getSources: () => sourcesRef.current,
-        onProgress: (partial) => {
-          setOutputs((prev) => prev.map((o) => (o.id === output.id ? { ...o, ...partial } : o)));
-        },
-      };
 
-      const task: Promise<Partial<NotebookOutput>> = (() => {
+      const task: Promise<Partial<NotebookOutput>> = (async () => {
+        const instructions = await buildInstructions(type, styleId, options);
+        const ctx: GenerateContext = {
+          client,
+          model: getModel(),
+          instructions,
+          sourceTools: createSourceTools(() => sourcesRef.current),
+          getSources: () => sourcesRef.current,
+          onProgress: (partial) => {
+            setOutputs((prev) => prev.map((o) => (o.id === output.id ? { ...o, ...partial } : o)));
+          },
+        };
+
         switch (type) {
           case "podcast":
             return generatePodcast(ctx, styleId);
