@@ -97,17 +97,43 @@ export interface CategoryConfig {
   name: string;
   description: string;
   consent?: boolean | string;
+  /** Minimum classifier confidence (0..1) for this category to count as a match. Falls back to chat.classification.threshold. */
+  threshold?: number;
+}
+
+export type RiskSeverity = "low" | "medium" | "high";
+
+export interface RiskConfig {
+  name: string;
+  description: string;
+  /** Visual emphasis on the warning banner. Defaults to "medium". */
+  severity?: RiskSeverity;
+  /** Body text shown in the warning. Falls back to a generic message using the risk name. */
+  message?: string;
+  /** Minimum classifier confidence (0..1) for this risk to fire. Falls back to chat.classification.threshold. */
+  threshold?: number;
+}
+
+export interface ClassificationConfig {
+  /** Override the model used for classification (defaults to chat.summarizer or the current chat model). */
+  model?: string;
+  /** Default threshold (0..1) applied when a category or risk does not set its own. */
+  threshold?: number;
 }
 
 export function categorySlug(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, "_");
 }
 
+export const riskSlug = categorySlug;
+
 interface ChatConfig {
   retentionDays?: number;
   optimizer?: string;
   summarizer?: string;
+  classification?: ClassificationConfig;
   categories?: CategoryConfig[];
+  risks?: RiskConfig[];
 }
 
 export interface DriveConfig {

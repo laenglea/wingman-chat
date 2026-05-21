@@ -43,7 +43,7 @@ export interface ChatContextType {
   /** Live meta for in-flight tool calls; cleared on commit (data persists on `tool_result.meta`). */
   toolMeta: Record<string, Record<string, unknown>>;
 
-  // Category consent state (post-turn advisory overlay)
+  // Post-turn advisory overlay — covers both category consent and risk warnings.
   pendingConsent: PendingConsent | null;
   resolveConsent: (result: ConsentResult) => void;
 }

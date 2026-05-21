@@ -2,7 +2,7 @@ import mime from "mime";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod/v3";
-import instructionsSummarizeChat from "@/features/chat/prompts/chat-title.txt?raw";
+import instructionsClassifyChat from "@/features/chat/prompts/chat-classify.txt?raw";
 import instructionsConvertCsv from "@/features/chat/prompts/convert-csv.txt?raw";
 import instructionsConvertMd from "@/features/chat/prompts/convert-md.txt?raw";
 import instructionsRewriteSelection from "@/features/chat/prompts/rewrite-selection.txt?raw";
@@ -322,35 +322,71 @@ export class Client {
     ); // end traceGenAI
   }
 
-  async summarizeChat(
+  async classifyChat(
     model: string,
     input: Message[],
     categories: Array<{ id: string; description: string }> = [],
-  ): Promise<{ title: string | null; categories: string[] }> {
+    risks: Array<{ id: string; description: string }> = [],
+  ): Promise<{
+    title: string | null;
+    categories: Array<{ id: string; confidence: number }>;
+    risks: Array<{ id: string; confidence: number }>;
+  }> {
     const history = input.slice(-6).map((m) => ({ role: m.role, content: m.content }));
-    const ids = categories.map((c) => c.id);
-    const schema =
-      ids.length > 0
-        ? z
-            .object({
-              title: z.string(),
-              categories: z.array(z.enum(ids as [string, ...string[]])),
-            })
-            .strict()
-        : z
-            .object({
-              title: z.string(),
-              categories: z.array(z.string()),
-            })
-            .strict();
+    const categoryIds = categories.map((c) => c.id);
+    const riskIds = risks.map((r) => r.id);
+
+    const categoryIdSchema = categoryIds.length > 0 ? z.enum(categoryIds as [string, ...string[]]) : z.string();
+    const riskIdSchema = riskIds.length > 0 ? z.enum(riskIds as [string, ...string[]]) : z.string();
+
+    const confidenceSchema = z
+      .number()
+      .describe(
+        "Model confidence that this category or risk applies to the latest user message. " +
+          "A value between 0 and 1, where higher values denote higher confidence. " +
+          "Omit matches with confidence below ~0.5.",
+      );
+
+    const schema = z
+      .object({
+        title: z.string().describe("Short, descriptive title for the conversation. Less than 10 words, no quotes."),
+        categories: z
+          .array(
+            z
+              .object({
+                id: categoryIdSchema.describe("Id of a category from the provided list."),
+                confidence: confidenceSchema,
+              })
+              .strict(),
+          )
+          .describe("Categories that clearly apply to the latest user message. May be empty."),
+        risks: z
+          .array(
+            z
+              .object({
+                id: riskIdSchema.describe("Id of a risk from the provided list."),
+                confidence: confidenceSchema,
+              })
+              .strict(),
+          )
+          .describe(
+            "Risks that the latest user message actually triggers (not merely mentions). May be empty.",
+          ),
+      })
+      .strict();
+
     const result = await this.parse(
       model,
-      instructionsSummarizeChat,
-      JSON.stringify({ categories, history }),
+      instructionsClassifyChat,
+      JSON.stringify({ categories, risks, history }),
       schema,
-      "summarize_chat",
+      "classify_chat",
     );
-    return { title: result?.title ?? null, categories: result?.categories ?? [] };
+    return {
+      title: result?.title ?? null,
+      categories: result?.categories ?? [],
+      risks: result?.risks ?? [],
+    };
   }
 
   /**

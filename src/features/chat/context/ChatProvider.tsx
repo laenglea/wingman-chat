@@ -7,7 +7,7 @@ import { useChats } from "@/features/chat/hooks/useChats";
 import { useModels } from "@/features/chat/hooks/useModels";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
 import { setModel as setInterpreterModel } from "@/features/tools/lib/llmCommand";
-import { type CategoryConfig, categorySlug, getConfig } from "@/shared/config";
+import { type CategoryConfig, categorySlug, getConfig, type RiskConfig, riskSlug } from "@/shared/config";
 import { run as agentRun } from "@/shared/lib/agent";
 import type { Client } from "@/shared/lib/client";
 import { getErrorInfo } from "@/shared/lib/errors";
@@ -118,6 +118,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [pendingConsent, setPendingConsent] = useState<PendingConsent | null>(null);
   // chatId -> set of category ids the user has accepted in this session. Intentionally not persisted.
   const consentedCategoriesRef = useRef<Map<string, Set<string>>>(new Map());
+  // chatId -> set of risk ids already acknowledged in this session (avoid repeating the same warning on every turn).
+  const acknowledgedRisksRef = useRef<Map<string, Set<string>>>(new Map());
   const [streamingMessage, setStreamingMessage] = useState<{ chatId: string; message: Message } | null>(null);
   const streamingMessageRef = useRef<{ chatId: string; message: Message } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -189,6 +191,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
       if (id === chatIdRef.current) return;
 
       setChatId(id);
+      // Clear any stale post-turn notice so prompts from one thread don't leak into another.
+      setPendingConsent(null);
       resetTools();
       closeApp();
 
@@ -307,48 +311,95 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
-      // Kick off the combined title + category-detection call in parallel with the model turn so
-      // the consent overlay can appear as soon as the user hits send, without waiting for the stream.
-      // When categories are configured we run every turn for detection (and refresh the title every
-      // turn for free). Without categories we keep the original initial + every-3-user-turns cadence.
+      // Kick off the combined title + classification call in parallel with the model turn so
+      // the consent/risk overlay can appear as soon as the user hits send, without waiting for
+      // the stream. When categories or risks are configured we run every turn for detection
+      // (and refresh the title every turn for free). With neither configured we keep the
+      // original initial + every-3-user-turns cadence.
       const categoryConfigs = config.chat?.categories ?? [];
+      const riskConfigs = config.chat?.risks ?? [];
+      const classificationCfg = config.chat?.classification;
+      const defaultThreshold = classificationCfg?.threshold ?? 0.5;
       const hasCategories = categoryConfigs.length > 0;
+      const hasRisks = riskConfigs.length > 0;
       const needsTitle = !initialTitle || conversation.length % 6 === 1;
-      if (needsTitle || hasCategories) {
-        const summarizerModel = config.chat?.summarizer || currentModel.id;
+      if (needsTitle || hasCategories || hasRisks) {
+        const summarizerModel = classificationCfg?.model || config.chat?.summarizer || currentModel.id;
         client
-          .summarizeChat(
+          .classifyChat(
             summarizerModel,
             conversation,
             categoryConfigs.map((c) => ({ id: categorySlug(c.name), description: c.description })),
+            riskConfigs.map((r) => ({ id: riskSlug(r.name), description: r.description })),
           )
-          .then(({ title, categories: detected }) => {
+          .then(({ title, categories: detectedCategories, risks: detectedRisks }) => {
             if (title) {
               updateChat(id, () => ({ title }));
             }
-            if (!detected.length) return;
-            const consented = consentedCategoriesRef.current.get(id) ?? new Set<string>();
-            const toAsk = detected
-              .map((slug) => categoryConfigs.find((c) => categorySlug(c.name) === slug))
-              .find((c): c is CategoryConfig => !!c && !!c.consent && !consented.has(categorySlug(c.name)));
-            if (toAsk) {
-              const customText = typeof toAsk.consent === "string" ? toAsk.consent : null;
-              setPendingConsent((prev) =>
-                prev
-                  ? prev
-                  : {
-                      categoryId: categorySlug(toAsk.name),
-                      categoryName: toAsk.name,
-                      consent: {
-                        message:
-                          customText ?? `This conversation appears to be about "${toAsk.name}". Please acknowledge.`,
-                      },
-                      resolve: () => {},
-                    },
-              );
+
+            // Risks take precedence over category consent — they're more severe.
+            let next: PendingConsent | null = null;
+            if (detectedRisks.length > 0 && hasRisks) {
+              const acknowledged = acknowledgedRisksRef.current.get(id) ?? new Set<string>();
+              const matchedRisk = detectedRisks
+                .map((match) => {
+                  const cfg = riskConfigs.find((r) => riskSlug(r.name) === match.id);
+                  return cfg ? { cfg, confidence: match.confidence } : null;
+                })
+                .filter((m): m is { cfg: RiskConfig; confidence: number } => m !== null)
+                .filter(({ cfg, confidence }) => confidence >= (cfg.threshold ?? defaultThreshold))
+                .filter(({ cfg }) => !acknowledged.has(riskSlug(cfg.name)))
+                // Show the highest-confidence unacknowledged risk first.
+                .sort((a, b) => b.confidence - a.confidence)[0];
+
+              if (matchedRisk) {
+                const { cfg } = matchedRisk;
+                next = {
+                  kind: "risk",
+                  id: riskSlug(cfg.name),
+                  name: cfg.name,
+                  consent: {
+                    message:
+                      cfg.message ??
+                      `This request appears to involve "${cfg.name}", which may require special attention. Please review before continuing.`,
+                    severity: cfg.severity ?? "medium",
+                  },
+                  resolve: () => {},
+                };
+              }
+            }
+
+            if (!next && detectedCategories.length > 0 && hasCategories) {
+              const consented = consentedCategoriesRef.current.get(id) ?? new Set<string>();
+              const toAsk = detectedCategories
+                .map((match) => {
+                  const cfg = categoryConfigs.find((c) => categorySlug(c.name) === match.id);
+                  return cfg ? { cfg, confidence: match.confidence } : null;
+                })
+                .filter((m): m is { cfg: CategoryConfig; confidence: number } => m !== null)
+                .filter(({ cfg, confidence }) => confidence >= (cfg.threshold ?? defaultThreshold))
+                .find(({ cfg }) => !!cfg.consent && !consented.has(categorySlug(cfg.name)));
+
+              if (toAsk) {
+                const customText = typeof toAsk.cfg.consent === "string" ? toAsk.cfg.consent : null;
+                next = {
+                  kind: "category",
+                  id: categorySlug(toAsk.cfg.name),
+                  name: toAsk.cfg.name,
+                  consent: {
+                    message:
+                      customText ?? `This conversation appears to be about "${toAsk.cfg.name}". Please acknowledge.`,
+                  },
+                  resolve: () => {},
+                };
+              }
+            }
+
+            if (next) {
+              setPendingConsent((prev) => prev ?? next);
             }
           })
-          .catch((err) => console.error("summarizeChat failed", err));
+          .catch((err) => console.error("classifyChat failed", err));
       }
 
       // Create tool context with current message content and elicitation support
@@ -516,7 +567,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       client,
       model,
       config.chat?.summarizer,
+      config.chat?.classification,
       config.chat?.categories,
+      config.chat?.risks,
       chatTools,
       chatInstructions,
       renderApp,
@@ -602,9 +655,10 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setPendingConsent((prev) => {
         if (!prev) return prev;
         if (result.action === "accept" && chatId) {
-          const set = consentedCategoriesRef.current.get(chatId) ?? new Set<string>();
-          set.add(prev.categoryId);
-          consentedCategoriesRef.current.set(chatId, set);
+          const ref = prev.kind === "risk" ? acknowledgedRisksRef : consentedCategoriesRef;
+          const set = ref.current.get(chatId) ?? new Set<string>();
+          set.add(prev.id);
+          ref.current.set(chatId, set);
         }
         return null;
       });
@@ -686,7 +740,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
     resolveElicitation,
     toolMeta,
 
-    // Category consent
     pendingConsent,
     resolveConsent,
   };

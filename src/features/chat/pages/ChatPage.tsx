@@ -601,8 +601,9 @@ export function ChatPage() {
             <ChatInput />
           </div>
         </div>
-        <ChatConsentBanner />
       </footer>
+
+      <ChatConsentBanner />
 
       {/* Artifacts drawer - right side */}
       {shouldRenderArtifactsDrawer && (

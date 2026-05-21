@@ -128,6 +128,30 @@ type Chat struct {
 	RetentionDays *int   `json:"retentionDays,omitempty" yaml:"retentionDays,omitempty"`
 	Summarizer    string `json:"summarizer,omitempty" yaml:"summarizer,omitempty"`
 	Optimizer     string `json:"optimizer,omitempty" yaml:"optimizer,omitempty"`
+
+	Classification *Classification `json:"classification,omitempty" yaml:"classification,omitempty"`
+	Categories     []Category      `json:"categories,omitempty" yaml:"categories,omitempty"`
+	Risks          []Risk          `json:"risks,omitempty" yaml:"risks,omitempty"`
+}
+
+type Classification struct {
+	Model     string  `json:"model,omitempty" yaml:"model,omitempty"`
+	Threshold float64 `json:"threshold,omitempty" yaml:"threshold,omitempty"`
+}
+
+type Category struct {
+	Name        string  `json:"name,omitempty" yaml:"name,omitempty"`
+	Description string  `json:"description,omitempty" yaml:"description,omitempty"`
+	Consent     any     `json:"consent,omitempty" yaml:"consent,omitempty"`
+	Threshold   float64 `json:"threshold,omitempty" yaml:"threshold,omitempty"`
+}
+
+type Risk struct {
+	Name        string  `json:"name,omitempty" yaml:"name,omitempty"`
+	Description string  `json:"description,omitempty" yaml:"description,omitempty"`
+	Severity    string  `json:"severity,omitempty" yaml:"severity,omitempty"`
+	Message     string  `json:"message,omitempty" yaml:"message,omitempty"`
+	Threshold   float64 `json:"threshold,omitempty" yaml:"threshold,omitempty"`
 }
 
 type Translator struct {
