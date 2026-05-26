@@ -318,7 +318,6 @@ export class Client {
           throw error;
         }
       },
-      { effort: options?.effort, verbosity: options?.verbosity, toolCount: tools?.length },
     ); // end traceGenAI
   }
 

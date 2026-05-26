@@ -7,6 +7,7 @@
 
 import type { Content, Message, Tool, ToolCallContent, ToolContext } from "../types/chat";
 import type { Client } from "./client";
+import { traceExecuteTool } from "./otel";
 
 /** Options forwarded verbatim to `client.complete`. */
 export type CompleteOptions = Parameters<Client["complete"]>[5];
@@ -132,7 +133,11 @@ export async function run(
             }
           : undefined;
 
-        const result = await tool.function(args, toolContext);
+        const result = await traceExecuteTool(
+          toolCall.name,
+          { toolCallId: toolCall.id, toolDescription: tool.description },
+          () => tool.function(args, toolContext),
+        );
 
         appendToolResult({
           role: "user",

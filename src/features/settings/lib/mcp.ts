@@ -28,7 +28,6 @@ import {
   McpError,
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { traceMCP } from "@/shared/lib/otel";
 import {
   type AudioContent,
   type FileContent,
@@ -349,45 +348,38 @@ export class MCPClient implements ToolProvider {
               this.activeToolContext = context ?? null;
 
               try {
-                return await traceMCP(
-                  "tools/call",
-                  tool.name,
-                  { toolName: tool.name, serverAddress: this.url },
-                  async () => {
-                    const result = await activeClient.callTool({
-                      name: tool.name,
-                      arguments: args,
-                    });
+                const result = await activeClient.callTool({
+                  name: tool.name,
+                  arguments: args,
+                });
 
-                    // Handle both current and compatibility result formats
-                    // Compatibility format has toolResult field, current has content field
-                    const normalizedResult: CallToolResult =
-                      "toolResult" in result ? (result.toolResult as CallToolResult) : (result as CallToolResult);
+                // Handle both current and compatibility result formats
+                // Compatibility format has toolResult field, current has content field
+                const normalizedResult: CallToolResult =
+                  "toolResult" in result ? (result.toolResult as CallToolResult) : (result as CallToolResult);
 
-                    const resource = this.uiResources.get(tool.name);
+                const resource = this.uiResources.get(tool.name);
 
-                    if (resource && context?.setMeta) {
-                      // Don't render the UI here — InlineMcpApp handles rendering via
-                      // restoreToolUI with the correct display mode and target iframe.
-                      // We only persist the metadata so InlineMcpApp knows what to render.
-                      const toolUiMeta = tool._meta?.ui as
-                        | { defaultDisplayMode?: string; availableDisplayModes?: string[] }
-                        | undefined;
-                      context.setMeta?.({
-                        toolProvider: this.id,
-                        toolResource: resource.uri,
-                        ...(toolUiMeta?.defaultDisplayMode
-                          ? { defaultDisplayMode: toolUiMeta.defaultDisplayMode }
-                          : {}),
-                        ...(toolUiMeta?.availableDisplayModes
-                          ? { appDisplayModes: toolUiMeta.availableDisplayModes }
-                          : {}),
-                      });
-                    }
+                if (resource && context?.setMeta) {
+                  // Don't render the UI here — InlineMcpApp handles rendering via
+                  // restoreToolUI with the correct display mode and target iframe.
+                  // We only persist the metadata so InlineMcpApp knows what to render.
+                  const toolUiMeta = tool._meta?.ui as
+                    | { defaultDisplayMode?: string; availableDisplayModes?: string[] }
+                    | undefined;
+                  context.setMeta?.({
+                    toolProvider: this.id,
+                    toolResource: resource.uri,
+                    ...(toolUiMeta?.defaultDisplayMode
+                      ? { defaultDisplayMode: toolUiMeta.defaultDisplayMode }
+                      : {}),
+                    ...(toolUiMeta?.availableDisplayModes
+                      ? { appDisplayModes: toolUiMeta.availableDisplayModes }
+                      : {}),
+                  });
+                }
 
-                    return processContent(normalizedResult.content as MCPContentBlock[]);
-                  },
-                );
+                return processContent(normalizedResult.content as MCPContentBlock[]);
               } finally {
                 this.activeToolContext = null;
               }
