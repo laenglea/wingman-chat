@@ -11,6 +11,7 @@ import {
   PostMessageTransport,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/app-bridge";
+import { trace } from "@opentelemetry/api";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport as ClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -348,6 +349,8 @@ export class MCPClient implements ToolProvider {
               this.activeToolContext = context ?? null;
 
               try {
+                annotateMcpSpan(this.url, context);
+
                 const result = await activeClient.callTool({
                   name: tool.name,
                   arguments: args,
@@ -370,12 +373,8 @@ export class MCPClient implements ToolProvider {
                   context.setMeta?.({
                     toolProvider: this.id,
                     toolResource: resource.uri,
-                    ...(toolUiMeta?.defaultDisplayMode
-                      ? { defaultDisplayMode: toolUiMeta.defaultDisplayMode }
-                      : {}),
-                    ...(toolUiMeta?.availableDisplayModes
-                      ? { appDisplayModes: toolUiMeta.availableDisplayModes }
-                      : {}),
+                    ...(toolUiMeta?.defaultDisplayMode ? { defaultDisplayMode: toolUiMeta.defaultDisplayMode } : {}),
+                    ...(toolUiMeta?.availableDisplayModes ? { appDisplayModes: toolUiMeta.availableDisplayModes } : {}),
                   });
                 }
 
@@ -892,6 +891,23 @@ function buildHostContext(tool: MCPTool, iframe: HTMLIFrameElement, displayMode?
       hover: window.matchMedia("(hover: hover)").matches,
     },
   };
+}
+
+function annotateMcpSpan(serverUrl: string, toolContext?: ToolContext): void {
+  const span = toolContext?.agentContext ? trace.getSpan(toolContext.agentContext) : trace.getActiveSpan();
+  if (!span) return;
+
+  span.setAttribute("mcp.method.name", "tools/call");
+  span.setAttribute("url.full", serverUrl);
+
+  try {
+    const url = new URL(serverUrl);
+    if (url.hostname) span.setAttribute("server.address", url.hostname);
+    if (url.port) span.setAttribute("server.port", Number(url.port));
+    if (url.protocol) span.setAttribute("network.protocol.name", url.protocol.replace(":", ""));
+  } catch {
+    // Malformed URL — skip the standard server.* attributes.
+  }
 }
 
 function isSafeExternalUrl(value: string): boolean {
