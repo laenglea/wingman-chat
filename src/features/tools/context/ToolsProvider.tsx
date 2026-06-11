@@ -156,8 +156,8 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: toolsVersion is a cache-bust trigger, not a real dependency
   const providers = useMemo<ToolProvider[]>(() => {
     const list: ToolProvider[] = [];
-    if (canvasProvider) list.push(canvasProvider);
     if (internetProvider) list.push(internetProvider);
+    if (canvasProvider) list.push(canvasProvider);
     if (artifactsProvider) list.push(artifactsProvider);
     list.push(skillBuilderProvider);
     list.push(...visibleConfigMcpClients);
@@ -287,6 +287,10 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       for (const id of mcpIds) {
+        // Skip failed providers — they must be retried explicitly by the user.
+        // Without this, toggling any other provider would re-trigger a connection
+        // attempt for every previously-failed MCP.
+        if (mcpStatesRef.current.get(id) === ProviderState.Failed) continue;
         connectMcp(id, mcpConnectionDesired.has(id)).catch(console.error);
       }
     }, 0);
