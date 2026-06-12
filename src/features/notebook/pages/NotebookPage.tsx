@@ -19,6 +19,7 @@ import { SourcesPanel } from "../components/SourcesPanel";
 import { StudioPanel } from "../components/StudioPanel";
 import { useNotebook } from "../hooks/useNotebook";
 import { useOutputDownload } from "../hooks/useOutputDownload";
+import { exportNotebookAsZip, importNotebookFromZip } from "../lib/notebookImportExport";
 import * as store from "../lib/opfs-notebook";
 import type { Notebook, NotebookOutput } from "../types/notebook";
 
@@ -176,6 +177,30 @@ export function NotebookPage() {
     [notebookId, navigate, setViewingOutput],
   );
 
+  // Export notebook as a ZIP download
+  const handleExport = useCallback(
+    (id: string) => {
+      const nb = notebooks.find((n) => n.id === id);
+      void exportNotebookAsZip(id, nb?.customTitle ?? nb?.title);
+    },
+    [notebooks],
+  );
+
+  // Import a notebook from a ZIP, then open it
+  const handleImport = useCallback(
+    async (file: File) => {
+      try {
+        const newId = await importNotebookFromZip(file);
+        await loadNotebooks();
+        setViewingOutput(null);
+        navigate({ to: "/notebook/$notebookId", params: { notebookId: newId } });
+      } catch (error) {
+        console.error("Failed to import notebook:", error);
+      }
+    },
+    [loadNotebooks, navigate, setViewingOutput],
+  );
+
   // Initial load: auto-select the most recent notebook if none is in the URL.
   useEffect(() => {
     if (loaded) return;
@@ -200,9 +225,11 @@ export function NotebookPage() {
         onDelete={handleDelete}
         onRename={handleRename}
         onNew={handleNew}
+        onExport={handleExport}
+        onImport={handleImport}
       />
     );
-  }, [notebooks, notebookId, handleSelect, handleDelete, handleRename, handleNew, loaded]);
+  }, [notebooks, notebookId, handleSelect, handleDelete, handleRename, handleNew, handleExport, handleImport, loaded]);
 
   useEffect(() => {
     setSidebarContent(sidebarContent);
