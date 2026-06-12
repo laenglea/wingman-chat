@@ -411,19 +411,19 @@ export function CanvasPage() {
         {/* Main content — centered on full page width */}
         <div
           className={cn(
-            "flex-1 flex flex-col items-center min-h-0 p-4 pt-16 relative",
+            "flex-1 flex flex-col items-center min-h-0 p-4 pt-8 md:pt-16 relative",
             images.length > 0 && "md:px-24",
           )}
         >
           {selectedImage ? (
             /* Image viewer — centered in space above the refine input */
-            <div className="flex items-center justify-center flex-1 min-h-0 pb-24 w-full">
+            <div className="flex items-center justify-center flex-1 min-h-0 pb-44 md:pb-28 w-full">
               {/* Inner wrapper sized to the image — loader and buttons anchor to this */}
               <div className="relative rounded-2xl shadow-xl overflow-hidden">
                 <img
                   src={selectedImage.data}
                   alt={selectedImage.prompt || "Generated image"}
-                  className="block max-w-full max-h-[calc(100vh-14rem)]"
+                  className="block max-w-full max-h-[calc(100svh-22rem)] md:max-h-[calc(100vh-14rem)]"
                 />
 
                 {/* Loader overlay — covers only the image */}
@@ -434,7 +434,7 @@ export function CanvasPage() {
                 )}
 
                 {/* Action buttons — always visible on touch, hover-reveal on desktop */}
-                <div className="absolute top-2 right-2 flex items-center gap-1.5 opacity-100 md:opacity-0 md:hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => addAsReference(selectedImage.id)}
@@ -496,7 +496,7 @@ export function CanvasPage() {
 
           {/* Refine input — floating bottom center overlay */}
           {selectedImage && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 flex justify-center px-4">
+            <div className="pointer-events-none absolute inset-x-0 bottom-24 md:bottom-6 z-20 flex justify-center px-4">
               <CanvasInput
                 prompt={prompt}
                 onPromptChange={setPrompt}
@@ -524,7 +524,7 @@ export function CanvasPage() {
 
         {/* Thumbnail grid overlay — bottom horizontal on mobile, right vertical on desktop */}
         {images.length > 0 && (
-          <div className="absolute bottom-20 inset-x-0 md:bottom-0 md:inset-auto md:top-16 md:right-0 z-10 flex md:flex-col items-center gap-2 p-2 overflow-x-auto md:overflow-x-hidden md:overflow-y-auto scrollbar-hide">
+          <div className="absolute bottom-0 inset-x-0 md:bottom-0 md:inset-auto md:top-16 md:right-0 z-10 flex md:flex-col items-center gap-2 p-2 overflow-x-auto md:overflow-x-hidden md:overflow-y-auto scrollbar-hide bg-white/50 dark:bg-neutral-950/50 md:bg-transparent dark:md:bg-transparent backdrop-blur-sm md:backdrop-blur-none">
             {/* New generation tile */}
             <button
               type="button"
