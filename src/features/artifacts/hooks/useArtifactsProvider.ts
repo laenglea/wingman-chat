@@ -4,10 +4,12 @@ import type { FileSystemManager } from "@/features/artifacts/lib/fs";
 import artifactsInstructionsText from "@/features/artifacts/prompts/artifacts.txt?raw";
 import interpreterInstructionsText from "@/features/artifacts/prompts/interpreter.txt?raw";
 import llmInstructionsText from "@/features/artifacts/prompts/llm.txt?raw";
+import ocrInstructionsText from "@/features/artifacts/prompts/ocr.txt?raw";
 import officeInstructionsText from "@/features/artifacts/prompts/office.txt?raw";
 import { executeBash, getSingleton, loadArtifactsIntoFs, readFilesFromFs } from "@/features/tools/lib/bash";
 import { executeCode } from "@/features/tools/lib/interpreter";
 import { withSandboxLock } from "@/features/tools/lib/sandboxLock";
+import { getConfig } from "@/shared/config";
 import { createFileTools, type FileData, type FileEntry, type WritableFileSource } from "@/shared/lib/file-tools";
 import { isDataUrl } from "@/shared/lib/fileContent";
 import { normalizeArtifactPath } from "@/shared/lib/sandbox";
@@ -401,6 +403,8 @@ export function useArtifactsProvider(): ToolProvider | null {
         interpreterInstructionsText,
         officeInstructionsText,
         llmInstructionsText,
+        // Only advertise the `ocr` helper when a backend extractor is configured.
+        ...(getConfig().extractor ? [ocrInstructionsText] : []),
       ].join("\n\n"),
       tools: artifactsTools(),
     };

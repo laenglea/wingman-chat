@@ -19,6 +19,7 @@ import type {
   WorkerToMainMessage,
 } from "./interpreterProtocol";
 import { runLlm } from "./llmCommand";
+import { runOcr } from "./ocrCommand";
 import { renderPlotlyFigures } from "./plotlyRenderer";
 
 export type { CodeExecutionRequest, CodeExecutionResult } from "./interpreterProtocol";
@@ -47,6 +48,8 @@ function getWorker(): Worker {
       const message = event.data;
       if (message.type === "llm-request") {
         void replyOnPort(message.port, () => runLlm(message.prompt, message.options));
+      } else if (message.type === "ocr-request") {
+        void replyOnPort(message.port, () => runOcr(message.data, message.filename));
       } else {
         void replyOnPort(message.port, () => renderPlotlyFigures(message.manifests, message.plotlyJs));
       }

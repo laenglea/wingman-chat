@@ -26,6 +26,7 @@ import type {
   WorkerToMainMessage,
 } from "./interpreterProtocol";
 import LLM_SHIM from "./llmShim.py?raw";
+import OCR_SHIM from "./ocrShim.py?raw";
 import PLOTLY_IMAGE_SHIM from "./plotlyShim.py?raw";
 
 // Typed view of the dedicated-worker global scope (the project compiles
@@ -343,7 +344,9 @@ function loadPyodide(): Promise<PyodideInterface> {
         p.FS.mkdirTree(SANDBOX_HOME);
         p.FS.chdir(SANDBOX_HOME);
         p.globals.set("_wingman_llm", requestLlm);
+        p.globals.set("_wingman_ocr", (path: string) => requestOcr(p, path));
         await p.runPythonAsync(LLM_SHIM);
+        await p.runPythonAsync(OCR_SHIM);
         await p.runPythonAsync(ASYNCIO_SHIM);
         rewriteAsyncEntrypoints = p.globals.get("_wingman_rewrite_async") as (code: string) => string;
         console.log("Pyodide loaded successfully");
@@ -479,6 +482,22 @@ function requestLlm(prompt: string, optionsJson?: string | null): Promise<string
     }
   }
   return callMain<string>((port) => ({ type: "llm-request", prompt, options, port }));
+}
+
+/**
+ * Bridge behind the Python `ocr` helper (see ocrShim.py). The file bytes are
+ * read from the worker's FS here; the main thread ships them to the backend
+ * extractor service (which needs the chat client/config).
+ */
+function requestOcr(pyodide: PyodideInterface, path: string): Promise<string> {
+  let data: Uint8Array;
+  try {
+    data = pyodide.FS.readFile(path) as Uint8Array;
+  } catch {
+    return Promise.reject(new Error(`ocr: cannot read file: ${path}`));
+  }
+  const filename = path.slice(path.lastIndexOf("/") + 1) || "document";
+  return callMain<string>((port) => ({ type: "ocr-request", data, filename, port }));
 }
 
 // Plotly render queue — manifests are written by plotlyShim.py; the actual

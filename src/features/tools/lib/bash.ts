@@ -1,9 +1,10 @@
-import { Bash, InMemoryFs, type InitialFiles } from "just-bash/browser";
+import { Bash, type InitialFiles, InMemoryFs } from "just-bash/browser";
 import type { OverlayFile } from "@/features/artifacts/lib/fs";
 import { bytesToDataUrl, dataUrlToBytes } from "@/shared/lib/fileContent";
-import { SANDBOX_HOME } from "@/shared/lib/sandbox";
 import { inferContentTypeFromPath, isTextContentType } from "@/shared/lib/fileTypes";
+import { SANDBOX_HOME } from "@/shared/lib/sandbox";
 import { llmCommands } from "./llmCommand";
+import { ocrCommands } from "./ocrCommand";
 import { pythonCommands } from "./pythonCommand";
 
 export interface BashExecutionRequest {
@@ -67,7 +68,7 @@ export function createBashInstance(files?: Record<string, { content: string; con
   const bash = new Bash({
     fs: memFs,
     cwd: SANDBOX_HOME,
-    customCommands: [...pythonCommands, ...llmCommands],
+    customCommands: [...pythonCommands, ...llmCommands, ...ocrCommands],
     executionLimits: {
       maxCallDepth: 50,
       maxCommandCount: 10000,

@@ -2,9 +2,10 @@
  * Message protocol between the main thread and the Pyodide interpreter worker.
  *
  * Python execution runs in a dedicated module worker so CPU-bound code (e.g.
- * pdfplumber over a large PDF) cannot freeze the UI thread. Two capabilities
+ * pdfplumber over a large PDF) cannot freeze the UI thread. Some capabilities
  * still require the main thread, so the worker calls back over RPC:
  *   - the `llm(...)` Python global — needs the chat client/config
+ *   - the `ocr(...)` Python global — needs the chat client/config
  *   - Plotly figure rendering — plotly.js requires a real DOM
  */
 
@@ -66,6 +67,9 @@ export interface ExecuteMessage {
 
 export type WorkerToMainMessage =
   | { type: "llm-request"; prompt: string; options?: LlmCallOptions; port: MessagePort }
+  // Document bytes read from the worker FS, extracted on the main thread via
+  // the backend extractor service; `filename` lets the backend route by format.
+  | { type: "ocr-request"; data: Uint8Array; filename: string; port: MessagePort }
   // `plotlyJs` carries the plotly.js source (read from the wheel inside the
   // worker's FS) on the first render request; the main thread caches the
   // loaded script, so subsequent requests omit it.
