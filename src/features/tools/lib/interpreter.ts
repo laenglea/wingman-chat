@@ -49,7 +49,7 @@ function getWorker(): Worker {
       if (message.type === "llm-request") {
         void replyOnPort(message.port, () => runLlm(message.prompt, message.options));
       } else if (message.type === "ocr-request") {
-        void replyOnPort(message.port, () => runOcr(message.data, message.filename));
+        void replyOnPort(message.port, () => runOcr(message.data, message.path));
       } else {
         void replyOnPort(message.port, () => renderPlotlyFigures(message.manifests, message.plotlyJs));
       }

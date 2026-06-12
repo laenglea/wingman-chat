@@ -496,8 +496,7 @@ function requestOcr(pyodide: PyodideInterface, path: string): Promise<string> {
   } catch {
     return Promise.reject(new Error(`ocr: cannot read file: ${path}`));
   }
-  const filename = path.slice(path.lastIndexOf("/") + 1) || "document";
-  return callMain<string>((port) => ({ type: "ocr-request", data, filename, port }));
+  return callMain<string>((port) => ({ type: "ocr-request", data, path, port }));
 }
 
 // Plotly render queue — manifests are written by plotlyShim.py; the actual

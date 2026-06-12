@@ -1,8 +1,9 @@
 import { type Command, type CommandContext, defineCommand, type ExecResult } from "just-bash/browser";
 import { getConfig } from "@/shared/config";
 import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
+import { getFileName } from "@/shared/lib/utils";
 
-export async function runOcr(bytes: Uint8Array, filename: string): Promise<string> {
+export async function runOcr(bytes: Uint8Array, path: string): Promise<string> {
   const config = getConfig();
   if (!config.extractor) {
     throw new Error("ocr: no document extraction service configured");
@@ -10,9 +11,9 @@ export async function runOcr(bytes: Uint8Array, filename: string): Promise<strin
 
   // Ship the original filename and content type so the backend extractor can
   // route by format; unknown extensions fall back to content sniffing.
-  const name = filename.slice(filename.lastIndexOf("/") + 1) || "document";
+  const name = getFileName(path);
   const type = inferContentTypeFromPath(name) ?? "application/octet-stream";
-  return config.client.extractText(new File([bytes as BlobPart], name, { type }));
+  return config.client.extractText(new File([bytes], name, { type }));
 }
 
 function parseOcrArgs(args: string[]): { output?: string; path: string; error?: string } {
@@ -50,8 +51,9 @@ async function executeOcr(args: string[], ctx: CommandContext): Promise<ExecResu
   const fsPath = resolvePath(path, ctx.cwd);
   let bytes: Uint8Array;
   try {
-    const raw = await ctx.fs.readFile(fsPath);
-    bytes = typeof raw === "string" ? new TextEncoder().encode(raw) : raw;
+    // readFileBuffer, not readFile — the latter decodes to a UTF-8 string,
+    // which destroys binary formats like PDF and DOCX.
+    bytes = await ctx.fs.readFileBuffer(fsPath);
   } catch {
     return { stdout: "", stderr: `ocr: cannot read file: ${path}\n`, exitCode: 1 };
   }

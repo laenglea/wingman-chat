@@ -7,9 +7,10 @@ import os as _os
 async def ocr(path):
     """Extract text from a document via the cloud extraction/OCR service.
 
-    Handles scanned PDFs, images of documents, and Office formats. Use only
-    after direct extraction (pdfminer, pdfplumber, docx2txt, ...) returned
-    empty or garbled text — this is a network round trip to a remote service.
+    Handles scanned PDFs, images of documents, and Office formats. Call it
+    directly for images; for PDFs and Office files use it only after direct
+    extraction (pdfminer, pdfplumber, docx2txt, ...) returned empty or
+    garbled text — this is a network round trip to a remote service.
 
     Args:
         path: Path to the document file in the sandbox filesystem.

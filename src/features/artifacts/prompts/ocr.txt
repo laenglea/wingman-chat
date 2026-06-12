@@ -1,19 +1,21 @@
 ### OCR helper (`ocr`)
 
-Both interpreters expose an `ocr` helper that sends a document file to a cloud extraction service (OCR + layout analysis) and returns the recognized text. It reads scanned PDFs, document images, and Office files whose text local libraries cannot recover.
+Both interpreters expose an `ocr` helper that sends a document file to a cloud extraction service (OCR + layout analysis) and returns the recognized text. It handles scanned PDFs, images of documents, and Office files.
 
-**Always try direct extraction first** — it is faster and runs locally: `pdfminer.six`/`pdfplumber` for PDFs, `docx2txt`/`python-docx` for Word, `python-pptx` for PowerPoint (see the Office Documents section). Fall back to `ocr` only when the direct result is empty, near-empty, or garbled — typical for scanned or image-only documents. It is a network round trip to a remote service.
+- Python: `text = await ocr("/home/user/scan.pdf")` — async, returns `str`
+- Bash: `ocr scan.pdf` — writes the text to stdout; `-o/--output <file>` writes it to a file instead
 
-- Python: `text = await ocr("/home/user/scan.pdf")` — async, returns the extracted text as `str`
-- Bash: `ocr scan.pdf` — writes the extracted text to stdout
-  - Optional flag: `-o/--output <file>` writes the text to a file instead of stdout
+When to use it:
+- PDFs and Office files: ALWAYS try local extraction first (`pdfminer.six`/`pdfplumber`, `docx2txt`, `python-pptx` — see Office Documents); it is faster and runs offline. Fall back to `ocr` only when the result is empty, near-empty, or garbled — typical for scanned or image-only documents.
+- Images of documents (PNG/JPEG scans, photos, screenshots): call `ocr` directly — the sandbox has no local OCR.
+- One call per document: it is a network round trip — pass the whole file, never loop over pages.
 
-Typical fallback pattern in Python:
+Typical fallback pattern:
 
 ```python
 from pdfminer.high_level import extract_text
 
 text = extract_text("/home/user/scan.pdf")
-if len(text.strip()) < 50:  # empty or near-empty → likely a scanned document
+if len(text.strip()) < 50:  # empty or near-empty → likely scanned
     text = await ocr("/home/user/scan.pdf")
 ```

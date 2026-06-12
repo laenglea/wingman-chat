@@ -68,8 +68,8 @@ export interface ExecuteMessage {
 export type WorkerToMainMessage =
   | { type: "llm-request"; prompt: string; options?: LlmCallOptions; port: MessagePort }
   // Document bytes read from the worker FS, extracted on the main thread via
-  // the backend extractor service; `filename` lets the backend route by format.
-  | { type: "ocr-request"; data: Uint8Array; filename: string; port: MessagePort }
+  // the backend extractor service; the basename of `path` lets it route by format.
+  | { type: "ocr-request"; data: Uint8Array; path: string; port: MessagePort }
   // `plotlyJs` carries the plotly.js source (read from the wheel inside the
   // worker's FS) on the first render request; the main thread caches the
   // loaded script, so subsequent requests omit it.
