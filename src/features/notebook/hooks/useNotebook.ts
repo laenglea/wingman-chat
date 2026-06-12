@@ -6,6 +6,7 @@ import { convertFileToText } from "@/shared/lib/convert";
 import { blobToDataUrl } from "@/shared/lib/opfs-core";
 import type { Content } from "@/shared/types/chat";
 import type { File } from "@/shared/types/file";
+import { compactAgentMessage } from "../lib/chat-history";
 import * as store from "../lib/opfs-notebook";
 import {
   type GenerateContext,
@@ -85,6 +86,13 @@ async function withScreenWakeLock<T>(task: Promise<T>): Promise<T> {
 }
 
 const filenameSchema = z.object({ filename: z.string() }).strict();
+
+/**
+ * Conventional source the chat maintains to capture task-shaping decisions
+ * (audience, scope, tone, focus). Its content is appended as user
+ * instructions to every output generation.
+ */
+export const BRIEF_SOURCE_PATH = "brief.md";
 
 /** Placeholders the UI passes when the user didn't provide a real name. */
 export const PLACEHOLDER_SOURCE_NAMES = {
@@ -301,6 +309,7 @@ export function useNotebook(notebookId?: string) {
 
       const source: File = { path, content };
       await store.addSource(nb.id, source);
+      store.touchNotebook(nb.id);
       setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
     [ensureNotebook, reservePath],
@@ -404,6 +413,7 @@ export function useNotebook(notebookId?: string) {
         added.push(audioSource);
       }
 
+      store.touchNotebook(nb.id);
       setSources((prev) => {
         const paths = new Set(added.map((s) => s.path));
         return [...prev.filter((s) => !paths.has(s.path)), ...added];
@@ -442,6 +452,7 @@ export function useNotebook(notebookId?: string) {
 
       const source: File = { path, content };
       await store.addSource(nb.id, source);
+      store.touchNotebook(nb.id);
       setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
     [ensureNotebook, reservePath],
@@ -451,6 +462,7 @@ export function useNotebook(notebookId?: string) {
     async (path: string) => {
       if (!notebook) return;
       await store.removeSource(notebook.id, path);
+      store.touchNotebook(notebook.id);
       setSources((prev) => prev.filter((s) => s.path !== path));
     },
     [notebook],
@@ -488,6 +500,7 @@ export function useNotebook(notebookId?: string) {
 
       await store.addSource(notebook.id, renamed);
       await store.removeSource(notebook.id, oldPath);
+      store.touchNotebook(notebook.id);
       setSources((prev) => prev.map((s) => (s.path === oldPath ? renamed : s)));
     },
     [notebook],
@@ -504,6 +517,7 @@ export function useNotebook(notebookId?: string) {
       if (!notebook) return;
       const source: File = contentType ? { path, content, contentType } : { path, content };
       await store.addSource(notebook.id, source);
+      store.touchNotebook(notebook.id);
       setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
     [notebook],
@@ -528,7 +542,12 @@ export function useNotebook(notebookId?: string) {
 
       try {
         const tools = [
-          ...createSourceTools(() => sourcesRef.current, { onCreate: (path, content) => addTextSource(path, content) }),
+          ...createSourceTools(() => sourcesRef.current, {
+            onCreate: (path, content) => addTextSource(path, content),
+            onWrite: writeSource,
+            onRename: renameSource,
+            onDelete: deleteSource,
+          }),
           ...createSourceExecTools(() => sourcesRef.current, {
             onWrite: writeSource,
           }),
@@ -541,16 +560,19 @@ export function useNotebook(notebookId?: string) {
           agentName: "notebook",
           onStream: (content) => setStreamingContent(content),
         });
-        const response = result[result.length - 1];
 
         setStreamingContent(null);
 
-        const assistantMsg: NotebookMessage = {
-          ...response,
-          timestamp: new Date().toISOString(),
-        };
+        // Keep the whole agent run (tool calls + results, compacted) so the
+        // next turn remembers what was read and edited — without this the
+        // model re-surveys the sources on every message and multi-turn
+        // refinement loses the prior edits from context.
+        const stamp = new Date().toISOString();
+        const agentMessages: NotebookMessage[] = result
+          .slice(conversation.length)
+          .map((m) => ({ ...compactAgentMessage(m), timestamp: stamp }));
 
-        const finalMessages = [...newMessages, assistantMsg];
+        const finalMessages = [...newMessages, ...agentMessages];
         setMessages(finalMessages);
         await store.saveMessages(notebook.id, finalMessages);
         store.touchNotebook(notebook.id);
@@ -569,11 +591,17 @@ export function useNotebook(notebookId?: string) {
         };
         const finalMessages = [...newMessages, errorMsg];
         setMessages(finalMessages);
+        // Persist the failed turn too — otherwise the user's question and the
+        // error reply silently vanish on reload.
+        await store.saveMessages(notebook.id, finalMessages).catch((saveErr) => {
+          console.error("Failed to persist messages after chat error:", saveErr);
+        });
+        store.touchNotebook(notebook.id);
       } finally {
         setIsChatting(false);
       }
     },
-    [notebook, messages, client, getModel, isChatting, addTextSource, writeSource],
+    [notebook, messages, client, getModel, isChatting, addTextSource, writeSource, renameSource, deleteSource],
   );
 
   // ── Outputs ────────────────────────────────────────────────────────
@@ -595,9 +623,23 @@ export function useNotebook(notebookId?: string) {
 
       const notebookId = notebook.id;
 
+      // The notebook brief (maintained via chat) feeds every generation as
+      // user instructions, ahead of any one-shot instructions from the dialog.
+      const brief = sourcesRef.current
+        .find((s) => s.path === BRIEF_SOURCE_PATH && !s.content.startsWith("data:"))
+        ?.content.trim();
+      const effectiveOptions: BuildInstructionsOptions | undefined = brief
+        ? { ...options, instructions: [brief, options?.instructions].filter(Boolean).join("\n\n") }
+        : options;
+
+      // Mirror of the in-flight output including everything the generator
+      // reported via onProgress — the catch below persists it so a failure
+      // keeps expensive partial work (e.g. a podcast script).
+      let latest: NotebookOutput = output;
+
       const task: Promise<Partial<NotebookOutput>> = withScreenWakeLock(
         (async () => {
-          const instructions = await buildInstructions(type, styleId, options);
+          const instructions = await buildInstructions(type, styleId, effectiveOptions);
           const ctx: GenerateContext = {
             client,
             model: getModel(),
@@ -605,6 +647,7 @@ export function useNotebook(notebookId?: string) {
             sourceTools: createSourceTools(() => sourcesRef.current),
             getSources: () => sourcesRef.current,
             onProgress: (partial) => {
+              latest = { ...latest, ...partial };
               setOutputs((prev) => prev.map((o) => (o.id === output.id ? { ...o, ...partial } : o)));
             },
           };
@@ -615,7 +658,9 @@ export function useNotebook(notebookId?: string) {
             case "infographic":
               return generateInfographic(ctx);
             case "slides":
-              return options?.slideMode === "images" ? generateImageSlides(ctx) : generateHtmlSlides(ctx);
+              return options?.slideMode === "images"
+                ? generateImageSlides(ctx)
+                : generateHtmlSlides(ctx, styleId, effectiveOptions);
             case "quiz":
               return generateQuiz(ctx);
             case "mindmap":
@@ -634,19 +679,26 @@ export function useNotebook(notebookId?: string) {
 
       task
         .then(async (partial) => {
-          const completed: NotebookOutput = { ...output, ...partial, status: "completed" };
+          const completed: NotebookOutput = { ...latest, ...partial, status: "completed" };
           setOutputs((prev) => prev.map((o) => (o.id === output.id ? completed : o)));
           await store.addOutput(notebookId, completed);
           store.touchNotebook(notebookId);
         })
-        .catch((err) => {
-          setOutputs((prev) =>
-            prev.map((o) =>
-              o.id === output.id
-                ? { ...o, status: "error" as const, error: err instanceof Error ? err.message : "Generation failed" }
-                : o,
-            ),
-          );
+        .catch(async (err) => {
+          const errored: NotebookOutput = {
+            ...latest,
+            status: "error",
+            error: err instanceof Error ? err.message : "Generation failed",
+          };
+          setOutputs((prev) => prev.map((o) => (o.id === output.id ? errored : o)));
+          // Persist the failure so it is still visible (and deletable) after a
+          // reload instead of silently disappearing.
+          try {
+            await store.addOutput(notebookId, errored);
+            store.touchNotebook(notebookId);
+          } catch (persistErr) {
+            console.error("Failed to persist errored output:", persistErr);
+          }
         });
     },
     [notebook, sources, client, getModel],
