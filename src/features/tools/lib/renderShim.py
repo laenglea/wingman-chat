@@ -25,6 +25,7 @@ async def render(prompt, output, input=None):
     Returns:
         The path of the written image file.
     """
-    paths = [] if input is None else [input] if isinstance(input, str) else list(input)
+    # str/PathLike count as a single path — only genuine collections fan out.
+    paths = [] if input is None else [input] if isinstance(input, (str, _os.PathLike)) else list(input)
     paths = [_os.path.abspath(str(p)) for p in paths]
     return await _wingman_render(str(prompt), _os.path.abspath(str(output)), _json.dumps(paths))

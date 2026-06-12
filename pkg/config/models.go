@@ -37,8 +37,7 @@ type Config struct {
 }
 
 type Support struct {
-	URL   string `json:"url,omitempty" yaml:"url,omitempty"`
-	Email string `json:"email,omitempty" yaml:"email,omitempty"`
+	URL string `json:"url,omitempty" yaml:"url,omitempty"`
 }
 
 type Tool struct {

@@ -11,6 +11,8 @@ export type ArtifactKind =
   | "csv"
   | "markdown"
   | "image"
+  | "audio"
+  | "video"
   | "pdf"
   | "docx"
   | "xlsx"
@@ -274,7 +276,20 @@ export function artifactKind(path: string, contentType?: string): ArtifactKind {
     return "code";
   }
 
-  // Extensions caught earlier (pdf, docx, xlsx, pptx) are omitted.
+  // Audio/video for the media player. Checked after code extensions because
+  // browsers report odd MIME types for some code files (.ts → video/mp2t).
+  const audioExtensions = ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "weba"];
+  const videoExtensions = ["mp4", "webm", "mov", "m4v", "ogv", "avi", "mkv", "wmv"];
+
+  if (normalizedContentType?.startsWith("audio/") || audioExtensions.includes(ext)) {
+    return "audio";
+  }
+
+  if (normalizedContentType?.startsWith("video/") || videoExtensions.includes(ext)) {
+    return "video";
+  }
+
+  // Extensions caught earlier (pdf, docx, xlsx, pptx, audio/video) are omitted.
   const binaryExtensions = [
     "zip",
     "gz",
@@ -291,18 +306,6 @@ export function artifactKind(path: string, contentType?: string): ArtifactKind {
     "ttf",
     "otf",
     "eot",
-    "mp3",
-    "wav",
-    "ogg",
-    "m4a",
-    "aac",
-    "flac",
-    "mp4",
-    "webm",
-    "mov",
-    "avi",
-    "mkv",
-    "wmv",
     "bin",
     "wasm",
     "pyc",

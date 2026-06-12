@@ -33,6 +33,7 @@ import { DocxEditor } from "@/shared/ui/editors/DocxEditor";
 import { HtmlEditor } from "@/shared/ui/editors/HtmlEditor";
 import { JsEditor } from "@/shared/ui/editors/JsEditor";
 import { MarkdownEditor } from "@/shared/ui/editors/MarkdownEditor";
+import { MediaEditor } from "@/shared/ui/editors/MediaEditor";
 import { OfficeMarkdownEditor } from "@/shared/ui/editors/OfficeMarkdownEditor";
 import { PdfEditor } from "@/shared/ui/editors/PdfEditor";
 import { PptxEditor } from "@/shared/ui/editors/PptxEditor";
@@ -436,6 +437,16 @@ export function ArtifactsDrawer() {
               draggable={false}
             />
           </div>
+        );
+      case "audio":
+      case "video":
+        return (
+          <MediaEditor
+            key={editorKey}
+            path={activeFileData.path}
+            content={activeFileData.content}
+            contentType={activeFileData.contentType}
+          />
         );
       case "pdf":
         return <PdfEditor key={editorKey} content={activeFileData.content} />;

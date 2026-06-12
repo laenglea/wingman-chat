@@ -5,8 +5,8 @@
  * parsing, dataframe crunching, ...) cannot freeze the UI. The main-thread
  * counterpart is `interpreter.ts`; the message protocol lives in
  * `interpreterProtocol.ts`. Capabilities that need the main thread (the `llm`,
- * `ocr`, `vision`, and `render` Python globals, Plotly DOM rendering) are
- * proxied back over RPC.
+ * `ocr`, `vision`, `render`, `synthesize`, and `transcribe` Python globals,
+ * Plotly DOM rendering) are proxied back over RPC.
  */
 
 import { loadPyodide as loadPyodideRuntime, type PyodideInterface } from "pyodide";
@@ -21,9 +21,9 @@ import type {
   CodeExecutionResult,
   ExecuteMessage,
   LlmCallOptions,
-  PlotlyRenderManifest,
-  PlotlyRenderResult,
-  RenderImageInput,
+  PlotlyManifest,
+  PlotlyResult,
+  RenderInput,
   RpcReply,
   WorkerToMainMessage,
 } from "./interpreterProtocol";
@@ -31,6 +31,8 @@ import LLM_SHIM from "./llmShim.py?raw";
 import OCR_SHIM from "./ocrShim.py?raw";
 import PLOTLY_IMAGE_SHIM from "./plotlyShim.py?raw";
 import RENDER_SHIM from "./renderShim.py?raw";
+import SYNTHESIZE_SHIM from "./synthesizeShim.py?raw";
+import TRANSCRIBE_SHIM from "./transcribeShim.py?raw";
 import VISION_SHIM from "./visionShim.py?raw";
 
 // Typed view of the dedicated-worker global scope (the project compiles
@@ -356,10 +358,16 @@ function loadPyodide(): Promise<PyodideInterface> {
         p.globals.set("_wingman_render", (prompt: string, output: string, inputsJson: string) =>
           requestRenderImage(p, prompt, output, inputsJson),
         );
+        p.globals.set("_wingman_synthesize", (text: string, output: string, voice: string | null) =>
+          requestSynthesize(p, text, output, voice),
+        );
+        p.globals.set("_wingman_transcribe", (path: string) => requestTranscribe(p, path));
         await p.runPythonAsync(LLM_SHIM);
         await p.runPythonAsync(OCR_SHIM);
         await p.runPythonAsync(VISION_SHIM);
         await p.runPythonAsync(RENDER_SHIM);
+        await p.runPythonAsync(SYNTHESIZE_SHIM);
+        await p.runPythonAsync(TRANSCRIBE_SHIM);
         await p.runPythonAsync(ASYNCIO_SHIM);
         rewriteAsyncEntrypoints = p.globals.get("_wingman_rewrite_async") as (code: string) => string;
         console.log("Pyodide loaded successfully");
@@ -505,6 +513,12 @@ function readWorkerFile(pyodide: PyodideInterface, path: string, helper: string)
   }
 }
 
+function writeWorkerFile(pyodide: PyodideInterface, path: string, data: Uint8Array): void {
+  const dir = path.substring(0, path.lastIndexOf("/"));
+  if (dir) ensureDir(pyodide, dir);
+  pyodide.FS.writeFile(path, data);
+}
+
 /**
  * Bridge behind the Python `ocr` helper (see ocrShim.py). The file bytes are
  * read from the worker's FS here; the main thread ships them to the backend
@@ -536,17 +550,45 @@ async function requestRenderImage(
   output: string,
   inputsJson: string,
 ): Promise<string> {
-  const inputs: RenderImageInput[] = (JSON.parse(inputsJson) as string[]).map((path) => ({
+  const inputs: RenderInput[] = (JSON.parse(inputsJson) as string[]).map((path) => ({
     data: readWorkerFile(pyodide, path, "render"),
     path,
   }));
 
-  const data = await callMain<Uint8Array>((port) => ({ type: "render-image-request", prompt, inputs, port }));
-
-  const dir = output.substring(0, output.lastIndexOf("/"));
-  if (dir) ensureDir(pyodide, dir);
-  pyodide.FS.writeFile(output, data);
+  const data = await callMain<Uint8Array>((port) => ({ type: "render-request", prompt, inputs, port }));
+  writeWorkerFile(pyodide, output, data);
   return output;
+}
+
+/**
+ * Bridge behind the Python `synthesize` helper (see synthesizeShim.py). The
+ * main thread calls the backend TTS service; the resulting WAV audio is
+ * written back to `output` here.
+ */
+async function requestSynthesize(
+  pyodide: PyodideInterface,
+  text: string,
+  output: string,
+  voice: string | null,
+): Promise<string> {
+  const data = await callMain<Uint8Array>((port) => ({
+    type: "synthesize-request",
+    text,
+    voice: voice ?? undefined,
+    port,
+  }));
+  writeWorkerFile(pyodide, output, data);
+  return output;
+}
+
+/**
+ * Bridge behind the Python `transcribe` helper (see transcribeShim.py). The
+ * audio bytes are read from the worker's FS here; the main thread ships them
+ * to the backend speech-to-text service.
+ */
+async function requestTranscribe(pyodide: PyodideInterface, path: string): Promise<string> {
+  const data = readWorkerFile(pyodide, path, "transcribe");
+  return callMain<string>((port) => ({ type: "transcribe-request", data, path, port }));
 }
 
 // Plotly render queue — manifests are written by plotlyShim.py; the actual
@@ -566,7 +608,7 @@ function clearRenderQueue(pyodide: PyodideInterface): void {
   }
 }
 
-function readRenderManifests(pyodide: PyodideInterface): PlotlyRenderManifest[] {
+function readRenderManifests(pyodide: PyodideInterface): PlotlyManifest[] {
   let entries: string[];
   try {
     entries = (pyodide.FS.readdir(RENDER_QUEUE_DIR) as string[])
@@ -576,11 +618,11 @@ function readRenderManifests(pyodide: PyodideInterface): PlotlyRenderManifest[] 
     return [];
   }
 
-  const manifests: PlotlyRenderManifest[] = [];
+  const manifests: PlotlyManifest[] = [];
   for (const entry of entries) {
     try {
       const json = pyodide.FS.readFile(`${RENDER_QUEUE_DIR}/${entry}`, { encoding: "utf8" }) as string;
-      manifests.push(JSON.parse(json) as PlotlyRenderManifest);
+      manifests.push(JSON.parse(json) as PlotlyManifest);
     } catch (error) {
       console.error(`Failed to read plotly manifest ${entry}:`, error);
     }
@@ -603,8 +645,8 @@ async function processRenderQueue(pyodide: PyodideInterface): Promise<void> {
 
   try {
     const plotlyJs = plotlyJsSent ? undefined : readPlotlyJsSource(pyodide);
-    const results = await callMain<PlotlyRenderResult[]>((port) => ({
-      type: "render-request",
+    const results = await callMain<PlotlyResult[]>((port) => ({
+      type: "plotly-request",
       manifests,
       plotlyJs,
       port,

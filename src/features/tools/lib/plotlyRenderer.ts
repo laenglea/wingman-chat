@@ -8,7 +8,7 @@
  */
 
 import { decodeBase64 } from "@/shared/lib/utils";
-import type { PlotlyRenderManifest, PlotlyRenderResult } from "./interpreterProtocol";
+import type { PlotlyManifest, PlotlyResult } from "./interpreterProtocol";
 
 let plotlyJsLoaded = false;
 
@@ -53,7 +53,7 @@ function decodeDataUrl(dataUrl: string, format: string): Uint8Array | string {
   return decodeBase64(payload);
 }
 
-async function renderFigure(manifest: PlotlyRenderManifest): Promise<PlotlyRenderResult> {
+async function renderFigure(manifest: PlotlyManifest): Promise<PlotlyResult> {
   const Plotly = (window as unknown as Record<string, unknown>).Plotly as {
     newPlot: (el: HTMLElement, data: unknown[], layout?: unknown, config?: unknown) => Promise<void>;
     toImage: (el: HTMLElement, opts: Record<string, unknown>) => Promise<string>;
@@ -94,13 +94,10 @@ async function renderFigure(manifest: PlotlyRenderManifest): Promise<PlotlyRende
  * that fail to render are logged and skipped, matching the previous
  * per-figure error behavior.
  */
-export async function renderPlotlyFigures(
-  manifests: PlotlyRenderManifest[],
-  plotlyJs?: string,
-): Promise<PlotlyRenderResult[]> {
+export async function renderPlotlyFigures(manifests: PlotlyManifest[], plotlyJs?: string): Promise<PlotlyResult[]> {
   await ensurePlotlyJsLoaded(plotlyJs);
 
-  const results: PlotlyRenderResult[] = [];
+  const results: PlotlyResult[] = [];
   for (const manifest of manifests) {
     try {
       results.push(await renderFigure(manifest));

@@ -16,8 +16,8 @@ func Load() *Config {
 		Disclaimer: os.Getenv("DISCLAIMER"),
 	}
 
-	if u, e := os.Getenv("SUPPORT_URL"), os.Getenv("SUPPORT_EMAIL"); u != "" || e != "" {
-		cfg.Support = &Support{URL: u, Email: e}
+	if u := os.Getenv("SUPPORT_URL"); u != "" {
+		cfg.Support = &Support{URL: u}
 	}
 
 	if bridgeURL := os.Getenv("BRIDGE_URL"); bridgeURL != "" {

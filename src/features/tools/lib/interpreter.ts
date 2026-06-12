@@ -22,6 +22,8 @@ import { runLlm } from "./llmCommand";
 import { runOcr } from "./ocrCommand";
 import { renderPlotlyFigures } from "./plotlyRenderer";
 import { runRenderImage } from "./renderCommand";
+import { runSynthesize } from "./synthesizeCommand";
+import { runTranscribe } from "./transcribeCommand";
 import { runVision } from "./visionCommand";
 
 export type { CodeExecutionRequest, CodeExecutionResult } from "./interpreterProtocol";
@@ -54,8 +56,12 @@ function getWorker(): Worker {
         void replyOnPort(message.port, () => runOcr(message.data, message.path));
       } else if (message.type === "vision-request") {
         void replyOnPort(message.port, () => runVision(message.data, message.path, message.prompt));
-      } else if (message.type === "render-image-request") {
+      } else if (message.type === "render-request") {
         void replyOnPort(message.port, () => runRenderImage(message.prompt, message.inputs));
+      } else if (message.type === "synthesize-request") {
+        void replyOnPort(message.port, () => runSynthesize(message.text, message.voice));
+      } else if (message.type === "transcribe-request") {
+        void replyOnPort(message.port, () => runTranscribe(message.data, message.path));
       } else {
         void replyOnPort(message.port, () => renderPlotlyFigures(message.manifests, message.plotlyJs));
       }

@@ -7,6 +7,8 @@ import { llmCommands } from "./llmCommand";
 import { ocrCommands } from "./ocrCommand";
 import { pythonCommands } from "./pythonCommand";
 import { renderCommands } from "./renderCommand";
+import { synthesizeCommands } from "./synthesizeCommand";
+import { transcribeCommands } from "./transcribeCommand";
 import { visionCommands } from "./visionCommand";
 
 export interface BashExecutionRequest {
@@ -70,7 +72,15 @@ export function createBashInstance(files?: Record<string, { content: string; con
   const bash = new Bash({
     fs: memFs,
     cwd: SANDBOX_HOME,
-    customCommands: [...pythonCommands, ...llmCommands, ...ocrCommands, ...visionCommands, ...renderCommands],
+    customCommands: [
+      ...pythonCommands,
+      ...llmCommands,
+      ...ocrCommands,
+      ...visionCommands,
+      ...renderCommands,
+      ...synthesizeCommands,
+      ...transcribeCommands,
+    ],
     executionLimits: {
       maxCallDepth: 50,
       maxCommandCount: 10000,

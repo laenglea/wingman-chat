@@ -1,10 +1,20 @@
 import { type Command, type CommandContext, defineCommand, type ExecResult } from "just-bash/browser";
 import { getConfig } from "@/shared/config";
 import { getTextFromContent, Role } from "@/shared/types/chat";
+import { parseFlags } from "./commandUtils";
 import type { LlmCallOptions } from "./interpreterProtocol";
 import { decodeStdin } from "./stdin";
 
 const EFFORT_LEVELS = new Set(["none", "minimal", "low", "medium", "high"]);
+
+const LLM_FLAGS = {
+  "-m": "model",
+  "--model": "model",
+  "-s": "system",
+  "--system": "system",
+  "-e": "effort",
+  "--effort": "effort",
+};
 
 // Default model for `llm` calls — kept in sync with the chat's selected model
 // by ChatProvider. Per-call options override it.
@@ -35,45 +45,28 @@ export async function runLlm(prompt: string, options: LlmCallOptions = {}): Prom
   return getTextFromContent(result.content);
 }
 
-function parseLlmArgs(args: string[]): { options: LlmCallOptions; prompt: string; error?: string } {
-  const options: LlmCallOptions = {};
-  const rest: string[] = [];
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "-m" || arg === "--model") {
-      const value = args[++i];
-      if (!value) return { options, prompt: "", error: `llm: option ${arg} requires an argument` };
-      options.model = value;
-    } else if (arg === "-s" || arg === "--system") {
-      const value = args[++i];
-      if (!value) return { options, prompt: "", error: `llm: option ${arg} requires an argument` };
-      options.system = value;
-    } else if (arg === "-e" || arg === "--effort") {
-      const value = args[++i];
-      if (!value || !EFFORT_LEVELS.has(value)) {
-        return { options, prompt: "", error: `llm: option ${arg} requires one of: ${[...EFFORT_LEVELS].join(", ")}` };
-      }
-      options.effort = value as LlmCallOptions["effort"];
-    } else {
-      rest.push(arg);
-    }
-  }
-
-  return { options, prompt: rest.join(" ").trim() };
-}
-
 async function executeLlm(args: string[], ctx: CommandContext): Promise<ExecResult> {
-  const { options, prompt: argPrompt, error } = parseLlmArgs(args);
+  const { options: flags, rest, error } = parseFlags("llm", args, LLM_FLAGS);
   if (error) {
     return { stdout: "", stderr: `${error}\n`, exitCode: 2 };
   }
 
-  let prompt = argPrompt;
-  if (!prompt) {
-    prompt = decodeStdin(ctx.stdin);
+  const effort = flags.effort?.at(-1);
+  if (effort && !EFFORT_LEVELS.has(effort)) {
+    return {
+      stdout: "",
+      stderr: `llm: option --effort requires one of: ${[...EFFORT_LEVELS].join(", ")}\n`,
+      exitCode: 2,
+    };
   }
 
+  const options: LlmCallOptions = {
+    model: flags.model?.at(-1),
+    system: flags.system?.at(-1),
+    effort: effort as LlmCallOptions["effort"],
+  };
+
+  const prompt = rest.join(" ").trim() || decodeStdin(ctx.stdin);
   if (!prompt) {
     return { stdout: "", stderr: "llm: no prompt provided (pass as args or pipe via stdin)\n", exitCode: 2 };
   }

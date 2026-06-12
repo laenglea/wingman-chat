@@ -1,10 +1,10 @@
-import { type Command, type CommandContext, defineCommand, type ExecResult } from "just-bash/browser";
+import type { Command } from "just-bash/browser";
 import { getConfig } from "@/shared/config";
 import { bytesToDataUrl } from "@/shared/lib/fileContent";
 import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
 import { getFileName } from "@/shared/lib/utils";
 import { getTextFromContent, Role } from "@/shared/types/chat";
-import { resolvePath, writeOutputFile } from "./commandUtils";
+import { defineFileToTextCommand } from "./commandUtils";
 import { getModel } from "./llmCommand";
 
 const DEFAULT_PROMPT =
@@ -16,6 +16,7 @@ export async function runVision(bytes: Uint8Array, path: string, prompt?: string
   if (!config.vision) {
     throw new Error("vision: no vision service configured");
   }
+  // Configured vision model, or whatever model the chat currently uses.
   const model = config.vision.model || getModel();
   if (!model) {
     throw new Error("vision: no model");
@@ -52,57 +53,11 @@ export async function runVision(bytes: Uint8Array, path: string, prompt?: string
   return text;
 }
 
-function parseVisionArgs(args: string[]): { output?: string; path: string; prompt?: string; error?: string } {
-  let output: string | undefined;
-  const rest: string[] = [];
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "-o" || arg === "--output") {
-      const value = args[++i];
-      if (!value) return { path: "", error: `vision: option ${arg} requires an argument` };
-      output = value;
-    } else {
-      rest.push(arg);
-    }
-  }
-
-  if (rest.length === 0) {
-    return { path: "", error: 'usage: vision [-o output.txt] <image> ["prompt"]' };
-  }
-
-  return { output, path: rest[0], prompt: rest.slice(1).join(" ").trim() || undefined };
-}
-
-async function executeVision(args: string[], ctx: CommandContext): Promise<ExecResult> {
-  const { output, path, prompt, error } = parseVisionArgs(args);
-  if (error) {
-    return { stdout: "", stderr: `${error}\n`, exitCode: 2 };
-  }
-
-  const fsPath = resolvePath(path, ctx.cwd);
-  let bytes: Uint8Array;
-  try {
-    // readFileBuffer, not readFile — the latter decodes to a UTF-8 string,
-    // which destroys binary image data.
-    bytes = await ctx.fs.readFileBuffer(fsPath);
-  } catch {
-    return { stdout: "", stderr: `vision: cannot read file: ${path}\n`, exitCode: 1 };
-  }
-
-  try {
-    const text = await runVision(bytes, fsPath, prompt);
-
-    if (output) {
-      await writeOutputFile(ctx.fs, resolvePath(output, ctx.cwd), text);
-      return { stdout: "", stderr: "", exitCode: 0 };
-    }
-
-    return { stdout: text.endsWith("\n") ? text : `${text}\n`, stderr: "", exitCode: 0 };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    return { stdout: "", stderr: `${message}\n`, exitCode: 1 };
-  }
-}
-
-export const visionCommands: Command[] = [defineCommand("vision", executeVision)];
+export const visionCommands: Command[] = [
+  defineFileToTextCommand({
+    name: "vision",
+    usage: 'usage: vision [-o output.txt] <image> ["prompt"]',
+    acceptsPrompt: true,
+    run: runVision,
+  }),
+];

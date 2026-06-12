@@ -1,43 +1,38 @@
 {
-    "vision": {
-        "enabled": true
-    },
+    "vision": {},
 
-    "stt": {
-        "enabled": true
-    },
+    "stt": {},
 
-    "tts": {
-        "enabled": true
-    },
+    "tts": {},
 
-    "voice": {
-        "enabled": true
-    },
+    "voice": {},
 
-    "artifacts": {
-        "enabled": true
-    },
+    "artifacts": {},
 
-    "repository": {
-        "enabled": true
-    },
+    "repository": {},
 
-    "renderer": {
-        "enabled": true
+    "renderer": {},
+
+    "extractor": {
+        "files": [
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx"
+        ]
     },
 
     "internet": {
-        "enabled": true,
         "elicitation": true,
         "searcher": "web",
         "scraper": "web",
         "researcher": "web"
     },
 
-    "notebook": {
-        "enabled": true
-    },
+    "notebook": {},
 
     "telemetry": {},
 
@@ -62,8 +57,6 @@
     ],
 
     "translator": {
-        "enabled": true,
-
         "files": [
             ".pdf"
         ],

@@ -1,14 +1,16 @@
 import {
   File,
+  FileAudio,
   FileCode,
   FileImage,
   FileSpreadsheet,
   FileText,
+  FileVideo,
+  type LucideIcon,
   Mail,
   Presentation,
-  type LucideIcon,
 } from "lucide-react";
-import { artifactKind, type ArtifactKind } from "@/features/artifacts/lib/artifacts";
+import { type ArtifactKind, artifactKind } from "@/features/artifacts/lib/artifacts";
 import { cn } from "../lib/cn";
 
 export type FileIconProps = {
@@ -23,6 +25,8 @@ const ICON_BY_KIND: Record<ArtifactKind, LucideIcon> = {
   html: FileCode,
   svg: FileImage,
   image: FileImage,
+  audio: FileAudio,
+  video: FileVideo,
   csv: FileSpreadsheet,
   xlsx: FileSpreadsheet,
   docx: FileText,

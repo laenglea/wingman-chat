@@ -2,10 +2,13 @@ import { type Command, type CommandContext, defineCommand, type ExecResult } fro
 import { getConfig } from "@/shared/config";
 import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
 import { getFileName } from "@/shared/lib/utils";
-import { resolvePath, writeOutputFile } from "./commandUtils";
-import type { RenderImageInput } from "./interpreterProtocol";
+import { parseFlags, resolveModel, resolvePath, writeOutputFile } from "./commandUtils";
+import type { RenderInput } from "./interpreterProtocol";
 
-export async function runRenderImage(prompt: string, inputs: RenderImageInput[]): Promise<Uint8Array> {
+const RENDER_FLAGS = { "-i": "input", "--input": "input", "-o": "output", "--output": "output" };
+const RENDER_USAGE = 'usage: render [-i input.png ...] -o output.png "prompt"';
+
+export async function runRenderImage(prompt: string, inputs: RenderInput[]): Promise<Uint8Array> {
   const config = getConfig();
   if (!config.renderer) {
     throw new Error("render: no image rendering service configured");
@@ -28,7 +31,8 @@ export async function runRenderImage(prompt: string, inputs: RenderImageInput[])
     return new File([data as BlobPart], name, { type });
   });
 
-  const blob = await config.client.generateImage(config.renderer.model ?? "", prompt, images);
+  const model = await resolveModel(config.renderer.model, "renderer");
+  const blob = await config.client.generateImage(model, prompt, images);
   const data = new Uint8Array(await blob.arrayBuffer());
   if (data.length === 0) {
     throw new Error("render: service returned an empty image");
@@ -37,42 +41,20 @@ export async function runRenderImage(prompt: string, inputs: RenderImageInput[])
   return data;
 }
 
-function parseRenderArgs(args: string[]): { inputs: string[]; output: string; prompt: string; error?: string } {
-  const inputs: string[] = [];
-  let output: string | undefined;
-  const rest: string[] = [];
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === "-i" || arg === "--input") {
-      const value = args[++i];
-      if (!value) return { inputs, output: "", prompt: "", error: `render: option ${arg} requires an argument` };
-      inputs.push(value);
-    } else if (arg === "-o" || arg === "--output") {
-      const value = args[++i];
-      if (!value) return { inputs, output: "", prompt: "", error: `render: option ${arg} requires an argument` };
-      output = value;
-    } else {
-      rest.push(arg);
-    }
-  }
-
-  const prompt = rest.join(" ").trim();
-  if (!output || !prompt) {
-    return { inputs, output: "", prompt: "", error: 'usage: render [-i input.png ...] -o output.png "prompt"' };
-  }
-
-  return { inputs, output, prompt };
-}
-
 async function executeRender(args: string[], ctx: CommandContext): Promise<ExecResult> {
-  const { inputs, output, prompt, error } = parseRenderArgs(args);
+  const { options, rest, error } = parseFlags("render", args, RENDER_FLAGS);
   if (error) {
     return { stdout: "", stderr: `${error}\n`, exitCode: 2 };
   }
 
-  const images: RenderImageInput[] = [];
-  for (const input of inputs) {
+  const output = options.output?.at(-1);
+  const prompt = rest.join(" ").trim();
+  if (!output || !prompt) {
+    return { stdout: "", stderr: `${RENDER_USAGE}\n`, exitCode: 2 };
+  }
+
+  const images: RenderInput[] = [];
+  for (const input of options.input ?? []) {
     const fsPath = resolvePath(input, ctx.cwd);
     try {
       // readFileBuffer, not readFile — the latter decodes to a UTF-8 string,

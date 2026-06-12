@@ -7,6 +7,8 @@ import llmInstructionsText from "@/features/artifacts/prompts/llm.txt?raw";
 import ocrInstructionsText from "@/features/artifacts/prompts/ocr.txt?raw";
 import officeInstructionsText from "@/features/artifacts/prompts/office.txt?raw";
 import renderInstructionsText from "@/features/artifacts/prompts/render.txt?raw";
+import synthesizeInstructionsText from "@/features/artifacts/prompts/synthesize.txt?raw";
+import transcribeInstructionsText from "@/features/artifacts/prompts/transcribe.txt?raw";
 import visionInstructionsText from "@/features/artifacts/prompts/vision.txt?raw";
 import { executeBash, getSingleton, loadArtifactsIntoFs, readFilesFromFs } from "@/features/tools/lib/bash";
 import { executeCode } from "@/features/tools/lib/interpreter";
@@ -405,11 +407,13 @@ export function useArtifactsProvider(): ToolProvider | null {
         interpreterInstructionsText,
         officeInstructionsText,
         llmInstructionsText,
-        // Only advertise the `ocr`, `vision`, and `render` helpers when their
-        // backing services are configured.
+        // Only advertise the `ocr`, `vision`, `render`, `synthesize`, and
+        // `transcribe` helpers when their backing services are configured.
         ...(getConfig().extractor ? [ocrInstructionsText] : []),
         ...(getConfig().vision ? [visionInstructionsText] : []),
         ...(getConfig().renderer ? [renderInstructionsText] : []),
+        ...(getConfig().tts ? [synthesizeInstructionsText] : []),
+        ...(getConfig().stt ? [transcribeInstructionsText] : []),
       ].join("\n\n"),
       tools: artifactsTools(),
     };
