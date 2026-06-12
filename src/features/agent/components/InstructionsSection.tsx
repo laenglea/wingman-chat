@@ -95,10 +95,15 @@ export function InstructionsSection({ agent }: InstructionsSectionProps) {
               >
                 <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl shadow-xl transition-all">
                   {/* Header */}
-                  <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-200/60 dark:border-neutral-800/60">
-                    <Dialog.Title className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-                      Instructions
-                    </Dialog.Title>
+                  <div className="flex items-start justify-between px-5 py-3.5 border-b border-neutral-200/60 dark:border-neutral-800/60">
+                    <div>
+                      <Dialog.Title className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+                        Instructions
+                      </Dialog.Title>
+                      <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                        Instructions entered here are automatically included in the agent's prompt every time it runs.
+                      </p>
+                    </div>
                     <button
                       type="button"
                       onClick={closeDialog}
@@ -111,20 +116,15 @@ export function InstructionsSection({ agent }: InstructionsSectionProps) {
                   {/* Content */}
                   <div className="px-5 py-3.5">
                     {isEditing ? (
-                      <>
-                        <textarea
-                          value={value}
-                          onChange={(e) => setValue(e.target.value)}
-                          onKeyDown={handleKeyDown}
-                          rows={12}
-                          className="w-full px-3 py-2 text-sm rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y min-h-50 backdrop-blur-sm transition-colors"
-                          placeholder="Enter instructions for this agent..."
-                          autoFocus
-                        />
-                        <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                          Instructions help the AI understand how to behave and what context to use.
-                        </p>
-                      </>
+                      <textarea
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        rows={12}
+                        className="w-full px-3 py-2 text-sm rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y min-h-50 backdrop-blur-sm transition-colors"
+                        placeholder="Enter instructions for this agent..."
+                        autoFocus
+                      />
                     ) : (
                       <div className="max-h-96 overflow-auto">
                         {agent.instructions?.trim() ? (
