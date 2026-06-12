@@ -47,6 +47,9 @@ const PACKAGE_ALIASES: Record<string, string> = {
   pdfminer: "pdfminer-six",
   // Bundled as extract-msg's dep.
   msoffcrypto: "msoffcrypto-tool",
+  // loadPackage resolves import names case-sensitively ("PIL"), but
+  // normalizePackageName lowercases — map it to the package name explicitly.
+  pil: "pillow",
 };
 
 // Packages that cannot run in Pyodide (native binaries) — silently ignored when requested.

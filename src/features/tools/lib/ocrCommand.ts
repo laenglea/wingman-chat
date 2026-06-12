@@ -8,12 +8,20 @@ export async function runOcr(bytes: Uint8Array, path: string): Promise<string> {
   if (!config.extractor) {
     throw new Error("ocr: no document extraction service configured");
   }
+  if (bytes.length === 0) {
+    throw new Error(`ocr: file is empty: ${path}`);
+  }
 
-  // Ship the original filename and content type so the backend extractor can
-  // route by format; unknown extensions fall back to content sniffing.
+  // Ship the original filename and content type — the backend extractor
+  // routes uploads by content type and rejects ones it cannot identify.
   const name = getFileName(path);
-  const type = inferContentTypeFromPath(name) ?? "application/octet-stream";
-  return config.client.extractText(new File([bytes], name, { type }));
+  const type = inferContentTypeFromPath(name);
+  if (!type) {
+    throw new Error(`ocr: cannot determine document type of ${name} — use a known file extension like .pdf or .docx`);
+  }
+  const text = await config.client.extractText(new File([bytes as BlobPart], name, { type }));
+  console.debug(`ocr: ${path} (${type}, ${bytes.length} bytes) → ${text.length} chars`);
+  return text;
 }
 
 function parseOcrArgs(args: string[]): { output?: string; path: string; error?: string } {
