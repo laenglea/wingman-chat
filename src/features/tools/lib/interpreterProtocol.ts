@@ -6,6 +6,8 @@
  * still require the main thread, so the worker calls back over RPC:
  *   - the `llm(...)` Python global — needs the chat client/config
  *   - the `ocr(...)` Python global — needs the chat client/config
+ *   - the `vision(...)` Python global — needs the chat client/config
+ *   - the `render(...)` Python global — needs the chat client/config
  *   - Plotly figure rendering — plotly.js requires a real DOM
  */
 
@@ -45,6 +47,12 @@ export interface PlotlyRenderResult {
   data: Uint8Array | string;
 }
 
+/** Input image for the `render` helper — bytes plus the path whose basename routes the upload by format. */
+export interface RenderImageInput {
+  data: Uint8Array;
+  path: string;
+}
+
 /**
  * Per-call options for the `llm` helper. Everything is optional — `model`
  * falls back to the model currently selected in the chat.
@@ -70,6 +78,12 @@ export type WorkerToMainMessage =
   // Document bytes read from the worker FS, extracted on the main thread via
   // the backend extractor service; the basename of `path` lets it route by format.
   | { type: "ocr-request"; data: Uint8Array; path: string; port: MessagePort }
+  // Image bytes read from the worker FS, analyzed on the main thread via a
+  // vision-capable chat model.
+  | { type: "vision-request"; data: Uint8Array; path: string; prompt?: string; port: MessagePort }
+  // Image generation/editing via the backend renderer service; replies with
+  // the image bytes, which the worker writes to the requested output path.
+  | { type: "render-image-request"; prompt: string; inputs: RenderImageInput[]; port: MessagePort }
   // `plotlyJs` carries the plotly.js source (read from the wheel inside the
   // worker's FS) on the first render request; the main thread caches the
   // loaded script, so subsequent requests omit it.

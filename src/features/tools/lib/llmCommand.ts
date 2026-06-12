@@ -14,6 +14,10 @@ export function setModel(newModel: string | null): void {
   defaultModel = newModel;
 }
 
+export function getModel(): string | null {
+  return defaultModel;
+}
+
 export async function runLlm(prompt: string, options: LlmCallOptions = {}): Promise<string> {
   const model = options.model || defaultModel;
   if (!model) {

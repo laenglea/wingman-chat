@@ -4,8 +4,9 @@
  * Runs all Python execution off the main thread so CPU-bound code (PDF
  * parsing, dataframe crunching, ...) cannot freeze the UI. The main-thread
  * counterpart is `interpreter.ts`; the message protocol lives in
- * `interpreterProtocol.ts`. Capabilities that need the main thread (the `llm`
- * Python global, Plotly DOM rendering) are proxied back over RPC.
+ * `interpreterProtocol.ts`. Capabilities that need the main thread (the `llm`,
+ * `ocr`, `vision`, and `render` Python globals, Plotly DOM rendering) are
+ * proxied back over RPC.
  */
 
 import { loadPyodide as loadPyodideRuntime, type PyodideInterface } from "pyodide";
@@ -22,12 +23,15 @@ import type {
   LlmCallOptions,
   PlotlyRenderManifest,
   PlotlyRenderResult,
+  RenderImageInput,
   RpcReply,
   WorkerToMainMessage,
 } from "./interpreterProtocol";
 import LLM_SHIM from "./llmShim.py?raw";
 import OCR_SHIM from "./ocrShim.py?raw";
 import PLOTLY_IMAGE_SHIM from "./plotlyShim.py?raw";
+import RENDER_SHIM from "./renderShim.py?raw";
+import VISION_SHIM from "./visionShim.py?raw";
 
 // Typed view of the dedicated-worker global scope (the project compiles
 // against the DOM lib, so we avoid referencing the webworker lib globally).
@@ -348,8 +352,14 @@ function loadPyodide(): Promise<PyodideInterface> {
         p.FS.chdir(SANDBOX_HOME);
         p.globals.set("_wingman_llm", requestLlm);
         p.globals.set("_wingman_ocr", (path: string) => requestOcr(p, path));
+        p.globals.set("_wingman_vision", (path: string, prompt: string | null) => requestVision(p, path, prompt));
+        p.globals.set("_wingman_render", (prompt: string, output: string, inputsJson: string) =>
+          requestRenderImage(p, prompt, output, inputsJson),
+        );
         await p.runPythonAsync(LLM_SHIM);
         await p.runPythonAsync(OCR_SHIM);
+        await p.runPythonAsync(VISION_SHIM);
+        await p.runPythonAsync(RENDER_SHIM);
         await p.runPythonAsync(ASYNCIO_SHIM);
         rewriteAsyncEntrypoints = p.globals.get("_wingman_rewrite_async") as (code: string) => string;
         console.log("Pyodide loaded successfully");
@@ -487,19 +497,56 @@ function requestLlm(prompt: string, optionsJson?: string | null): Promise<string
   return callMain<string>((port) => ({ type: "llm-request", prompt, options, port }));
 }
 
+function readWorkerFile(pyodide: PyodideInterface, path: string, helper: string): Uint8Array {
+  try {
+    return pyodide.FS.readFile(path) as Uint8Array;
+  } catch {
+    throw new Error(`${helper}: cannot read file: ${path}`);
+  }
+}
+
 /**
  * Bridge behind the Python `ocr` helper (see ocrShim.py). The file bytes are
  * read from the worker's FS here; the main thread ships them to the backend
  * extractor service (which needs the chat client/config).
  */
-function requestOcr(pyodide: PyodideInterface, path: string): Promise<string> {
-  let data: Uint8Array;
-  try {
-    data = pyodide.FS.readFile(path) as Uint8Array;
-  } catch {
-    return Promise.reject(new Error(`ocr: cannot read file: ${path}`));
-  }
+async function requestOcr(pyodide: PyodideInterface, path: string): Promise<string> {
+  const data = readWorkerFile(pyodide, path, "ocr");
   return callMain<string>((port) => ({ type: "ocr-request", data, path, port }));
+}
+
+/**
+ * Bridge behind the Python `vision` helper (see visionShim.py). The image
+ * bytes are read from the worker's FS here; the main thread sends them to a
+ * vision-capable chat model.
+ */
+async function requestVision(pyodide: PyodideInterface, path: string, prompt: string | null): Promise<string> {
+  const data = readWorkerFile(pyodide, path, "vision");
+  return callMain<string>((port) => ({ type: "vision-request", data, path, prompt: prompt ?? undefined, port }));
+}
+
+/**
+ * Bridge behind the Python `render` helper (see renderShim.py). Input images
+ * are read from the worker's FS; the main thread calls the backend renderer
+ * service and the resulting image is written back to `output` here.
+ */
+async function requestRenderImage(
+  pyodide: PyodideInterface,
+  prompt: string,
+  output: string,
+  inputsJson: string,
+): Promise<string> {
+  const inputs: RenderImageInput[] = (JSON.parse(inputsJson) as string[]).map((path) => ({
+    data: readWorkerFile(pyodide, path, "render"),
+    path,
+  }));
+
+  const data = await callMain<Uint8Array>((port) => ({ type: "render-image-request", prompt, inputs, port }));
+
+  const dir = output.substring(0, output.lastIndexOf("/"));
+  if (dir) ensureDir(pyodide, dir);
+  pyodide.FS.writeFile(output, data);
+  return output;
 }
 
 // Plotly render queue — manifests are written by plotlyShim.py; the actual

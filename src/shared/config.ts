@@ -87,6 +87,7 @@ interface TextConfig {
 }
 
 interface VisionConfig {
+  model?: string;
   files: string[];
 }
 
@@ -305,7 +306,7 @@ export const loadConfig = async (): Promise<Config | undefined> => {
         cfg.voice && cfg.voice.enabled !== false
           ? { model: cfg.voice.model, transcriber: cfg.voice.transcriber }
           : null,
-      vision: cfg.vision ? { files: cfg.vision.files ?? DEFAULT_VISION_FILES } : null,
+      vision: cfg.vision ? { model: cfg.vision.model, files: cfg.vision.files ?? DEFAULT_VISION_FILES } : null,
 
       text: cfg.text ? { files: cfg.text.files } : null,
 

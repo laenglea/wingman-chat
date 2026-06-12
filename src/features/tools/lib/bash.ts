@@ -6,6 +6,8 @@ import { SANDBOX_HOME } from "@/shared/lib/sandbox";
 import { llmCommands } from "./llmCommand";
 import { ocrCommands } from "./ocrCommand";
 import { pythonCommands } from "./pythonCommand";
+import { renderCommands } from "./renderCommand";
+import { visionCommands } from "./visionCommand";
 
 export interface BashExecutionRequest {
   command: string;
@@ -68,7 +70,7 @@ export function createBashInstance(files?: Record<string, { content: string; con
   const bash = new Bash({
     fs: memFs,
     cwd: SANDBOX_HOME,
-    customCommands: [...pythonCommands, ...llmCommands, ...ocrCommands],
+    customCommands: [...pythonCommands, ...llmCommands, ...ocrCommands, ...visionCommands, ...renderCommands],
     executionLimits: {
       maxCallDepth: 50,
       maxCommandCount: 10000,

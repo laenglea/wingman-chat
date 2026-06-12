@@ -6,6 +6,8 @@ import interpreterInstructionsText from "@/features/artifacts/prompts/interprete
 import llmInstructionsText from "@/features/artifacts/prompts/llm.txt?raw";
 import ocrInstructionsText from "@/features/artifacts/prompts/ocr.txt?raw";
 import officeInstructionsText from "@/features/artifacts/prompts/office.txt?raw";
+import renderInstructionsText from "@/features/artifacts/prompts/render.txt?raw";
+import visionInstructionsText from "@/features/artifacts/prompts/vision.txt?raw";
 import { executeBash, getSingleton, loadArtifactsIntoFs, readFilesFromFs } from "@/features/tools/lib/bash";
 import { executeCode } from "@/features/tools/lib/interpreter";
 import { withSandboxLock } from "@/features/tools/lib/sandboxLock";
@@ -403,8 +405,11 @@ export function useArtifactsProvider(): ToolProvider | null {
         interpreterInstructionsText,
         officeInstructionsText,
         llmInstructionsText,
-        // Only advertise the `ocr` helper when a backend extractor is configured.
+        // Only advertise the `ocr`, `vision`, and `render` helpers when their
+        // backing services are configured.
         ...(getConfig().extractor ? [ocrInstructionsText] : []),
+        ...(getConfig().vision ? [visionInstructionsText] : []),
+        ...(getConfig().renderer ? [renderInstructionsText] : []),
       ].join("\n\n"),
       tools: artifactsTools(),
     };

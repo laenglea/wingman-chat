@@ -2,6 +2,7 @@ import { type Command, type CommandContext, defineCommand, type ExecResult } fro
 import { getConfig } from "@/shared/config";
 import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
 import { getFileName } from "@/shared/lib/utils";
+import { resolvePath, writeOutputFile } from "./commandUtils";
 
 export async function runOcr(bytes: Uint8Array, path: string): Promise<string> {
   const config = getConfig();
@@ -46,10 +47,6 @@ function parseOcrArgs(args: string[]): { output?: string; path: string; error?: 
   return { output, path: rest[0] };
 }
 
-function resolvePath(path: string, cwd: string): string {
-  return path.startsWith("/") ? path : `${cwd}/${path}`;
-}
-
 async function executeOcr(args: string[], ctx: CommandContext): Promise<ExecResult> {
   const { output, path, error } = parseOcrArgs(args);
   if (error) {
@@ -70,16 +67,7 @@ async function executeOcr(args: string[], ctx: CommandContext): Promise<ExecResu
     const text = await runOcr(bytes, fsPath);
 
     if (output) {
-      const outPath = resolvePath(output, ctx.cwd);
-      const dir = outPath.substring(0, outPath.lastIndexOf("/"));
-      if (dir) {
-        try {
-          await ctx.fs.mkdir(dir, { recursive: true });
-        } catch {
-          // exists
-        }
-      }
-      await ctx.fs.writeFile(outPath, text);
+      await writeOutputFile(ctx.fs, resolvePath(output, ctx.cwd), text);
       return { stdout: "", stderr: "", exitCode: 0 };
     }
 
