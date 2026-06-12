@@ -19,7 +19,7 @@ import { SourcesPanel } from "../components/SourcesPanel";
 import { StudioPanel } from "../components/StudioPanel";
 import { useNotebook } from "../hooks/useNotebook";
 import { useOutputDownload } from "../hooks/useOutputDownload";
-import { exportNotebookAsZip, importNotebookFromZip } from "../lib/notebookImportExport";
+import { exportNotebookAsZip, importNotebooksFromZip } from "../lib/notebookImportExport";
 import * as store from "../lib/opfs-notebook";
 import type { Notebook, NotebookOutput } from "../types/notebook";
 
@@ -186,16 +186,19 @@ export function NotebookPage() {
     [notebooks],
   );
 
-  // Import a notebook from a ZIP, then open it
+  // Import notebook(s) from a ZIP (single or bulk export), then open the first
   const handleImport = useCallback(
     async (file: File) => {
       try {
-        const newId = await importNotebookFromZip(file);
+        const ids = await importNotebooksFromZip(file);
         await loadNotebooks();
-        setViewingOutput(null);
-        navigate({ to: "/notebook/$notebookId", params: { notebookId: newId } });
+        if (ids.length > 0) {
+          setViewingOutput(null);
+          navigate({ to: "/notebook/$notebookId", params: { notebookId: ids[0] } });
+        }
       } catch (error) {
         console.error("Failed to import notebook:", error);
+        alert("Failed to import notebook. Please check the file and try again.");
       }
     },
     [loadNotebooks, navigate, setViewingOutput],

@@ -1,6 +1,12 @@
 import JSZip from "jszip";
-import { getDirectory, readIndex, writeBlob } from "@/shared/lib/opfs-core";
-import { addDirectoryToZip, downloadFolderAsZip } from "@/shared/lib/opfs-zip";
+import { getDirectory, readIndex } from "@/shared/lib/opfs-core";
+import {
+  addDirectoryToZip,
+  downloadFolderAsZip,
+  extractZipEntry,
+  getZipFolder,
+  isJunkZipEntry,
+} from "@/shared/lib/opfs-zip";
 import { downloadBlob } from "@/shared/lib/utils";
 import type { Notebook } from "../types/notebook";
 import { getNotebook, saveNotebook } from "./opfs-notebook";
@@ -15,26 +21,17 @@ function slug(raw: string): string {
   return s || "notebook";
 }
 
-function getZipFolder(parent: JSZip, name: string): JSZip {
-  const folder = parent.folder(name);
-  if (!folder) {
-    throw new Error(`Failed to create zip folder: ${name}`);
-  }
-  return folder;
-}
-
 /**
  * Reconcile an imported notebook folder with the collection index.
  *
- * Notebook metadata lives in `notebook.json` (not a format the generic
- * `rebuildFolderIndex` understands), so after extracting a folder we read it
- * back, force its id to match the folder, and re-register it via
+ * Notebook metadata lives in `notebook.json`, so after extracting a folder we
+ * read it back, force its id to match the folder, and re-register it via
  * `saveNotebook` (which writes notebook.json + the index entry).
  *
  * @param bumpUpdatedAt When true, set `updatedAt` to now so the notebook sorts
- *   to the top (used for single imports). Bulk imports preserve the original.
+ *   to the top (single-notebook share). Bulk restores preserve the original.
  */
-async function reconcileImportedNotebook(id: string, { bumpUpdatedAt }: { bumpUpdatedAt: boolean }): Promise<string> {
+async function reconcileImportedNotebook(id: string, { bumpUpdatedAt }: { bumpUpdatedAt: boolean }): Promise<void> {
   const existing = await getNotebook(id);
   const now = new Date().toISOString();
   const notebook: Notebook = {
@@ -45,11 +42,10 @@ async function reconcileImportedNotebook(id: string, { bumpUpdatedAt }: { bumpUp
     updatedAt: bumpUpdatedAt ? now : existing?.updatedAt || now,
   };
   await saveNotebook(notebook);
-  return id;
 }
 
 // ============================================================================
-// Single notebook (used by the notebook sidebar)
+// Export
 // ============================================================================
 
 /**
@@ -63,39 +59,6 @@ export async function exportNotebookAsZip(notebookId: string, title?: string): P
 }
 
 /**
- * Import a notebook from a ZIP produced by {@link exportNotebookAsZip}.
- *
- * The notebook is always imported under a fresh id (never overwrites an
- * existing one), the `notebook.json` id is reconciled with that new id, and
- * the collection index is updated so the notebook appears in the sidebar.
- *
- * @returns The id of the newly imported notebook.
- */
-export async function importNotebookFromZip(file: File): Promise<string> {
-  const zip = await JSZip.loadAsync(file);
-  const newId = crypto.randomUUID();
-  const base = `notebooks/${newId}`;
-
-  await getDirectory(base, { create: true });
-
-  for (const [relativePath, entry] of Object.entries(zip.files)) {
-    const fullPath = `${base}/${relativePath}`;
-    if (entry.dir) {
-      await getDirectory(fullPath.replace(/\/$/, ""), { create: true });
-    } else {
-      const content = await entry.async("arraybuffer");
-      await writeBlob(fullPath, new Blob([content]));
-    }
-  }
-
-  return reconcileImportedNotebook(newId, { bumpUpdatedAt: true });
-}
-
-// ============================================================================
-// Bulk (used by Settings — mirrors the agents import/export)
-// ============================================================================
-
-/**
  * Export all notebooks bundled into a single ZIP, each under
  * `notebooks/{id}/…` so the archive is self-describing.
  */
@@ -107,10 +70,9 @@ export async function exportNotebooksAsZip(): Promise<void> {
     const notebooksZip = getZipFolder(zip, "notebooks");
 
     for (const entry of index) {
-      const folder = getZipFolder(notebooksZip, entry.id);
       try {
         const handle = await getDirectory(`notebooks/${entry.id}`);
-        await addDirectoryToZip(handle, folder);
+        await addDirectoryToZip(handle, getZipFolder(notebooksZip, entry.id));
       } catch {
         /* notebook folder missing — skip */
       }
@@ -123,60 +85,61 @@ export async function exportNotebooksAsZip(): Promise<void> {
   downloadBlob(blob, `wingman-notebooks-${new Date().toISOString().split("T")[0]}.zip`);
 }
 
+// ============================================================================
+// Import
+// ============================================================================
+
 /**
- * Import notebooks from a ZIP. Supports two layouts:
- *  1. Bulk: `notebooks/{id}/…` (from {@link exportNotebooksAsZip}) — each id is
- *     preserved and merged with any existing notebook of that id.
- *  2. Flat: `notebook.json` at the root (a single-notebook export) — a fresh
- *     id is generated.
+ * Import notebooks from a ZIP. Supports both export layouts:
+ *  1. Bulk: `notebooks/{id}/…` (from {@link exportNotebooksAsZip}) — ids are
+ *     preserved and merged with any existing notebook of the same id, keeping
+ *     original timestamps.
+ *  2. Flat: `notebook.json` at the root (from {@link exportNotebookAsZip}) —
+ *     a fresh id is generated and the notebook is bumped to the top.
  *
- * Merges with existing data and rebuilds the affected index entries.
+ * Throws on archives that match neither layout.
+ *
+ * @returns The ids of the imported notebooks.
  */
-export async function importNotebooksFromZip(file: Blob): Promise<void> {
+export async function importNotebooksFromZip(file: Blob): Promise<string[]> {
   const zip = await JSZip.loadAsync(file);
-  const paths = Object.keys(zip.files);
+  const entries = Object.entries(zip.files).filter(([path]) => !isJunkZipEntry(path));
+  const paths = entries.map(([path]) => path);
+
   const isBulk = paths.some((p) => p.startsWith("notebooks/"));
   const isFlat = !isBulk && paths.some((p) => p === "notebook.json");
-
-  const importedIds = new Set<string>();
+  if (!isBulk && !isFlat) {
+    throw new Error("Unrecognized archive: expected a notebook export.");
+  }
 
   if (isFlat) {
     const newId = crypto.randomUUID();
-    for (const [relativePath, entry] of Object.entries(zip.files)) {
-      const fullPath = `notebooks/${newId}/${relativePath}`;
-      if (entry.dir) {
-        await getDirectory(fullPath.replace(/\/$/, ""), { create: true });
-      } else {
-        const content = await entry.async("arraybuffer");
-        await writeBlob(fullPath, new Blob([content]));
-      }
+    for (const [relativePath, entry] of entries) {
+      await extractZipEntry(entry, `notebooks/${newId}/${relativePath}`);
     }
-    importedIds.add(newId);
-  } else {
-    for (const [relativePath, entry] of Object.entries(zip.files)) {
-      if (!relativePath.startsWith("notebooks/")) continue;
-
-      const after = relativePath.slice("notebooks/".length);
-      if (!after) continue;
-
-      // Capture the per-notebook folder id; skip the collection index.json.
-      const id = after.split("/")[0];
-      if (!id || id === "index.json") continue;
-      importedIds.add(id);
-
-      const fullPath = `notebooks/${after}`;
-      if (entry.dir) {
-        await getDirectory(fullPath.replace(/\/$/, ""), { create: true });
-      } else {
-        const content = await entry.async("arraybuffer");
-        await writeBlob(fullPath, new Blob([content]));
-      }
-    }
+    await reconcileImportedNotebook(newId, { bumpUpdatedAt: true });
+    return [newId];
   }
 
-  for (const id of importedIds) {
+  const ids = new Set<string>();
+  for (const [relativePath, entry] of entries) {
+    if (!relativePath.startsWith("notebooks/")) continue;
+
+    const after = relativePath.slice("notebooks/".length);
+    if (!after) continue;
+
+    // Track the per-notebook folder id; skip a stray collection index.json.
+    const id = after.split("/")[0];
+    if (!id || id === "index.json") continue;
+    ids.add(id);
+
+    await extractZipEntry(entry, `notebooks/${after}`);
+  }
+
+  for (const id of ids) {
     await reconcileImportedNotebook(id, { bumpUpdatedAt: false });
   }
+  return [...ids];
 }
 
 /**
