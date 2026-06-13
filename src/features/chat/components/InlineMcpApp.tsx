@@ -168,11 +168,11 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
 
   if (isFullscreenOnly) {
     return (
-      <div className="mt-2 ml-5 mb-2">
+      <div className="mt-2 mb-2">
         <button
           type="button"
           onClick={() => expandToFullscreen()}
-          className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors py-1.5 px-2 rounded bg-neutral-100 dark:bg-neutral-800/50"
+          className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors py-1.5 px-2 rounded-md bg-neutral-100 dark:bg-neutral-900/40"
         >
           <Maximize2 size={12} />
           <span>{showAppDrawer && activeAppKey === appKey ? "Showing in panel" : "Open in panel"}</span>
@@ -183,11 +183,11 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
 
   if (displayMode === "fullscreen" && !isFullscreenOnly) {
     return (
-      <div className="mt-2 ml-5 mb-2">
+      <div className="mt-2 mb-2">
         <button
           type="button"
           onClick={() => showDrawer()}
-          className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors py-1.5 px-2 rounded bg-neutral-100 dark:bg-neutral-800/50"
+          className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors py-1.5 px-2 rounded-md bg-neutral-100 dark:bg-neutral-900/40"
         >
           <Maximize2 size={12} />
           <span>Showing in panel</span>
@@ -197,7 +197,7 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
   }
 
   return (
-    <div className="mt-2 ml-5 mb-2 relative rounded-lg overflow-hidden border border-neutral-200/60 dark:border-neutral-700/60 min-h-[60px]">
+    <div className="mt-2 mb-2 relative rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-900/40 min-h-[60px]">
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-neutral-950/80 z-10 min-h-[60px]">
           <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
