@@ -57,3 +57,17 @@ export function isTextContentType(contentType?: string): boolean {
 export function isBinaryContentType(contentType?: string): boolean {
   return !!contentType && !isTextContentType(contentType);
 }
+
+/** Match a file against a config type entry — an extension (".eml") or a MIME type ("message/rfc822"). */
+export function fileMatchesType(name: string, type: string, entry: string): boolean {
+  const e = entry.trim().toLowerCase();
+  if (!e) return false;
+  if (e.startsWith(".")) return name.toLowerCase().endsWith(e);
+  const t = type.toLowerCase();
+  return t === e || inferContentTypeFromPath(name)?.toLowerCase() === e;
+}
+
+/** Whether a file matches any entry (extension or MIME) in a config type list. */
+export function fileMatchesTypeList(name: string, type: string, list: string[]): boolean {
+  return list.some((entry) => fileMatchesType(name, type, entry));
+}

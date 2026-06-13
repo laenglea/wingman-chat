@@ -98,6 +98,8 @@ interface TextConfig {
 interface VisionConfig {
   model?: string;
   files: string[];
+  /** Max input image size in bytes; oversized images are skipped. Optional. */
+  maxFileSize?: number;
 }
 
 interface RendererConfig {
@@ -116,6 +118,13 @@ interface InternetConfig {
 interface ExtractorConfig {
   model?: string;
   files: string[];
+  /** Max file size in bytes sent to the extract endpoint; checked before upload. Optional. */
+  maxFileSize?: number;
+}
+
+interface ArtifactsConfig {
+  /** Max size in bytes for a file uploaded into the artifacts workspace. Optional. */
+  maxFileSize?: number;
 }
 
 interface RepositoryConfig {
@@ -127,6 +136,10 @@ interface TranslatorConfig {
   model?: string;
   files: string[];
   languages: string[];
+  /** Max file size in bytes; defaults to 10 MB. */
+  maxFileSize?: number;
+  /** Max input text length; defaults to 50,000. */
+  maxTextLength?: number;
 }
 
 export interface CategoryConfig {
@@ -212,7 +225,7 @@ interface ConfigSchema {
 
   memory?: object;
 
-  artifacts?: object;
+  artifacts?: ArtifactsConfig;
   repository?: RepositoryConfig;
   translator?: TranslatorConfig;
 
@@ -231,6 +244,9 @@ const DEFAULT_TTS_VOICES: Record<string, string> = {
 const DEFAULT_VISION_FILES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
 
 const DEFAULT_TRANSLATOR_LANGUAGES = ["en", "de", "fr", "it", "es"];
+
+const DEFAULT_TRANSLATE_MAX_FILE_SIZE = 10 * 1024 * 1024;
+const DEFAULT_TRANSLATE_MAX_TEXT_LENGTH = 50000;
 
 interface Config {
   title: string;
@@ -262,7 +278,7 @@ interface Config {
 
   memory: object | null;
 
-  artifacts: object | null;
+  artifacts: ArtifactsConfig | null;
   repository: RepositoryConfig | null;
   translator: TranslatorConfig | null;
 
@@ -312,11 +328,19 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       notebook: cfg.notebook ?? null,
 
       voice: cfg.voice ? { model: cfg.voice.model, transcriber: cfg.voice.transcriber } : null,
-      vision: cfg.vision ? { model: cfg.vision.model, files: cfg.vision.files ?? DEFAULT_VISION_FILES } : null,
+      vision: cfg.vision
+        ? {
+            model: cfg.vision.model,
+            files: cfg.vision.files ?? DEFAULT_VISION_FILES,
+            maxFileSize: cfg.vision.maxFileSize,
+          }
+        : null,
 
       text: cfg.text ? { files: cfg.text.files } : null,
 
-      extractor: cfg.extractor ? { model: cfg.extractor.model, files: cfg.extractor.files ?? [] } : null,
+      extractor: cfg.extractor
+        ? { model: cfg.extractor.model, files: cfg.extractor.files ?? [], maxFileSize: cfg.extractor.maxFileSize }
+        : null,
 
       internet: cfg.internet ?? null,
       renderer: cfg.renderer ?? null,
@@ -329,6 +353,8 @@ export const loadConfig = async (): Promise<Config | undefined> => {
             model: cfg.translator.model,
             files: cfg.translator.files ?? [],
             languages: cfg.translator.languages ?? DEFAULT_TRANSLATOR_LANGUAGES,
+            maxFileSize: cfg.translator.maxFileSize ?? DEFAULT_TRANSLATE_MAX_FILE_SIZE,
+            maxTextLength: cfg.translator.maxTextLength ?? DEFAULT_TRANSLATE_MAX_TEXT_LENGTH,
           }
         : null,
 

@@ -16,6 +16,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isSupportedFile } from "@/features/translate/context/TranslateContext";
 import { useTranslate } from "@/features/translate/hooks/useTranslate";
 import { getConfig } from "@/shared/config";
 import { useDropZone } from "@/shared/hooks/useDropZone";
@@ -115,20 +116,11 @@ export function TranslatePage() {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      // Get allowed MIME types from supported files
-      const allowedMimeTypes = supportedFiles.map((sf) => sf.mime);
-
-      if (allowedMimeTypes.length === 0) {
-        // If no supported files, don't allow file selection
-        return;
-      }
-
-      if (allowedMimeTypes.includes(file.type)) {
+    if (file && supportedFiles.length > 0) {
+      if (isSupportedFile(file)) {
         selectFile(file);
       } else {
-        const supportedExtensions = supportedFiles.map((sf) => sf.ext).join(", ");
-        alert(`Please select a valid file type: ${supportedExtensions}`);
+        alert(`Please select a valid file type: ${supportedFiles.map((sf) => sf.ext).join(", ")}`);
       }
     }
   };
@@ -145,19 +137,13 @@ export function TranslatePage() {
   };
 
   const handleDropFiles = (files: File[]) => {
-    const allowedMimeTypes = supportedFiles.map((sf) => sf.mime);
+    if (supportedFiles.length === 0) return;
 
-    if (allowedMimeTypes.length === 0) {
-      // If no supported files, don't allow file drop
-      return;
-    }
-
-    const file = files.find((f) => allowedMimeTypes.includes(f.type));
+    const file = files.find(isSupportedFile);
     if (file) {
       selectFile(file);
     } else {
-      const supportedExtensions = supportedFiles.map((sf) => sf.ext).join(", ");
-      alert(`Please drop a valid file type: ${supportedExtensions}`);
+      alert(`Please drop a valid file type: ${supportedFiles.map((sf) => sf.ext).join(", ")}`);
     }
   };
 

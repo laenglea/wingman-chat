@@ -6,6 +6,8 @@ import type { Content, ImageContent } from "@/shared/types/chat";
 interface UseFileAttachmentsOptions {
   visionFiles: string[];
   artifactsAvailable: boolean;
+  visionMaxFileSize?: number;
+  artifactsMaxFileSize?: number;
 }
 
 /**
@@ -32,6 +34,8 @@ export interface UseFileAttachmentsReturn {
 export function useFileAttachments({
   visionFiles,
   artifactsAvailable,
+  visionMaxFileSize,
+  artifactsMaxFileSize,
 }: UseFileAttachmentsOptions): UseFileAttachmentsReturn {
   const [attachments, setAttachments] = useState<Content[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -51,10 +55,12 @@ export function useFileAttachments({
         const effectiveFile = effectiveType !== file.type ? new File([file], file.name, { type: effectiveType }) : file;
 
         // Vision images are sent inline; any other file goes to the artifacts
-        // workspace when available (matches the artifacts drawer). Without
-        // artifacts there's nowhere to put non-image files, so they're dropped.
-        if (visionFiles.includes(effectiveType)) imageFiles.push(effectiveFile);
-        else if (artifactsAvailable) docFiles.push(effectiveFile);
+        // workspace when available. Oversized files (per config) are skipped.
+        if (visionFiles.includes(effectiveType)) {
+          if (visionMaxFileSize == null || effectiveFile.size <= visionMaxFileSize) imageFiles.push(effectiveFile);
+        } else if (artifactsAvailable) {
+          if (artifactsMaxFileSize == null || effectiveFile.size <= artifactsMaxFileSize) docFiles.push(effectiveFile);
+        }
       }
 
       // Documents: hold them pending until send. The actual write into the
@@ -90,7 +96,7 @@ export function useFileAttachments({
         });
       }
     },
-    [visionFiles, artifactsAvailable],
+    [visionFiles, artifactsAvailable, visionMaxFileSize, artifactsMaxFileSize],
   );
 
   const clearAttachments = useCallback(() => {

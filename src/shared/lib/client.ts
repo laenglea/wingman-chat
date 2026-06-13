@@ -562,15 +562,6 @@ export class Client {
   }
 
   async translate(lang: string, input: string | Blob): Promise<string | Blob> {
-    if (input instanceof Blob && input.size > 10 * 1024 * 1024) {
-      throw new Error(`File size ${(input.size / 1024 / 1024).toFixed(1)}MB exceeds the maximum limit of 10MB`);
-    }
-    if (typeof input === "string" && input.length > 50000) {
-      throw new Error(
-        `Text length ${input.length.toLocaleString()} characters exceeds the maximum limit of 50,000 characters`,
-      );
-    }
-
     const data = new FormData();
     data.append("lang", lang);
     const headers: Record<string, string> = {};

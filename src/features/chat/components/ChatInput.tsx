@@ -91,7 +91,12 @@ export function ChatInput() {
     handleFiles,
     clearAttachments,
     removeAttachment,
-  } = useFileAttachments({ visionFiles: config.vision?.files ?? [], artifactsAvailable });
+  } = useFileAttachments({
+    visionFiles: config.vision?.files ?? [],
+    artifactsAvailable,
+    visionMaxFileSize: config.vision?.maxFileSize,
+    artifactsMaxFileSize: config.artifacts?.maxFileSize,
+  });
 
   const [activeDrive, setActiveDrive] = useState<(typeof config.drives)[number] | null>(null);
 

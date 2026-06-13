@@ -1,8 +1,9 @@
 import { getConfig } from "@/shared/config";
 import { docxToMarkdown } from "./docx";
-import { inferContentTypeFromPath, isTextContentType } from "./fileTypes";
+import { fileMatchesTypeList, inferContentTypeFromPath, isTextContentType } from "./fileTypes";
 import { pdfToMarkdown } from "./pdf";
 import { pptxToMarkdown } from "./pptx";
+import { formatBytes } from "./utils";
 import { csvToMarkdownTable, xlsxToCsv } from "./xlsx";
 
 // MIME constants
@@ -160,9 +161,9 @@ function converterKind(file: File, textTypes?: string[], extraTypes?: string[]):
 
   if (isTextContentType(type || inferContentTypeFromPath(name))) return "text";
 
-  if (textTypes?.some((t) => (t.startsWith(".") ? name.endsWith(t) : type === t))) return "text";
+  if (textTypes && fileMatchesTypeList(name, type, textTypes)) return "text";
 
-  if (extraTypes?.some((t) => (t.startsWith(".") ? name.endsWith(t) : type === t))) return "backend";
+  if (extraTypes && fileMatchesTypeList(name, type, extraTypes)) return "backend";
 
   return null;
 }
@@ -186,8 +187,14 @@ export async function convertFileToText(file: File): Promise<string> {
   const config = getConfig();
   const kind = converterKind(file, config.text?.files, config.extractor?.files);
 
+  // Optional extractor size cap. For builtin types the backend is only a quality
+  // boost over the client-side converters, so an oversized file simply skips it;
+  // for backend-only types it's the sole path → reject with a clear message.
+  const extractLimit = config.extractor?.maxFileSize;
+  const overExtractLimit = extractLimit != null && file.size > extractLimit;
+
   // Try API extraction first for non-text builtin types
-  if (config.extractor && kind === "builtin") {
+  if (config.extractor && kind === "builtin" && !overExtractLimit) {
     try {
       const text = await config.client.extractText(file);
       if (text?.trim()) return text;
@@ -198,6 +205,11 @@ export async function convertFileToText(file: File): Promise<string> {
 
   // Backend-only types → extractText is the only path
   if (kind === "backend") {
+    if (overExtractLimit) {
+      throw new Error(
+        `${file.name} is ${formatBytes(file.size)}, over the ${formatBytes(extractLimit as number)} extract limit`,
+      );
+    }
     return config.client.extractText(file);
   }
 

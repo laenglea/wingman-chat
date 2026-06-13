@@ -1,7 +1,8 @@
+import { getConfig } from "@/shared/config";
 import { readFileAsText } from "@/shared/lib/convert";
 import { inferContentTypeFromPath, isTextContentType } from "@/shared/lib/fileTypes";
 import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "@/shared/lib/mediaTypes";
-import { fileExtension, readAsDataURL } from "@/shared/lib/utils";
+import { fileExtension, formatBytes, readAsDataURL } from "@/shared/lib/utils";
 
 // Artifact kind type
 export type ArtifactKind =
@@ -45,6 +46,11 @@ const BINARY_PRESERVED_MIME_BY_EXT: Record<string, string> = {
 // Process an uploaded file, preserving office docs / PDFs / email files as
 // binary so previewers and Python tools can use the originals.
 export async function processUploadedFile(file: File): Promise<ProcessedFile[]> {
+  const maxFileSize = getConfig().artifacts?.maxFileSize;
+  if (maxFileSize != null && file.size > maxFileSize) {
+    throw new Error(`${file.name} is ${formatBytes(file.size)}, over the ${formatBytes(maxFileSize)} limit`);
+  }
+
   const ext = fileExtension(file.name);
 
   if (BINARY_PRESERVED_MIME_BY_EXT[ext]) {
