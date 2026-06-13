@@ -52,6 +52,21 @@ function expandToSentences(text: string, start: number, end: number): string {
   return text.substring(sentenceStart, sentenceEnd).trim();
 }
 
+// mime.getExtension is lossy for audio containers — it maps audio/webm to
+// ".weba" and audio/ogg to ".oga", neither of which the transcription endpoint
+// accepts (it allows mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm, flac). Map the
+// types we send to an accepted extension before falling back to mime.
+const TRANSCRIBE_EXTENSIONS: Record<string, string> = {
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/opus": "ogg",
+  "audio/mp4": "m4a",
+  "audio/aac": "m4a",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/flac": "flac",
+};
+
 export class Client {
   private oai: OpenAI;
 
@@ -665,7 +680,9 @@ export class Client {
   }
 
   async transcribe(model: string, blob: Blob): Promise<string> {
-    const extension = mime.getExtension(blob.type) || "audio";
+    // Strip any ";codecs=…" parameter (MediaRecorder emits "audio/webm;codecs=opus").
+    const baseType = blob.type.split(";")[0].trim();
+    const extension = TRANSCRIBE_EXTENSIONS[baseType] || mime.getExtension(baseType) || "audio";
     const file = new File([blob], `audio_recording.${extension}`, { type: blob.type });
     const result = await (await this.post("/api/v1/audio/transcriptions", { file, ...(model && { model }) })).json();
     return result.text || "";

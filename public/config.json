@@ -1,74 +1,55 @@
 {
-    "vision": {},
+  "vision": {},
 
-    "stt": {},
+  "stt": {},
 
-    "tts": {},
+  "tts": {},
 
-    "voice": {},
+  "voice": {},
 
-    "artifacts": {},
+  "artifacts": {},
 
-    "repository": {},
+  "repository": {},
 
-    "renderer": {},
+  "renderer": {},
 
-    "extractor": {
-        "files": [
-            ".pdf",
-            ".doc",
-            ".docx",
-            ".xls",
-            ".xlsx",
-            ".ppt",
-            ".pptx"
-        ]
-    },
+  "extractor": {
+    "files": [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"]
+  },
 
-    "internet": {
-        "elicitation": true,
-        "searcher": "web",
-        "scraper": "web",
-        "researcher": "web"
-    },
+  "internet": {
+    "elicitation": true,
+    "searcher": "web",
+    "scraper": "web",
+    "researcher": "web"
+  },
 
-    "notebook": {},
+  "notebook": {},
 
-    "telemetry": {},
+  "_telemetry": {},
 
-    "_models": [
-        {
-            "id": "gpt-5.1",
+  "_models": [
+    {
+      "id": "gpt-5.1",
 
-            "name": "GPT-5.1",
-            "description": "Default Model",
+      "name": "GPT-5.1",
+      "description": "Default Model",
 
-            "instructions": "You are a helpful assistant. Today is {{date}}."
-        }
-    ],
-
-
-    "_tools": [
-        {
-            "id": "web",
-            "name": "Web",
-            "description": "Search and browse the web"
-        }
-    ],
-
-    "translator": {
-        "files": [
-            ".pdf"
-        ],
-
-        "languages": [
-            "en",
-            "es",
-            "fr",
-            "de",
-            "zh",
-            "ja",
-            "ru"
-        ]
+      "instructions": "You are a helpful assistant. Today is {{date}}."
     }
+  ],
+
+  "_tools": [
+    {
+      "id": "web",
+      "name": "Web",
+      "description": "Search and browse the web"
+    }
+  ],
+
+  "translator": {
+    "files": [".pdf"],
+
+    "languages": ["en", "es", "fr", "de", "zh", "ja", "ru"]
+  }
 }

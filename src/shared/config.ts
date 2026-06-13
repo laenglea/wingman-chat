@@ -41,8 +41,19 @@ interface TTSConfig {
   voices?: Record<string, string>;
 }
 
+/**
+ * Container/codec the audio is re-encoded to before upload when transcribing a
+ * video. Defaults to `opus` (Opus in Ogg) — the smallest broadly-accepted form.
+ * `opus`/`webm` need a WebCodecs Opus encoder and `mp4` an AAC encoder — all fall
+ * back to `wav` (pure-JS, universal but ~8x larger) when the browser can't encode
+ * them. Container choice rarely matters; model input-length caps (e.g. OpenAI
+ * gpt-4o-transcribe ~23 min) are a separate, model-specific limit.
+ */
+export type STTFormat = "opus" | "webm" | "wav" | "mp4";
+
 interface STTConfig {
   model?: string;
+  format?: STTFormat;
 }
 
 interface NotebookStyleBase {

@@ -12,7 +12,9 @@ const ARTIFACT_REFERENCE_PREFIX = "Attached files (available in the artifacts wo
 
 /** Build the model-facing reference line for files attached to a message. */
 export function formatArtifactReference(paths: string[]): string {
-  return `${ARTIFACT_REFERENCE_PREFIX}${paths.join(", ")}`;
+  // Newline-separated, not comma: filenames may contain commas (e.g.
+  // "clip (1080p, h264).mp4") but never newlines, so this round-trips cleanly.
+  return `${ARTIFACT_REFERENCE_PREFIX}${paths.join("\n")}`;
 }
 
 /** Extract artifact paths from a reference line, or [] if it isn't one. */
@@ -20,7 +22,7 @@ export function parseArtifactReference(text: string): string[] {
   if (!text.startsWith(ARTIFACT_REFERENCE_PREFIX)) return [];
   return text
     .slice(ARTIFACT_REFERENCE_PREFIX.length)
-    .split(",")
+    .split("\n")
     .map((p) => p.trim())
     .filter(Boolean);
 }

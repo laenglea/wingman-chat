@@ -8,6 +8,10 @@ interface UseFileAttachmentsOptions {
   artifactsAvailable: boolean;
 }
 
+// Audio/video can't be converted to text, but the artifacts workspace stores
+// them verbatim so the `transcribe` tool can read them.
+const isMediaType = (type: string) => type.startsWith("audio/") || type.startsWith("video/");
+
 export interface UseFileAttachmentsReturn {
   attachments: Content[];
   pendingFiles: File[];
@@ -40,10 +44,11 @@ export function useFileAttachments({
             : (lookupContentType(file.name.split(".").pop() ?? "") ?? file.type);
         const effectiveFile = effectiveType !== file.type ? new File([file], file.name, { type: effectiveType }) : file;
 
-        // Documents require the artifacts workspace; without it, only images
-        // are accepted in chat (the file picker hides doc types too).
+        // Documents and media need the artifacts workspace; without it, only
+        // images are accepted in chat (the file picker hides those types too).
         if (visionFiles.includes(effectiveType)) imageFiles.push(effectiveFile);
-        else if (artifactsAvailable && canConvert(effectiveFile)) docFiles.push(effectiveFile);
+        else if (artifactsAvailable && (canConvert(effectiveFile) || isMediaType(effectiveType)))
+          docFiles.push(effectiveFile);
       }
 
       // Documents: hold them pending until send. The actual write into the

@@ -140,10 +140,14 @@ export function ChatInput() {
 
   const placeholderText = messages.length === 0 ? randomPlaceholder : "Ask anything";
 
-  // Accepted upload types: always images; document types only when the
-  // artifacts workspace is available to hold them.
+  // Accepted upload types: always images; document and media types only when
+  // the artifacts workspace is available to hold them. Audio/video aren't
+  // converted to text — artifacts stores them verbatim for the `transcribe` tool.
   const acceptString = useMemo(
-    () => [...(config.vision?.files ?? []), ...(artifactsAvailable ? acceptTypes() : [])].join(","),
+    () =>
+      [...(config.vision?.files ?? []), ...(artifactsAvailable ? [...acceptTypes(), "audio/*", "video/*"] : [])].join(
+        ",",
+      ),
     [config.vision?.files, artifactsAvailable],
   );
 

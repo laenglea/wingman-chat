@@ -3,6 +3,7 @@ import { getConfig } from "@/shared/config";
 import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
 import { getFileName } from "@/shared/lib/utils";
 import { defineFileToTextCommand, resolveModel } from "./commandUtils";
+import { extractAudioForTranscription } from "./extractAudio";
 
 export async function runTranscribe(bytes: Uint8Array, path: string): Promise<string> {
   const config = getConfig();
@@ -22,8 +23,26 @@ export async function runTranscribe(bytes: Uint8Array, path: string): Promise<st
   }
 
   const model = await resolveModel(config.stt.model, "transcriber");
-  const text = await config.client.transcribe(model, new Blob([bytes as BlobPart], { type }));
-  console.debug(`transcribe: ${path} (${type}, ${bytes.length} bytes) → ${text.length} chars`);
+
+  // Video containers carry a large video track around a small audio one. Strip
+  // the video and re-encode the audio to a compact file in the browser so long
+  // recordings stay under the endpoint's upload limit; audio files upload as-is.
+  let audio: Blob;
+  if (type.startsWith("video/")) {
+    try {
+      audio = await extractAudioForTranscription(bytes, type, config.stt.format);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`transcribe: ${message}: ${name}`);
+    }
+  } else {
+    audio = new Blob([bytes as BlobPart], { type });
+  }
+
+  const text = await config.client.transcribe(model, audio);
+  console.debug(
+    `transcribe: ${path} (${type}, ${bytes.length} bytes → ${audio.type}, ${audio.size} bytes) → ${text.length} chars`,
+  );
   return text;
 }
 
