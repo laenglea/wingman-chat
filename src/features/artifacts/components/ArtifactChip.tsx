@@ -56,16 +56,16 @@ export const ArtifactChip = memo(function ArtifactChip({ path, className }: { pa
       title={exists ? `Open ${path}` : `${path} (no longer available)`}
       aria-label={exists ? `Open ${path}` : `${path} (no longer available)`}
       className={cn(
-        "group/artifact inline-flex items-center gap-3 rounded-lg border px-3 py-2 text-left align-top transition-colors",
-        "w-72 max-w-full",
+        "group/artifact inline-flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left align-top transition-colors",
+        "max-w-xs",
         exists
-          ? "border-neutral-200 bg-neutral-50 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800/60 dark:hover:bg-neutral-700/60"
-          : "cursor-not-allowed border-neutral-200/60 bg-neutral-50/50 opacity-50 dark:border-neutral-700/50 dark:bg-neutral-800/30",
+          ? "bg-neutral-100 hover:bg-neutral-200/70 dark:bg-neutral-900/40 dark:hover:bg-neutral-800/50"
+          : "cursor-not-allowed bg-neutral-100/50 opacity-50 dark:bg-neutral-900/20",
         className,
       )}
     >
       <span className="relative shrink-0">
-        <File className="h-9 w-9 text-neutral-400 dark:text-neutral-500" strokeWidth={1.5} />
+        <File className="h-7 w-7 text-neutral-400 dark:text-neutral-500" strokeWidth={1.5} />
         {ext && (
           <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded bg-neutral-500 px-1 text-[8px] font-bold leading-snug text-white dark:bg-neutral-600">
             {ext}
@@ -73,18 +73,13 @@ export const ArtifactChip = memo(function ArtifactChip({ path, className }: { pa
         )}
       </span>
 
-      <span className="min-w-0 flex-1">
-        <span
-          className={cn(
-            "block truncate text-sm font-medium text-neutral-700 dark:text-neutral-200",
-            !exists && "line-through",
-          )}
-        >
-          {name}
-        </span>
-        <span className="block text-xs text-neutral-400 dark:text-neutral-500">
-          {exists ? "Open in artifacts" : "No longer available"}
-        </span>
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-sm font-medium text-neutral-700 dark:text-neutral-200",
+          !exists && "line-through",
+        )}
+      >
+        {name}
       </span>
 
       {exists && (

@@ -394,7 +394,7 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
         )}
 
         {turnArtifactPaths.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 mb-2 flex flex-wrap gap-2">
             {turnArtifactPaths.map((path) => (
               <ArtifactChip key={path} path={path} />
             ))}

@@ -73,16 +73,16 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
         const parsed = JSON.parse(text);
         const sanitized = sanitizeForDisplay(parsed);
         const formatted = JSON.stringify(sanitized, null, 2);
-        return <CodeRenderer code={formatted} language="json" name={name} />;
+        return <CodeRenderer code={formatted} language="json" name={name} subtle />;
       } catch {
         // Not JSON, render as text
-        return <CodeRenderer code={text} language="text" name={name} />;
+        return <CodeRenderer code={text} language="text" name={name} subtle />;
       }
     } else {
       // Content[] with mixed types - sanitize and stringify for display
       const sanitized = sanitizeForDisplay(content);
       const formatted = JSON.stringify(sanitized, null, 2);
-      return <CodeRenderer code={formatted} language="json" name={name} />;
+      return <CodeRenderer code={formatted} language="json" name={name} subtle />;
     }
   };
 
@@ -130,7 +130,7 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
         </button>
 
         {toolResultExpanded && (
-          <div className="ml-4.5 mt-2">
+          <div className="mt-1">
             {codeData ? (
               <CodeRenderer code={codeData.code} language={codeData.language} />
             ) : (
@@ -138,7 +138,7 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
             )}
             {(message.error || toolResult?.result) &&
               (message.error ? (
-                <CodeRenderer code={message.error.message} language="text" name="Error" />
+                <CodeRenderer code={message.error.message} language="text" name="Error" subtle />
               ) : (
                 renderContent(toolResult?.result || [], "Result")
               ))}

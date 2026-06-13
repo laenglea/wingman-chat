@@ -22,11 +22,13 @@ import rehypeNotoEmoji from "@/shared/lib/rehype-noto-emoji";
 import { useAssetUrlResolver } from "@/shared/lib/useAssetUrlResolver";
 import { downloadBlob } from "@/shared/lib/utils";
 import type { FileSystem } from "@/shared/types/file";
+import { ACTION_ICON_SIZE, actionButtonClassName } from "./actionButton";
 import { CodeRenderer } from "./CodeRenderer";
 import { MediaPlayer } from "./MediaPlayer";
 import { CsvRenderer } from "./renderers/CsvRenderer";
 import { HtmlRenderer } from "./renderers/HtmlRenderer";
 import { MarkdownRenderer } from "./renderers/MarkdownRenderer";
+import { RendererFrame } from "./renderers/RendererFrame";
 import { SvgRenderer } from "./renderers/SvgRenderer";
 
 const markdownLinkClassName =
@@ -378,12 +380,7 @@ function ResizableTable({
         <table
           ref={setTableElement}
           {...props}
-          className={cn(
-            "border-collapse border border-neutral-300 dark:border-neutral-700",
-            !widths && "w-full",
-            isResizing && "select-none",
-            className,
-          )}
+          className={cn("border-collapse", !widths && "w-full", isResizing && "select-none", className)}
           style={tableStyle}
         >
           {widths && (
@@ -454,38 +451,39 @@ function MarkdownTable({ children, ...props }: React.TableHTMLAttributes<HTMLTab
     }
   }, []);
 
-  const actionButtonClassName =
-    "flex items-center gap-1 py-0.5 px-1.5 rounded text-[11px] text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors disabled:opacity-40 disabled:pointer-events-none";
-
   return (
     <>
-      <div className="my-4">
-        <div className="flex justify-end gap-1 mb-1">
-          <button
-            type="button"
-            onClick={copyTable}
-            className={actionButtonClassName}
-            title="Copy table for Excel"
-            aria-label="Copy table for Excel"
-          >
-            {copied ? <CopyCheck size={11} /> : <Copy size={11} />}
-            <span>{copied ? "Copied" : "Copy"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsFullscreen(true)}
-            className={actionButtonClassName}
-            title="Open in full screen"
-            aria-label="Open table in full screen"
-          >
-            <Maximize2 size={11} />
-            <span>Full screen</span>
-          </button>
-        </div>
+      <RendererFrame
+        label=""
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={copyTable}
+              className={actionButtonClassName}
+              title="Copy table for Excel"
+              aria-label="Copy table for Excel"
+            >
+              {copied ? <CopyCheck size={ACTION_ICON_SIZE} /> : <Copy size={ACTION_ICON_SIZE} />}
+              <span>{copied ? "Copied" : "Copy"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(true)}
+              className={actionButtonClassName}
+              title="Open in full screen"
+              aria-label="Open table in full screen"
+            >
+              <Maximize2 size={ACTION_ICON_SIZE} />
+              <span>Full screen</span>
+            </button>
+          </>
+        }
+      >
         <ResizableTable {...props} onTableElement={setInlineTableElement}>
           {children}
         </ResizableTable>
-      </div>
+      </RendererFrame>
 
       <Transition appear show={isFullscreen} as={Fragment}>
         <Dialog as="div" className="relative z-80" onClose={() => setIsFullscreen(false)}>
@@ -510,7 +508,7 @@ function MarkdownTable({ children, ...props }: React.TableHTMLAttributes<HTMLTab
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Dialog.Panel className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-900">
+            <Dialog.Panel className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-950">
               <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-neutral-200 dark:border-neutral-800 shrink-0">
                 <div className="flex items-center gap-1">
                   <button
@@ -740,7 +738,7 @@ function createComponents(
     },
     thead: ({ children, ...props }) => {
       return (
-        <thead className="bg-neutral-200 dark:bg-neutral-800" {...props}>
+        <thead className="bg-neutral-100 dark:bg-neutral-900" {...props}>
           {children}
         </thead>
       );
@@ -749,16 +747,12 @@ function createComponents(
       return <tbody {...props}>{children}</tbody>;
     },
     tr: ({ children, ...props }) => {
-      return (
-        <tr className="border-b border-neutral-300 dark:border-neutral-700" {...props}>
-          {children}
-        </tr>
-      );
+      return <tr {...props}>{children}</tr>;
     },
     th: ({ children, ...props }) => {
       return (
         <th
-          className="p-2 text-left font-semibold border-r last:border-r-0 border-neutral-300 dark:border-neutral-700"
+          className="px-3 py-2 text-left text-sm font-semibold border-r last:border-r-0 border-neutral-200 dark:border-neutral-600"
           {...props}
         >
           {children}
@@ -767,7 +761,10 @@ function createComponents(
     },
     td: ({ children, ...props }) => {
       return (
-        <td className="p-2 border-r last:border-r-0 border-neutral-300 dark:border-neutral-700" {...props}>
+        <td
+          className="px-3 py-2 text-sm border-r last:border-r-0 border-neutral-200 dark:border-neutral-600"
+          {...props}
+        >
           {children}
         </td>
       );
