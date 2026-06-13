@@ -1,6 +1,7 @@
 import { readFileAsText } from "@/shared/lib/convert";
 import { inferContentTypeFromPath, isTextContentType } from "@/shared/lib/fileTypes";
-import { readAsDataURL } from "@/shared/lib/utils";
+import { AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS } from "@/shared/lib/mediaTypes";
+import { fileExtension, readAsDataURL } from "@/shared/lib/utils";
 
 // Artifact kind type
 export type ArtifactKind =
@@ -44,8 +45,7 @@ const BINARY_PRESERVED_MIME_BY_EXT: Record<string, string> = {
 // Process an uploaded file, preserving office docs / PDFs / email files as
 // binary so previewers and Python tools can use the originals.
 export async function processUploadedFile(file: File): Promise<ProcessedFile[]> {
-  const fileName = file.name.toLowerCase();
-  const ext = fileName.split(".").pop() || "";
+  const ext = fileExtension(file.name);
 
   if (BINARY_PRESERVED_MIME_BY_EXT[ext]) {
     const contentType = file.type || BINARY_PRESERVED_MIME_BY_EXT[ext];
@@ -131,9 +131,7 @@ export function artifactKind(path: string, contentType?: string): ArtifactKind {
     return "markdown";
   }
 
-  const imageExtensions = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico", "avif", "tif", "tiff"];
-
-  if (normalizedContentType?.startsWith("image/") || imageExtensions.includes(ext)) {
+  if (normalizedContentType?.startsWith("image/") || IMAGE_EXTENSIONS.has(ext)) {
     return "image";
   }
 
@@ -278,14 +276,11 @@ export function artifactKind(path: string, contentType?: string): ArtifactKind {
 
   // Audio/video for the media player. Checked after code extensions because
   // browsers report odd MIME types for some code files (.ts → video/mp2t).
-  const audioExtensions = ["mp3", "wav", "ogg", "oga", "m4a", "aac", "flac", "opus", "weba"];
-  const videoExtensions = ["mp4", "webm", "mov", "m4v", "ogv", "avi", "mkv", "wmv"];
-
-  if (normalizedContentType?.startsWith("audio/") || audioExtensions.includes(ext)) {
+  if (normalizedContentType?.startsWith("audio/") || AUDIO_EXTENSIONS.has(ext)) {
     return "audio";
   }
 
-  if (normalizedContentType?.startsWith("video/") || videoExtensions.includes(ext)) {
+  if (normalizedContentType?.startsWith("video/") || VIDEO_EXTENSIONS.has(ext)) {
     return "video";
   }
 

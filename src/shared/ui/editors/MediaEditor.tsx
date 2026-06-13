@@ -1,38 +1,13 @@
 import { FileX2 } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
-import { getFileName } from "@/shared/lib/utils";
+import { decodeDataURL, getFileName } from "@/shared/lib/utils";
 
 interface MediaEditorProps {
   path: string;
   /** Data URL with the media bytes. */
   content: string;
   contentType?: string;
-}
-
-/**
- * Decode a base64 `data:` URL into a `blob:` object URL. Media elements
- * (`<video>`/`<audio>`) reject `data:` URLs in WebKit/Safari ("Not allowed to
- * load local resource"), and a blob also avoids holding the whole file as an
- * inflated base64 string in the element. Returns null if it isn't a data URL.
- */
-function dataUrlToObjectUrl(dataUrl: string): string | null {
-  const match = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(dataUrl);
-  if (!match) return null;
-  const [, mime, base64, data] = match;
-  try {
-    let bytes: Uint8Array;
-    if (base64) {
-      const binary = atob(data);
-      bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    } else {
-      bytes = new TextEncoder().encode(decodeURIComponent(data));
-    }
-    return URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime || "application/octet-stream" }));
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -45,8 +20,9 @@ export const MediaEditor = memo(function MediaEditor({ path, content, contentTyp
   const type = contentType ?? inferContentTypeFromPath(path);
   const isVideo = !!type?.startsWith("video/");
 
-  // Play from a blob: URL — Safari blocks data: URLs in media elements. Pass
-  // through non-data URLs (e.g. blob:/https:) unchanged.
+  // Play from a blob: URL — Safari blocks data: URLs in media elements (and a
+  // blob avoids inflating the whole file as a base64 string in the element).
+  // Pass through non-data URLs (e.g. blob:/https:) unchanged.
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     setFailed(false);
@@ -54,8 +30,10 @@ export const MediaEditor = memo(function MediaEditor({ path, content, contentTyp
       setSrc(content);
       return;
     }
-    const url = dataUrlToObjectUrl(content);
-    if (!url) {
+    let url: string;
+    try {
+      url = URL.createObjectURL(decodeDataURL(content));
+    } catch {
       setFailed(true);
       return;
     }

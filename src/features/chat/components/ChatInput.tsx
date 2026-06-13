@@ -18,7 +18,7 @@ import { useAgents } from "@/features/agent/hooks/useAgents";
 import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
 import { processUploadedFile } from "@/features/artifacts/lib/artifacts";
 import { useChat } from "@/features/chat/hooks/useChat";
-import { useFileAttachments } from "@/features/chat/hooks/useFileAttachments";
+import { chatAcceptString, useFileAttachments } from "@/features/chat/hooks/useFileAttachments";
 import { useScreenCapture } from "@/features/chat/hooks/useScreenCapture";
 import { useSettings } from "@/features/settings/hooks/useSettings";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
@@ -27,7 +27,6 @@ import { useVoice } from "@/features/voice/hooks/useVoice";
 import { getConfig } from "@/shared/config";
 import { useDropZone } from "@/shared/hooks/useDropZone";
 import { cn } from "@/shared/lib/cn";
-import { acceptTypes } from "@/shared/lib/convert";
 import { getDriveContentUrl } from "@/shared/lib/drives";
 import { readAsDataURL } from "@/shared/lib/utils";
 import type { Content, ImageContent, Message, TextContent, ToolProvider } from "@/shared/types/chat";
@@ -140,14 +139,10 @@ export function ChatInput() {
 
   const placeholderText = messages.length === 0 ? randomPlaceholder : "Ask anything";
 
-  // Accepted upload types: always images; document and media types only when
-  // the artifacts workspace is available to hold them. Audio/video aren't
-  // converted to text — artifacts stores them verbatim for the `transcribe` tool.
+  // Accept-attribute kept in sync with the intake rule in `useFileAttachments`:
+  // images always; any file when the artifacts workspace can hold it.
   const acceptString = useMemo(
-    () =>
-      [...(config.vision?.files ?? []), ...(artifactsAvailable ? [...acceptTypes(), "audio/*", "video/*"] : [])].join(
-        ",",
-      ),
+    () => chatAcceptString(config.vision?.files ?? [], artifactsAvailable),
     [config.vision?.files, artifactsAvailable],
   );
 
@@ -559,16 +554,25 @@ export function ChatInput() {
 
                     const text = e.clipboardData.getData("text/plain");
 
-                    const imageItems = Array.from(e.clipboardData.items)
-                      .filter((item) => item.type.startsWith("image/"))
+                    // Any pasted file (image, doc, media, …) routes to handleFiles,
+                    // which decides inline-vision vs artifacts. Read synchronously —
+                    // clipboard items are only valid during the event.
+                    const fileItems = Array.from(e.clipboardData.items)
+                      .filter((item) => item.kind === "file")
                       .map((item) => item.getAsFile())
                       .filter(Boolean) as File[];
 
-                    const input = e.currentTarget;
-                    const selectionStart = input.selectionStart ?? content.length;
-                    const selectionEnd = input.selectionEnd ?? content.length;
+                    // A pasted file may also expose a text/plain representation (e.g.
+                    // an OS file copy yields the filename) — don't pollute the textarea.
+                    if (fileItems.length > 0) {
+                      await handleFiles(fileItems);
+                      return;
+                    }
 
                     if (text.trim()) {
+                      const input = e.currentTarget;
+                      const selectionStart = input.selectionStart ?? content.length;
+                      const selectionEnd = input.selectionEnd ?? content.length;
                       const nextContent = `${content.slice(0, selectionStart)}${text}${content.slice(selectionEnd)}`;
                       setContent(nextContent);
 
@@ -576,10 +580,6 @@ export function ChatInput() {
                         const nextPosition = selectionStart + text.length;
                         input.setSelectionRange(nextPosition, nextPosition);
                       });
-                    }
-
-                    if (imageItems.length > 0) {
-                      await handleFiles(imageItems);
                     }
                   }}
                   aria-label="Chat message input"

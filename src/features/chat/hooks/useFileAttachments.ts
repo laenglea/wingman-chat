@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { canConvert } from "@/shared/lib/convert";
-import { lookupContentType, readAsDataURL, resizeImageBlob } from "@/shared/lib/utils";
+import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
+import { readAsDataURL, resizeImageBlob } from "@/shared/lib/utils";
 import type { Content, ImageContent } from "@/shared/types/chat";
 
 interface UseFileAttachmentsOptions {
@@ -8,9 +8,15 @@ interface UseFileAttachmentsOptions {
   artifactsAvailable: boolean;
 }
 
-// Audio/video can't be converted to text, but the artifacts workspace stores
-// them verbatim so the `transcribe` tool can read them.
-const isMediaType = (type: string) => type.startsWith("audio/") || type.startsWith("video/");
+/**
+ * Accept-attribute for the chat file picker, kept in sync with `handleFiles`'
+ * intake rule (single source of truth): vision images always; any file when the
+ * artifacts workspace is available to hold it ("" = browser shows all files,
+ * matching the artifacts drawer). Without artifacts, only vision images.
+ */
+export function chatAcceptString(visionFiles: string[], artifactsAvailable: boolean): string {
+  return artifactsAvailable ? "" : visionFiles.join(",");
+}
 
 export interface UseFileAttachmentsReturn {
   attachments: Content[];
@@ -41,14 +47,14 @@ export function useFileAttachments({
         const effectiveType =
           file.type && file.type !== "application/octet-stream"
             ? file.type
-            : (lookupContentType(file.name.split(".").pop() ?? "") ?? file.type);
+            : (inferContentTypeFromPath(file.name) ?? file.type);
         const effectiveFile = effectiveType !== file.type ? new File([file], file.name, { type: effectiveType }) : file;
 
-        // Documents and media need the artifacts workspace; without it, only
-        // images are accepted in chat (the file picker hides those types too).
+        // Vision images are sent inline; any other file goes to the artifacts
+        // workspace when available (matches the artifacts drawer). Without
+        // artifacts there's nowhere to put non-image files, so they're dropped.
         if (visionFiles.includes(effectiveType)) imageFiles.push(effectiveFile);
-        else if (artifactsAvailable && (canConvert(effectiveFile) || isMediaType(effectiveType)))
-          docFiles.push(effectiveFile);
+        else if (artifactsAvailable) docFiles.push(effectiveFile);
       }
 
       // Documents: hold them pending until send. The actual write into the

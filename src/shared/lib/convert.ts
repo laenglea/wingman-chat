@@ -167,15 +167,6 @@ function converterKind(file: File, textTypes?: string[], extraTypes?: string[]):
   return null;
 }
 
-/** Whether this module can convert the given file (includes extra types from config). */
-export function canConvert(file: File): boolean {
-  // Images are handled by the caller (stored verbatim as binary sources),
-  // but we advertise them as accepted so the picker lets them through.
-  if (file.type.startsWith("image/")) return true;
-  const config = getConfig();
-  return converterKind(file, config.text?.files, config.extractor?.files) !== null;
-}
-
 /** All accepted file types (SUPPORTED_TYPES + text files + extractor files from config). */
 export function acceptTypes(): string[] {
   const config = getConfig();

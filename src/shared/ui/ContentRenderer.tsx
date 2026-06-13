@@ -2,7 +2,7 @@ import { Download, File } from "lucide-react";
 import mime from "mime";
 import { cn } from "@/shared/lib/cn";
 import { dataUrlToBytes } from "@/shared/lib/fileContent";
-import { downloadBlob, downloadFromUrl, formatBytes, getFileExt } from "@/shared/lib/utils";
+import { downloadBlob, downloadFromUrl, fileExtension, formatBytes } from "@/shared/lib/utils";
 import type { AudioContent, Content, FileContent, ImageContent } from "@/shared/types/chat";
 import { Markdown } from "./Markdown";
 import { CsvRenderer } from "./renderers/CsvRenderer";
@@ -125,7 +125,7 @@ function FileDisplay({ content, className }: { content: FileContent; className?:
     downloadContent(content.data, content.name, mimeType);
   };
 
-  const ext = getFileExt(content.name).slice(1).toUpperCase();
+  const ext = fileExtension(content.name).toUpperCase();
   const size = fileSizeLabel(content.data);
 
   return (
