@@ -22,6 +22,7 @@ import { getConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
 import { getDriveContentUrl } from "@/shared/lib/drives";
 import { markdownToDocx } from "@/shared/lib/markdownToDocx";
+import { notify } from "@/shared/lib/notify";
 import { downloadBlob, getFileName } from "@/shared/lib/utils";
 import type { File, FileEntry } from "@/shared/types/file";
 import { DrivePicker, type SelectedFile } from "@/shared/ui/DrivePicker";
@@ -98,6 +99,7 @@ export function ArtifactsDrawer() {
             }
           } catch (error) {
             console.error(`Error uploading file ${file.name}:`, error);
+            notify.error("Upload failed", error instanceof Error ? error.message : `"${file.name}" couldn't be added.`);
           }
         }
       } finally {
@@ -945,7 +947,7 @@ export function ArtifactsDrawer() {
                     await fs.downloadAsZip();
                   } catch (error) {
                     console.error("Failed to download files:", error);
-                    alert("Failed to download files. Please try again.");
+                    notify.error("Download failed", "The files couldn't be downloaded. Please try again.");
                   }
                 }}
                 onDownloadFile={async (path) => {

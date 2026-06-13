@@ -33,6 +33,8 @@ import { rebuildAllIndexes } from "@/features/settings/lib/rebuildIndexes";
 import { useToolsContext } from "@/features/tools";
 import { COMPANION_ID } from "@/features/tools/hooks/useCompanion";
 import { cn } from "@/shared/lib/cn";
+import { confirm } from "@/shared/lib/confirm";
+import { notify } from "@/shared/lib/notify";
 import { clearAll, deleteDirectory, getStorageUsage, removeIndexEntry } from "@/shared/lib/opfs";
 import { downloadFolderAsZip } from "@/shared/lib/opfs-zip";
 import { formatBytes } from "@/shared/lib/utils";
@@ -228,11 +230,13 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
     }
   }, [isOpen, loadStorageInfo, loadNotebooks]);
 
-  const deleteChats = () => {
+  const deleteChats = async () => {
     if (
-      window.confirm(
-        `Are you sure you want to delete all ${chats.length} chat${chats.length === 1 ? "" : "s"}? This action cannot be undone.`,
-      )
+      await confirm({
+        title: "Delete all chats?",
+        message: `This permanently removes all ${chats.length} chat${chats.length === 1 ? "" : "s"} and can't be undone.`,
+        danger: true,
+      })
     ) {
       chats.forEach((chat) => {
         deleteChat(chat.id);
@@ -245,30 +249,42 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
 
   const deleteAllData = async () => {
     if (
-      !window.confirm(
-        "Are you sure you want to delete ALL data? This includes chats, agents, images, skills, and settings. This action cannot be undone.",
-      )
+      !(await confirm({
+        title: "Delete all data?",
+        message: "This permanently removes every chat, agent, image, skill, and setting. It can't be undone.",
+        danger: true,
+      }))
     ) {
       return;
     }
 
-    if (!window.confirm("This is your FINAL warning. All your data will be permanently deleted. Continue?")) {
+    if (
+      !(await confirm({
+        title: "Are you absolutely sure?",
+        message: "This is your final warning. All data will be permanently deleted and cannot be recovered.",
+        danger: true,
+        confirmLabel: "Delete everything",
+      }))
+    ) {
       return;
     }
 
     try {
       await clearAll();
-      alert("All data deleted. The page will now reload.");
-      window.location.reload();
+      notify.success("Data deleted", "Everything was removed. Reloading…");
+      setTimeout(() => window.location.reload(), 1200);
     } catch (error) {
       console.error("Delete all failed:", error);
-      alert("Failed to delete all data. Please try again.");
+      notify.error("Couldn't delete data", "Something went wrong. Please try again.");
     }
   };
 
   const rebuildIndexes = async () => {
     if (
-      !window.confirm("Rebuild OPFS indexes now? This will rescan chats, agents, images, skills, and repositories.")
+      !(await confirm({
+        title: "Rebuild indexes?",
+        message: "This rescans chats, agents, images, skills, and repositories. It may take a moment.",
+      }))
     ) {
       return;
     }
@@ -276,24 +292,14 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
     try {
       setIsRebuildingIndexes(true);
       const result = await rebuildAllIndexes();
-      alert(
-        `Indexes rebuilt successfully.\n\n` +
-          `Chats: ${result.chats}\n` +
-          `Agents: ${result.agents}\n` +
-          `Images: ${result.images}\n` +
-          `Skills: ${result.skills}\n` +
-          `Repositories: ${result.repositories}\n\n` +
-          `Cleaned empty folders:\n` +
-          `- Chats: ${result.cleanedChatsFolders}\n` +
-          `- Agents: ${result.cleanedAgentsFolders}\n` +
-          `- Images: ${result.cleanedImagesFolders}\n` +
-          `- Skills: ${result.cleanedSkillsFolders}\n` +
-          `- Repositories: ${result.cleanedRepositoryFolders}`,
+      notify.success(
+        "Indexes rebuilt",
+        `${result.chats} chats, ${result.agents} agents, ${result.images} images, ${result.skills} skills, ${result.repositories} repositories.`,
       );
       await loadStorageInfo();
     } catch (error) {
       console.error("Rebuild indexes failed:", error);
-      alert("Failed to rebuild indexes. Check console for details.");
+      notify.error("Couldn't rebuild indexes", "Check the console for details.");
     } finally {
       setIsRebuildingIndexes(false);
     }
@@ -312,14 +318,20 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
       const isZip = file.name.endsWith(".zip");
 
       if (isZip) {
-        if (!window.confirm("Import chats from ZIP? This will merge with your existing chats.")) return;
+        if (
+          !(await confirm({
+            title: "Import chats?",
+            message: "Chats from the ZIP will be merged with your existing chats.",
+          }))
+        )
+          return;
         try {
           await importChatsFromZip(file);
-          alert("Chats imported successfully! Please refresh the page to see the changes.");
-          window.location.reload();
+          notify.success("Chats imported", "Reloading to show them…");
+          setTimeout(() => window.location.reload(), 1200);
         } catch (error) {
           console.error("Failed to import chats:", error);
-          alert("Failed to import chats. Please check the file and try again.");
+          notify.error("Couldn't import chats", "Check the file and try again.");
         }
       } else {
         try {
@@ -327,24 +339,26 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
           const parsed = JSON.parse(jsonData);
           const count = parsed.chats?.length ?? 0;
           if (!count) {
-            alert("Invalid import file: Expected chats array not found.");
+            notify.error("Invalid import file", "No chats were found in this file.");
             return;
           }
           if (
-            !window.confirm(
-              `Import ${count} chat${count === 1 ? "" : "s"} from legacy format? This will add to your existing chats.`,
-            )
+            !(await confirm({
+              title: "Import chats?",
+              message: `${count} chat${count === 1 ? "" : "s"} from the legacy file will be added to your existing chats.`,
+            }))
           )
             return;
 
           const result = await importChatsFromLegacyJson(jsonData);
-          alert(
-            `Successfully imported ${result.imported} chat${result.imported === 1 ? "" : "s"}. Please refresh the page to see the changes.`,
+          notify.success(
+            "Chats imported",
+            `${result.imported} chat${result.imported === 1 ? "" : "s"} added. Reloading…`,
           );
-          window.location.reload();
+          setTimeout(() => window.location.reload(), 1200);
         } catch (error) {
           console.error("Failed to import chats:", error);
-          alert("Failed to import chats. Please check the file format and try again.");
+          notify.error("Couldn't import chats", "Check the file format and try again.");
         }
       }
     };
@@ -357,7 +371,7 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
       await exportChatsAsZip();
     } catch (error) {
       console.error("Failed to export chats:", error);
-      alert("Failed to export chats. Please try again.");
+      notify.error("Couldn't export chats", "Something went wrong. Please try again.");
     }
   };
 
@@ -366,15 +380,17 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
       await exportAgentsAsZip();
     } catch (error) {
       console.error("Failed to export agents:", error);
-      alert("Failed to export agents. Please try again.");
+      notify.error("Couldn't export agents", "Something went wrong. Please try again.");
     }
   };
 
   const deleteAgents = async () => {
     if (
-      !window.confirm(
-        `Are you sure you want to delete all ${agents.length} agent${agents.length === 1 ? "" : "s"}? This action cannot be undone.`,
-      )
+      !(await confirm({
+        title: "Delete all agents?",
+        message: `This permanently removes all ${agents.length} agent${agents.length === 1 ? "" : "s"} and can't be undone.`,
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -384,11 +400,11 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
         await deleteDirectory(`agents/${agent.id}`);
         await removeIndexEntry("agents", agent.id);
       }
-      alert("All agents deleted. The page will now reload.");
-      window.location.reload();
+      notify.success("Agents deleted", "Reloading to apply changes…");
+      setTimeout(() => window.location.reload(), 1200);
     } catch (error) {
       console.error("Failed to delete agents:", error);
-      alert("Failed to delete agents. Please try again.");
+      notify.error("Couldn't delete agents", "Something went wrong. Please try again.");
     }
   };
 
@@ -397,15 +413,17 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
       await exportNotebooksAsZip();
     } catch (error) {
       console.error("Failed to export notebooks:", error);
-      alert("Failed to export notebooks. Please try again.");
+      notify.error("Couldn't export notebooks", "Something went wrong. Please try again.");
     }
   };
 
   const deleteNotebooks = async () => {
     if (
-      !window.confirm(
-        `Are you sure you want to delete all ${notebooks.length} notebook${notebooks.length === 1 ? "" : "s"}? This action cannot be undone.`,
-      )
+      !(await confirm({
+        title: "Delete all notebooks?",
+        message: `This permanently removes all ${notebooks.length} notebook${notebooks.length === 1 ? "" : "s"} and can't be undone.`,
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -414,11 +432,11 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
       for (const notebook of notebooks) {
         await deleteNotebook(notebook.id);
       }
-      alert("All notebooks deleted. The page will now reload.");
-      window.location.reload();
+      notify.success("Notebooks deleted", "Reloading to apply changes…");
+      setTimeout(() => window.location.reload(), 1200);
     } catch (error) {
       console.error("Failed to delete notebooks:", error);
-      alert("Failed to delete notebooks. Please try again.");
+      notify.error("Couldn't delete notebooks", "Something went wrong. Please try again.");
     }
   };
 
@@ -915,7 +933,7 @@ export function SettingsDrawer({ isOpen, onClose, showAdvanced, initialSection }
                               );
                             } catch (error) {
                               console.error("Export failed:", error);
-                              alert("Failed to export data. Please try again.");
+                              notify.error("Couldn't export data", "Something went wrong. Please try again.");
                             } finally {
                               setIsExporting(false);
                             }

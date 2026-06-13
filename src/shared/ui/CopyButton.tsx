@@ -1,6 +1,7 @@
 import { CopyCheck as CopyCheckIcon, Copy as CopyIcon } from "lucide-react";
 import { useState } from "react";
 import { type CopyOptions, copyToClipboard } from "@/shared/lib/copy";
+import { notify } from "@/shared/lib/notify";
 
 type CopyButtonProps = CopyOptions & {
   className?: string;
@@ -22,6 +23,7 @@ export const CopyButton = ({ text, markdown, html, className }: CopyButtonProps)
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       console.error("failed to copy", error);
+      notify.error("Couldn't copy", "Your browser blocked clipboard access.");
     }
   };
 

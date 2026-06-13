@@ -5,6 +5,7 @@ import { useChatContext } from "@/features/chat/hooks/useChatContext";
 import type { ToolContextFactory } from "@/features/voice/hooks/useVoiceWebSockets";
 import { useVoiceWebSockets } from "@/features/voice/hooks/useVoiceWebSockets";
 import { getConfig } from "@/shared/config";
+import { notify } from "@/shared/lib/notify";
 import type { AudioContent, FileContent, ImageContent, TextContent, ToolContext } from "@/shared/types/chat";
 import { Role } from "@/shared/types/chat";
 import type { Elicitation } from "@/shared/types/elicitation";
@@ -223,9 +224,9 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       console.error("Failed to start voice mode:", error);
       const errorMessage = error?.toString() || "";
       if (errorMessage.includes("API key") || errorMessage.includes("401")) {
-        alert("Voice mode requires an OpenAI API key to be configured. Please add your API key to the configuration.");
+        notify.error("Voice mode unavailable", "An OpenAI API key must be configured to use voice mode.");
       } else {
-        alert("Failed to start voice mode. Please check your microphone permissions and try again.");
+        notify.error("Couldn't start voice mode", "Check your microphone permissions and try again.");
       }
     }
   }, [

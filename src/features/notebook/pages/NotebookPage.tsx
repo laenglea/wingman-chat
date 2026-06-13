@@ -1,6 +1,7 @@
 import { Outlet, useMatch, useNavigate } from "@tanstack/react-router";
 import { Download, PlusIcon, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { notify } from "@/shared/lib/notify";
 import { Markdown } from "@/shared/ui/Markdown";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/shared/ui/Resizable";
 import { useNavigation } from "@/shell/hooks/useNavigation";
@@ -198,7 +199,7 @@ export function NotebookPage() {
         }
       } catch (error) {
         console.error("Failed to import notebook:", error);
-        alert("Failed to import notebook. Please check the file and try again.");
+        notify.error("Couldn't import notebook", "Check the file and try again.");
       }
     },
     [loadNotebooks, navigate, setViewingOutput],

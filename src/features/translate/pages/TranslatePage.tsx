@@ -22,6 +22,7 @@ import { getConfig } from "@/shared/config";
 import { useDropZone } from "@/shared/hooks/useDropZone";
 import { cn } from "@/shared/lib/cn";
 import { getDriveContentUrl } from "@/shared/lib/drives";
+import { notify } from "@/shared/lib/notify";
 import { downloadFromUrl } from "@/shared/lib/utils";
 import { CopyButton } from "@/shared/ui/CopyButton";
 import { DrivePicker, type SelectedFile } from "@/shared/ui/DrivePicker";
@@ -120,7 +121,7 @@ export function TranslatePage() {
       if (isSupportedFile(file)) {
         selectFile(file);
       } else {
-        alert(`Please select a valid file type: ${supportedFiles.map((sf) => sf.ext).join(", ")}`);
+        notify.error("Unsupported file type", `Choose one of: ${supportedFiles.map((sf) => sf.ext).join(", ")}.`);
       }
     }
   };
@@ -143,7 +144,7 @@ export function TranslatePage() {
     if (file) {
       selectFile(file);
     } else {
-      alert(`Please drop a valid file type: ${supportedFiles.map((sf) => sf.ext).join(", ")}`);
+      notify.error("Unsupported file type", `Drop one of: ${supportedFiles.map((sf) => sf.ext).join(", ")}.`);
     }
   };
 

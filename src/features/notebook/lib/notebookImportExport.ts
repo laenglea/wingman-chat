@@ -1,4 +1,6 @@
 import JSZip from "jszip";
+import { confirm } from "@/shared/lib/confirm";
+import { notify } from "@/shared/lib/notify";
 import { getDirectory, readIndex } from "@/shared/lib/opfs-core";
 import {
   addDirectoryToZip,
@@ -156,15 +158,21 @@ export function triggerNotebookImport(): void {
     const file = (event.target as HTMLInputElement).files?.[0];
     if (!file) return;
 
-    if (!window.confirm("Import notebooks from ZIP? This will merge with your existing notebooks.")) return;
+    if (
+      !(await confirm({
+        title: "Import notebooks?",
+        message: "Notebooks from the ZIP will be merged with your existing notebooks.",
+      }))
+    )
+      return;
 
     try {
       await importNotebooksFromZip(file);
-      alert("Notebooks imported successfully! Please refresh the page to see the changes.");
-      window.location.reload();
+      notify.success("Notebooks imported", "Reloading to show them…");
+      setTimeout(() => window.location.reload(), 1200);
     } catch (error) {
       console.error("Failed to import notebooks:", error);
-      alert("Failed to import notebooks. Please check the file and try again.");
+      notify.error("Couldn't import notebooks", "Check the file and try again.");
     }
   };
 

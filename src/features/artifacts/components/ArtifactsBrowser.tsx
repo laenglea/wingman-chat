@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FileSystemManager } from "@/features/artifacts/lib/fs";
 import type { DriveConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
+import { notify } from "@/shared/lib/notify";
 import type { FileEntry } from "@/shared/types/file";
 import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 import { FileIcon } from "@/shared/ui/FileIcon";
@@ -308,7 +309,7 @@ export function ArtifactsBrowser({
     if (newPath !== renamingPath) {
       const success = await fs.renameFile(renamingPath, newPath);
       if (!success) {
-        alert("Failed to rename file. A file with that name may already exist.");
+        notify.error("Couldn't rename file", "A file with that name may already exist.");
       }
     }
 

@@ -136,9 +136,9 @@ interface TranslatorConfig {
   model?: string;
   files: string[];
   languages: string[];
-  /** Max file size in bytes; defaults to 10 MB. */
+  /** Max file size in bytes; unlimited if unset. */
   maxFileSize?: number;
-  /** Max input text length; defaults to 50,000. */
+  /** Max input text length; unlimited if unset. */
   maxTextLength?: number;
 }
 
@@ -245,9 +245,6 @@ const DEFAULT_VISION_FILES = ["image/jpeg", "image/png", "image/gif", "image/web
 
 const DEFAULT_TRANSLATOR_LANGUAGES = ["en", "de", "fr", "it", "es"];
 
-const DEFAULT_TRANSLATE_MAX_FILE_SIZE = 10 * 1024 * 1024;
-const DEFAULT_TRANSLATE_MAX_TEXT_LENGTH = 50000;
-
 interface Config {
   title: string;
   disclaimer: string;
@@ -339,7 +336,11 @@ export const loadConfig = async (): Promise<Config | undefined> => {
       text: cfg.text ? { files: cfg.text.files } : null,
 
       extractor: cfg.extractor
-        ? { model: cfg.extractor.model, files: cfg.extractor.files ?? [], maxFileSize: cfg.extractor.maxFileSize }
+        ? {
+            model: cfg.extractor.model,
+            files: cfg.extractor.files ?? [],
+            maxFileSize: cfg.extractor.maxFileSize,
+          }
         : null,
 
       internet: cfg.internet ?? null,
@@ -353,8 +354,8 @@ export const loadConfig = async (): Promise<Config | undefined> => {
             model: cfg.translator.model,
             files: cfg.translator.files ?? [],
             languages: cfg.translator.languages ?? DEFAULT_TRANSLATOR_LANGUAGES,
-            maxFileSize: cfg.translator.maxFileSize ?? DEFAULT_TRANSLATE_MAX_FILE_SIZE,
-            maxTextLength: cfg.translator.maxTextLength ?? DEFAULT_TRANSLATE_MAX_TEXT_LENGTH,
+            maxFileSize: cfg.translator.maxFileSize,
+            maxTextLength: cfg.translator.maxTextLength,
           }
         : null,
 

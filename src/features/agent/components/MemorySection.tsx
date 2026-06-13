@@ -4,6 +4,7 @@ import { Fragment, useCallback, useEffect, useState } from "react";
 import { useAgents } from "@/features/agent/hooks/useAgents";
 import type { Agent } from "@/features/agent/types/agent";
 import { cn } from "@/shared/lib/cn";
+import { confirm } from "@/shared/lib/confirm";
 import * as opfs from "@/shared/lib/opfs";
 import { Markdown } from "@/shared/ui/Markdown";
 import { Section } from "./Section";
@@ -85,7 +86,14 @@ export function MemorySection({ agent }: MemorySectionProps) {
   };
 
   const clearMemory = async () => {
-    if (!window.confirm("Clear all memory for this agent? This cannot be undone.")) return;
+    if (
+      !(await confirm({
+        title: "Clear agent memory?",
+        message: "All stored memory for this agent will be permanently erased and can't be recovered.",
+        danger: true,
+      }))
+    )
+      return;
     await opfs.deleteFile(memoryPath);
     setContent("");
     setEditValue("");

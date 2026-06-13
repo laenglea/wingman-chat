@@ -28,6 +28,7 @@ import { getConfig } from "@/shared/config";
 import { useDropZone } from "@/shared/hooks/useDropZone";
 import { cn } from "@/shared/lib/cn";
 import { getDriveContentUrl } from "@/shared/lib/drives";
+import { notify } from "@/shared/lib/notify";
 import { readAsDataURL } from "@/shared/lib/utils";
 import type { Content, ImageContent, Message, TextContent, ToolProvider } from "@/shared/types/chat";
 import { ProviderState, Role } from "@/shared/types/chat";
@@ -415,6 +416,7 @@ export function ChatInput() {
         }
       } catch (error) {
         console.error("Transcription failed:", error);
+        notify.error("Transcription failed", "The recording couldn't be transcribed. Please try again.");
       } finally {
         setTranscribingContent(false);
       }
@@ -423,6 +425,7 @@ export function ChatInput() {
         await startTranscription();
       } catch (error) {
         console.error("Failed to start transcription:", error);
+        notify.error("Couldn't start recording", "Check your microphone access and try again.");
       }
     }
   }, [isTranscribing, stopTranscription, startTranscription]);

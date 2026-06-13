@@ -1,4 +1,6 @@
 import JSZip from "jszip";
+import { confirm } from "@/shared/lib/confirm";
+import { notify } from "@/shared/lib/notify";
 import { getDirectory, readIndex, readText, writeBlob, writeJson, writeText } from "@/shared/lib/opfs-core";
 import {
   addDirectoryToZip,
@@ -382,14 +384,20 @@ export function triggerAgentImport(): void {
     const isZip = file.name.endsWith(".zip");
 
     if (isZip) {
-      if (!window.confirm("Import agents from ZIP? This will merge with your existing agents and skills.")) return;
+      if (
+        !(await confirm({
+          title: "Import agents?",
+          message: "Agents and skills from the ZIP will be merged with your existing ones.",
+        }))
+      )
+        return;
       try {
         await importAgentsFromZip(file);
-        alert("Agents imported successfully! Please refresh the page to see the changes.");
-        window.location.reload();
+        notify.success("Agents imported", "Reloading to show them…");
+        setTimeout(() => window.location.reload(), 1200);
       } catch (error) {
         console.error("Failed to import agents:", error);
-        alert("Failed to import agents. Please check the file and try again.");
+        notify.error("Couldn't import agents", "Check the file and try again.");
       }
     } else {
       try {
@@ -397,24 +405,26 @@ export function triggerAgentImport(): void {
         const parsed = JSON.parse(jsonData);
         const count = parsed.repositories?.length ?? 0;
         if (!count) {
-          alert("Invalid import file: Expected repositories array not found.");
+          notify.error("Invalid import file", "No agents were found in this file.");
           return;
         }
         if (
-          !window.confirm(
-            `Import ${count} legacy repositor${count === 1 ? "y" : "ies"} as agents? This will add to your existing agents.`,
-          )
+          !(await confirm({
+            title: "Import agents?",
+            message: `${count} legacy repositor${count === 1 ? "y" : "ies"} will be added as agents alongside your existing ones.`,
+          }))
         )
           return;
 
         const result = await importAgentsFromLegacyJson(jsonData);
-        alert(
-          `Successfully imported ${result.imported} repositor${result.imported === 1 ? "y" : "ies"} as agent${result.imported === 1 ? "" : "s"}. Please refresh to see changes.`,
+        notify.success(
+          "Agents imported",
+          `${result.imported} repositor${result.imported === 1 ? "y" : "ies"} added as agent${result.imported === 1 ? "" : "s"}. Reloading…`,
         );
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 1200);
       } catch (error) {
         console.error("Failed to import agents:", error);
-        alert("Failed to import. Please check the file format and try again.");
+        notify.error("Couldn't import agents", "Check the file format and try again.");
       }
     }
   };

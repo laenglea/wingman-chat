@@ -22,6 +22,7 @@ import type { Skill } from "@/features/skills/lib/skillParser";
 import { downloadSkill, parseSkillFile, validateSkillName } from "@/features/skills/lib/skillParser";
 import { getConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
+import { confirm } from "@/shared/lib/confirm";
 import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 import { Markdown } from "@/shared/ui/Markdown";
 
@@ -178,8 +179,16 @@ export function SkillCatalog({
   }, [editMode, selectedSkill, edName, edDescription, edContent]);
 
   const discardAndRun = useCallback(
-    (action: () => void) => {
-      if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Discard them?")) return;
+    async (action: () => void) => {
+      if (
+        hasUnsavedChanges &&
+        !(await confirm({
+          title: "Discard changes?",
+          message: "Your unsaved edits to this skill will be lost.",
+          danger: true,
+        }))
+      )
+        return;
       action();
     },
     [hasUnsavedChanges],
@@ -758,8 +767,14 @@ export function SkillCatalog({
                             <DropdownMenuItem
                               icon={<Trash2 size={13} />}
                               destructive
-                              onClick={() => {
-                                if (window.confirm(`Delete "${selectedSkill.name}"? This cannot be undone.`)) {
+                              onClick={async () => {
+                                if (
+                                  await confirm({
+                                    title: "Delete skill?",
+                                    message: `"${selectedSkill.name}" will be permanently removed. This can't be undone.`,
+                                    danger: true,
+                                  })
+                                ) {
                                   handleDeleteConfirm(selectedSkill);
                                 }
                               }}

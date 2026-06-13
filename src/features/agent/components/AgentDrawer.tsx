@@ -24,6 +24,7 @@ import type { Agent } from "@/features/agent/types/agent";
 import { exportSingleAgentAsZip, triggerAgentImport } from "@/features/settings/lib/agentImportExport";
 import { getConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
+import { confirm } from "@/shared/lib/confirm";
 import { DropdownMenu, DropdownMenuDivider, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 import { FilesSection } from "./FilesSection";
 import { InstructionsSection } from "./InstructionsSection";
@@ -469,8 +470,15 @@ export function AgentDrawer() {
                                 <DropdownMenuItem
                                   icon={<Trash2 size={12} />}
                                   destructive
-                                  onClick={() => {
-                                    if (!window.confirm(`Delete "${agent.name}"? This cannot be undone.`)) return;
+                                  onClick={async () => {
+                                    if (
+                                      !(await confirm({
+                                        title: "Delete agent?",
+                                        message: `"${agent.name}" will be permanently removed. This can't be undone.`,
+                                        danger: true,
+                                      }))
+                                    )
+                                      return;
                                     if (isActive) setCurrentAgent(null);
                                     deleteAgent(agent.id);
                                   }}
@@ -512,8 +520,15 @@ export function AgentDrawer() {
           key={currentAgent.id}
           agent={currentAgent}
           onExport={() => exportSingleAgentAsZip(currentAgent.id)}
-          onDelete={() => {
-            if (!window.confirm(`Delete "${currentAgent.name}"? This cannot be undone.`)) return;
+          onDelete={async () => {
+            if (
+              !(await confirm({
+                title: "Delete agent?",
+                message: `"${currentAgent.name}" will be permanently removed. This can't be undone.`,
+                danger: true,
+              }))
+            )
+              return;
             deleteAgent(currentAgent.id);
             handleAgentSelect(null);
           }}

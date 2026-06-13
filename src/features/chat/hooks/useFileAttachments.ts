@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { inferContentTypeFromPath } from "@/shared/lib/fileTypes";
-import { readAsDataURL, resizeImageBlob } from "@/shared/lib/utils";
+import { notify } from "@/shared/lib/notify";
+import { formatBytes, readAsDataURL, resizeImageBlob } from "@/shared/lib/utils";
 import type { Content, ImageContent } from "@/shared/types/chat";
 
 interface UseFileAttachmentsOptions {
@@ -55,11 +56,19 @@ export function useFileAttachments({
         const effectiveFile = effectiveType !== file.type ? new File([file], file.name, { type: effectiveType }) : file;
 
         // Vision images are sent inline; any other file goes to the artifacts
-        // workspace when available. Oversized files (per config) are skipped.
+        // workspace when available. Oversized files (per config) are rejected.
         if (visionFiles.includes(effectiveType)) {
-          if (visionMaxFileSize == null || effectiveFile.size <= visionMaxFileSize) imageFiles.push(effectiveFile);
+          if (visionMaxFileSize != null && effectiveFile.size > visionMaxFileSize) {
+            notify.error("Image too large", `"${file.name}" exceeds the ${formatBytes(visionMaxFileSize)} limit.`);
+          } else {
+            imageFiles.push(effectiveFile);
+          }
         } else if (artifactsAvailable) {
-          if (artifactsMaxFileSize == null || effectiveFile.size <= artifactsMaxFileSize) docFiles.push(effectiveFile);
+          if (artifactsMaxFileSize != null && effectiveFile.size > artifactsMaxFileSize) {
+            notify.error("File too large", `"${file.name}" exceeds the ${formatBytes(artifactsMaxFileSize)} limit.`);
+          } else {
+            docFiles.push(effectiveFile);
+          }
         }
       }
 

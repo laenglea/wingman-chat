@@ -12,6 +12,7 @@ import { type CategoryConfig, categorySlug, getConfig, type RiskConfig, riskSlug
 import { run as agentRun } from "@/shared/lib/agent";
 import type { Client } from "@/shared/lib/client";
 import { getErrorInfo } from "@/shared/lib/errors";
+import { notify } from "@/shared/lib/notify";
 import type { Content, Message, Model, ToolCallContent, ToolContext } from "@/shared/types/chat";
 import { Role } from "@/shared/types/chat";
 import type {
@@ -605,6 +606,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
             await chatFs.createFile(file.path, file.content, file.contentType);
           } catch (error) {
             console.error(`Failed to write attachment ${file.path} into artifacts:`, error);
+            notify.error("Attachment failed", `"${file.path}" couldn't be added to the workspace.`);
           }
         }
       }
