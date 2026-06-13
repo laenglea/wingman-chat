@@ -20,6 +20,11 @@ import { normalizeArtifactPath } from "@/shared/lib/sandbox";
 import type { Tool, ToolContext, ToolProvider } from "@/shared/types/chat";
 import { useArtifacts } from "./useArtifacts";
 
+function executionFailure(context: ToolContext | undefined, text: string) {
+  context?.setError?.({ code: "EXECUTION_ERROR", message: text });
+  return [{ type: "text" as const, text }];
+}
+
 /**
  * Adapt FileSystemManager into a WritableFileSource for the shared file tools.
  */
@@ -253,7 +258,7 @@ export function useArtifactsProvider(): ToolProvider | null {
               const hasPath = typeof path === "string" && path.length > 0;
 
               if (!hasCode && !hasPath) {
-                return [{ type: "text" as const, text: "Error executing code: provide `code` to run." }];
+                return executionFailure(context, "Error executing code: provide `code` to run.");
               }
 
               // Prefer `code` when both are provided — some models tack on `path`
@@ -262,12 +267,12 @@ export function useArtifactsProvider(): ToolProvider | null {
 
               if (!hasCode && hasPath) {
                 if (!fs) {
-                  return [{ type: "text" as const, text: "Error executing code: file system not available." }];
+                  return executionFailure(context, "Error executing code: file system not available.");
                 }
 
                 const file = await fs.getFile(path);
                 if (!file) {
-                  return [{ type: "text" as const, text: `Error executing code: file not found: ${path}` }];
+                  return executionFailure(context, `Error executing code: file not found: ${path}`);
                 }
 
                 script = file.content;
@@ -280,7 +285,7 @@ export function useArtifactsProvider(): ToolProvider | null {
               });
 
               if (!result.success) {
-                return [{ type: "text" as const, text: `Error executing code: ${result.error || "Unknown error"}` }];
+                return executionFailure(context, `Error executing code: ${result.error || "Unknown error"}`);
               }
 
               // Sync changed files back to artifacts and surface the ones written
@@ -293,12 +298,10 @@ export function useArtifactsProvider(): ToolProvider | null {
 
               return [{ type: "text" as const, text: result.output }];
             } catch (error) {
-              return [
-                {
-                  type: "text" as const,
-                  text: `Code execution failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-                },
-              ];
+              return executionFailure(
+                context,
+                `Code execution failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+              );
             }
           }),
       },
@@ -325,12 +328,7 @@ export function useArtifactsProvider(): ToolProvider | null {
             const { command } = args;
 
             if (typeof command !== "string" || !command.trim()) {
-              return [
-                {
-                  type: "text" as const,
-                  text: "Error: `command` is required (a non-empty bash command or script).",
-                },
-              ];
+              return executionFailure(context, "Error: `command` is required (a non-empty bash command or script).");
             }
 
             try {
@@ -370,17 +368,15 @@ export function useArtifactsProvider(): ToolProvider | null {
               const output = parts.join("\n") || "Command executed successfully (no output)";
 
               if (!result.success) {
-                return [{ type: "text" as const, text: `Error: ${output}` }];
+                return executionFailure(context, `Error: ${output}`);
               }
 
               return [{ type: "text" as const, text: output }];
             } catch (error) {
-              return [
-                {
-                  type: "text" as const,
-                  text: `Bash execution failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-                },
-              ];
+              return executionFailure(
+                context,
+                `Bash execution failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+              );
             }
           }),
       },

@@ -4,24 +4,12 @@ import { useChat } from "@/features/chat/hooks/useChat";
 import { useLastFullscreenApp } from "@/features/chat/hooks/useLastFullscreenApp";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
 import { cn } from "@/shared/lib/cn";
-import { tryParseToolArguments } from "@/shared/lib/toolArguments";
-import { getToolDisplayName } from "@/shared/lib/utils";
 import type { Content, Message, ToolResultContent } from "@/shared/types/chat";
 import { CodeRenderer } from "@/shared/ui/CodeRenderer";
 import { RenderContents } from "@/shared/ui/ContentRenderer";
 import { getToolCallPreview } from "./chatMessageUtils";
 import { InlineMcpApp } from "./InlineMcpApp";
-
-function extractCodeFromArguments(arguments_: string): { code: string; packages?: string[] } | null {
-  const args = tryParseToolArguments(arguments_);
-  if (args && typeof args.code === "string" && args.code) {
-    return {
-      code: args.code,
-      packages: args.packages as string[] | undefined,
-    };
-  }
-  return null;
-}
+import { extractToolCode, toolPresentation } from "./toolDisplay";
 
 type ChatToolMessageProps = {
   message: Message;
@@ -46,9 +34,10 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
     return undefined;
   }, [toolResult?.name, providers]);
   const isToolError = !!message.error;
-  const codeData = toolResult?.arguments ? extractCodeFromArguments(toolResult.arguments) : null;
+  const codeData = toolResult?.arguments ? extractToolCode(toolResult.arguments) : null;
+  const pres = toolPresentation(toolResult?.name ?? "", toolResult?.arguments, { error: isToolError });
   const queryPreview =
-    !codeData && toolResult?.arguments ? getToolCallPreview(toolResult.name || "", toolResult.arguments) : null;
+    !pres.Icon && toolResult?.arguments ? getToolCallPreview(toolResult.name || "", toolResult.arguments) : null;
 
   // Helper to replace long data URLs with placeholder for display
   const sanitizeForDisplay = (obj: unknown): unknown => {
@@ -97,12 +86,6 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
     }
   };
 
-  const getPreviewText = () => {
-    if (codeData) return codeData.code.split("\\n")[0];
-    if (queryPreview) return queryPreview;
-    return null;
-  };
-
   return (
     <div className="pb-2 max-w-full">
       <div className={cn("rounded-lg overflow-hidden max-w-full", isToolError && "bg-red-50/30 dark:bg-red-950/5")}>
@@ -121,6 +104,8 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
             <div className="flex items-center gap-2 min-w-0">
               {isToolError ? (
                 <AlertCircle className="w-3 h-3 text-red-400 dark:text-red-500 shrink-0" />
+              ) : pres.Icon ? (
+                <pres.Icon className="w-3 h-3 text-neutral-400 dark:text-neutral-500 shrink-0" />
               ) : toolIcon ? (
                 <img src={toolIcon} alt="" className="shrink-0 w-3 h-3 object-contain" />
               ) : (
@@ -128,15 +113,16 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
               )}
               <span
                 className={cn(
-                  "text-xs font-medium whitespace-nowrap",
+                  "text-xs whitespace-nowrap truncate",
+                  pres.mono ? "font-mono" : "font-medium",
                   isToolError ? "text-red-500 dark:text-red-400" : "text-neutral-500 dark:text-neutral-400",
                 )}
               >
-                {isToolError ? "Tool Error" : `${toolResult?.name ? getToolDisplayName(toolResult.name) : "Tool"}`}
+                {isToolError && !pres.Icon ? "Tool Error" : pres.label}
               </span>
-              {!toolResultExpanded && getPreviewText() && (
+              {!pres.Icon && !toolResultExpanded && queryPreview && (
                 <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono truncate">
-                  {getPreviewText()}
+                  {queryPreview}
                 </span>
               )}
             </div>
@@ -146,7 +132,7 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
         {toolResultExpanded && (
           <div className="ml-4.5 mt-2">
             {codeData ? (
-              <CodeRenderer code={codeData.code} language="python" />
+              <CodeRenderer code={codeData.code} language={codeData.language} />
             ) : (
               toolResult?.arguments && renderContent([{ type: "text", text: toolResult.arguments }], "Arguments")
             )}

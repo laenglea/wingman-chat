@@ -88,6 +88,7 @@ export interface ToolContext {
   sendMessage?(message: Message): Promise<void>;
   setMeta?(meta: Record<string, unknown>): void;
   updateMeta?(meta: Record<string, unknown>): void;
+  setError?(error: MessageError): void;
   setContext?(text: string | null): Promise<void>;
   /** Trace context for nested agents spawned from this tool. */
   agentContext?: AgentContext;

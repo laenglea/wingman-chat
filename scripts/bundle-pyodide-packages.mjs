@@ -39,6 +39,7 @@ const PYODIDE_BUILTIN_TARGETS = [
   "typing-extensions",
   "six",
   "pyyaml",
+  "tzdata",
 ];
 
 const PYPI_PACKAGES = [

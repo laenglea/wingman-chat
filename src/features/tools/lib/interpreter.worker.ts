@@ -119,6 +119,16 @@ _stdlib = set(getattr(_sys, 'stdlib_module_names', set())) | set(_sys.builtin_mo
   return [...unique];
 }
 
+// stdlib `zoneinfo` and pandas read the IANA tz database from the `tzdata`
+// package in WASM (no system zoneinfo dir), but never import it by name — so
+// find_imports can't see it. Detect the usual timezone entry points and request
+// tzdata explicitly. Matches: `zoneinfo`/`ZoneInfo`, pandas `.tz_localize(`/
+// `.tz_convert(`, and a `tz="…"` kwarg. pytz ships its own data and is skipped.
+const TZDATA_USAGE = /\bzoneinfo\b|\bZoneInfo\(|\.tz_localize\(|\.tz_convert\(|\btz\s*=\s*['"]/;
+function needsTzdata(code: string): boolean {
+  return TZDATA_USAGE.test(code);
+}
+
 let pyodideReady: Promise<PyodideInterface> | null = null;
 const loadedPackages = new Set<string>();
 let plotlyShimApplied = false;
@@ -400,7 +410,11 @@ async function executeCode(request: CodeExecutionRequest): Promise<CodeExecution
 
     const importedPackages = await findImportedPackages(pyodide, code);
     const requestedPackages = [
-      ...new Set([...importedPackages, ...packages.map(normalizePackageName).filter(Boolean)]),
+      ...new Set([
+        ...importedPackages,
+        ...packages.map(normalizePackageName).filter(Boolean),
+        ...(needsTzdata(code) ? ["tzdata"] : []),
+      ]),
     ];
 
     syncFilesToPyodide(pyodide, files);

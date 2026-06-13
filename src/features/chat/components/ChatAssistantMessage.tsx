@@ -5,7 +5,6 @@ import { useChat } from "@/features/chat/hooks/useChat";
 import { SkillChip } from "@/features/skills/components/SkillChip";
 import { getConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
-import { getToolDisplayName } from "@/shared/lib/utils";
 import type { Content, Message } from "@/shared/types/chat";
 import { RenderContents } from "@/shared/ui/ContentRenderer";
 import { ConvertButton } from "@/shared/ui/ConvertButton";
@@ -14,6 +13,7 @@ import { Markdown } from "@/shared/ui/Markdown";
 import { PlayButton } from "@/shared/ui/PlayButton";
 import { ChatMessageElicitation } from "./ChatMessageElicitation";
 import { collectTurnArtifactPaths, collectTurnSkillNames, getToolCallPreview, isTurnEnd } from "./chatMessageUtils";
+import { toolPresentation } from "./toolDisplay";
 
 // Error message component
 function ErrorMessage({ title, message, onRetry }: { title: string; message: string; onRetry?: () => void }) {
@@ -242,6 +242,7 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
 
               const meta = toolMeta[toolCall.id];
               const status = typeof meta?.status === "string" ? meta.status : null;
+              const pres = toolPresentation(toolCall.name, toolCall.arguments, { running: true });
               return (
                 <div
                   key={getMessagePartKey(toolCall, index, "loading-tool-call")}
@@ -249,16 +250,22 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
                 >
                   <div className="flex items-center gap-2 min-w-0">
                     <Loader2 className="w-3 h-3 animate-spin text-slate-400 dark:text-slate-500 shrink-0" />
-                    <span className="text-xs font-medium whitespace-nowrap text-neutral-500 dark:text-neutral-400">
-                      {getToolDisplayName(toolCall.name)}
+                    <span
+                      className={cn(
+                        "text-xs whitespace-nowrap text-neutral-500 dark:text-neutral-400",
+                        pres.mono ? "font-mono truncate" : "font-medium",
+                      )}
+                    >
+                      {pres.label}
                     </span>
-                    {status ? (
-                      <span className="text-xs italic text-neutral-500 dark:text-neutral-400 truncate">{status}</span>
-                    ) : preview ? (
-                      <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono truncate">
-                        {preview}
-                      </span>
-                    ) : null}
+                    {!pres.Icon &&
+                      (status ? (
+                        <span className="text-xs italic text-neutral-500 dark:text-neutral-400 truncate">{status}</span>
+                      ) : preview ? (
+                        <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono truncate">
+                          {preview}
+                        </span>
+                      ) : null)}
                   </div>
                 </div>
               );
@@ -351,6 +358,7 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
             // Tool calls shown inline only when streaming
             if (!isLast || !isResponding) return null;
             const preview = getToolCallPreview(part.name, part.arguments);
+            const pres = toolPresentation(part.name, part.arguments, { running: true });
             // Only the first tool call in a run gets top spacing (to match the
             // committed result's gap); consecutive concurrent calls stay tight.
             const isFirstToolCall = message.content[index - 1]?.type !== "tool_call";
@@ -361,10 +369,15 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <Loader2 className="w-3 h-3 animate-spin text-slate-400 dark:text-slate-500 shrink-0" />
-                  <span className="text-xs font-medium whitespace-nowrap text-neutral-500 dark:text-neutral-400">
-                    {getToolDisplayName(part.name)}
+                  <span
+                    className={cn(
+                      "text-xs whitespace-nowrap text-neutral-500 dark:text-neutral-400",
+                      pres.mono ? "font-mono truncate" : "font-medium",
+                    )}
+                  >
+                    {pres.label}
                   </span>
-                  {preview && (
+                  {!pres.Icon && preview && (
                     <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono truncate">{preview}</span>
                   )}
                 </div>

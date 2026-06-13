@@ -1,4 +1,4 @@
-import type { Content, Message, Tool, ToolCallContent, ToolContext } from "../types/chat";
+import type { Content, Message, MessageError, Tool, ToolCallContent, ToolContext } from "../types/chat";
 import type { AgentContext } from "../types/telemetry";
 import type { Client } from "./client";
 import { traceExecuteTool, traceInvokeAgent } from "./otel";
@@ -140,6 +140,7 @@ async function dispatchToolCall(
 
   try {
     let resultMeta: Record<string, unknown> | undefined;
+    let resultError: MessageError | undefined;
 
     const result = await traceExecuteTool(
       toolCall.name,
@@ -160,6 +161,9 @@ async function dispatchToolCall(
             resultMeta = { ...resultMeta, ...meta };
             hooks.onToolMeta?.(toolCall.id, { ...resultMeta });
           },
+          setError: (error) => {
+            resultError = error;
+          },
           agentContext: executeCtx,
         };
         return tool.function(args, toolContext);
@@ -178,6 +182,7 @@ async function dispatchToolCall(
           ...(resultMeta ? { meta: resultMeta } : {}),
         },
       ],
+      ...(resultError ? { error: resultError } : {}),
     };
   } catch (error) {
     console.error("Tool failed", error);
