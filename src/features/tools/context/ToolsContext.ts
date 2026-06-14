@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { DisplayModeOptions } from "@/features/settings/lib/mcp";
+import type { DisplayMode, DisplayModeOptions } from "@/features/settings/lib/mcp";
 import type {
   AudioContent,
   FileContent,
@@ -29,7 +29,8 @@ export interface ToolsContextValue {
     context: ToolContext,
     displayModeOptions?: DisplayModeOptions,
   ) => Promise<void>;
-  hasActiveBridge: (providerId: string) => boolean;
+  /** Push a host-initiated display-mode change to a provider's active app. */
+  setDisplayMode: (providerId: string, mode: DisplayMode) => void;
 }
 
 export const ToolsContext = createContext<ToolsContextValue | undefined>(undefined);

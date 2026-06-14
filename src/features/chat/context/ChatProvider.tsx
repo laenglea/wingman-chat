@@ -109,7 +109,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     deleteChat: deleteChatHook,
   } = useChats();
   const { isAvailable: artifactsEnabled, setFileSystem: setArtifactsFileSystem } = useArtifacts();
-  const { renderApp, closeApp } = useApp();
+  const { closeApp } = useApp();
   const { currentAgent } = useAgents();
   const { resetTools } = useToolsContext();
   const [chatId, setChatId] = useState<string | null>(null);
@@ -445,10 +445,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
               cb();
             }
           },
-          render: async () => {
-            console.log("[Render] Getting iframe for tool call:", currentToolCall.id, currentToolCall.name);
-            return renderApp();
-          },
         };
       };
 
@@ -584,7 +580,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
       config.chat?.risks,
       chatTools,
       chatInstructions,
-      renderApp,
       requestElicitation,
       updateModelContext,
       updateStreamingMessage,

@@ -9,7 +9,7 @@ import { CodeRenderer } from "@/shared/ui/CodeRenderer";
 import { RenderContents } from "@/shared/ui/ContentRenderer";
 import { McpProviderIcon } from "@/shared/ui/McpProviderIcon";
 import { getToolCallPreview } from "./chatMessageUtils";
-import { InlineMcpApp } from "./InlineMcpApp";
+import { McpApp } from "./McpApp";
 import { extractToolCode, toolPresentation } from "./toolDisplay";
 
 type ChatToolMessageProps = {
@@ -39,8 +39,16 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
   // When a result carries an MCP UI app, the app is the primary renderer; per the
   // MCP Apps spec the `content` blocks are for model context / text-only fallback,
   // so we don't also render the (redundant) media inline.
+  //
+  // We also require the app's provider to be registered: restoring a chat whose app
+  // belongs to an inactive agent (or an MCP filtered out by RBAC) means the client
+  // isn't available, so we fall back to the raw result instead of a broken app. Once
+  // the provider appears (e.g. the agent is activated) this flips true and McpApp mounts.
+  const appProviderId = toolResult?.meta?.toolProvider;
   const hasMcpApp =
-    typeof toolResult?.meta?.toolProvider === "string" && typeof toolResult?.meta?.toolResource === "string";
+    typeof appProviderId === "string" &&
+    typeof toolResult?.meta?.toolResource === "string" &&
+    providers.some((p) => p.id === appProviderId);
   const codeData = toolResult?.arguments ? extractToolCode(toolResult.arguments) : null;
   const pres = toolPresentation(toolResult?.name ?? "", toolResult?.arguments, { error: isToolError });
   const queryPreview =
@@ -160,13 +168,9 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
             </div>
           )}
 
-        {/* Render inline MCP app for tool results with UI metadata */}
+        {/* Render the MCP UI app (inline or fullscreen) for tool results with UI metadata */}
         {hasMcpApp && (
-          <InlineMcpApp
-            key={`${chat?.id}-${index}`}
-            toolResult={toolResult}
-            isLastFullscreenApp={isLastFullscreenApp}
-          />
+          <McpApp key={`${chat?.id}-${index}`} toolResult={toolResult} isLastFullscreenApp={isLastFullscreenApp} />
         )}
       </div>
     </div>

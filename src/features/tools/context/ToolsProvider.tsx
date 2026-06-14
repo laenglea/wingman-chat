@@ -358,11 +358,9 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     [allMcpClients, connectMcp],
   );
 
-  // Check whether a provider currently has an active app bridge (e.g. from a live tool call)
-  const hasActiveBridge = useCallback(
-    (providerId: string): boolean => {
-      const client = allMcpClients.find((c) => c.id === providerId);
-      return client?.hasActiveBridge() ?? false;
+  const setDisplayMode = useCallback(
+    (providerId: string, mode: import("@/features/settings/lib/mcp").DisplayMode) => {
+      allMcpClients.find((c) => c.id === providerId)?.applyAppDisplayMode(mode);
     },
     [allMcpClients],
   );
@@ -392,7 +390,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
         companionEnabled: companionEnabled,
         toggleCompanion: toggleCompanion,
         restoreToolUI,
-        hasActiveBridge,
+        setDisplayMode,
       }}
     >
       {children}
