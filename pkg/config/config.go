@@ -107,6 +107,11 @@ func applyEnvOverrides(cfg *Config) {
 		cfg.Chat.RetentionDays = days
 	}
 
+	if v := os.Getenv("CHAT_INSTRUCTIONS"); v != "" {
+		cfg.Chat = ensurePtr(cfg.Chat)
+		cfg.Chat.Instructions = v
+	}
+
 	if v := os.Getenv("CHAT_SUMMARIZER"); v != "" {
 		cfg.Chat = ensurePtr(cfg.Chat)
 		cfg.Chat.Summarizer = v

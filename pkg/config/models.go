@@ -126,6 +126,7 @@ type Notebook struct {
 }
 
 type Chat struct {
+	Instructions  string `json:"instructions,omitempty" yaml:"instructions,omitempty"`
 	RetentionDays *int   `json:"retentionDays,omitempty" yaml:"retentionDays,omitempty"`
 	Summarizer    string `json:"summarizer,omitempty" yaml:"summarizer,omitempty"`
 	Optimizer     string `json:"optimizer,omitempty" yaml:"optimizer,omitempty"`

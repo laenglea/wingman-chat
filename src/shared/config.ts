@@ -177,6 +177,7 @@ export function categorySlug(name: string): string {
 export const riskSlug = categorySlug;
 
 interface ChatConfig {
+  instructions?: string;
   retentionDays?: number;
   optimizer?: string;
   summarizer?: string;

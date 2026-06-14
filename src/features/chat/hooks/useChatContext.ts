@@ -9,6 +9,7 @@ import { useProfile } from "@/features/settings/hooks/useProfile";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
 import { setModel as setInterpreterModel } from "@/features/tools/lib/llmCommand";
 import { createSubagentTool } from "@/features/tools/lib/subagent";
+import { getConfig } from "@/shared/config";
 import { renderTemplate } from "@/shared/lib/template";
 import type { Model, Tool, ToolProvider } from "@/shared/types/chat";
 import { ProviderState } from "@/shared/types/chat";
@@ -18,7 +19,10 @@ export interface ChatContext {
   instructions: () => string;
 }
 
-export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | null): ChatContext {
+export function useChatContext(
+  mode: "voice" | "chat" = "chat",
+  model?: Model | null,
+): ChatContext {
   const { generateInstructions } = useProfile();
   const { providers, getProviderState } = useToolsContext();
 
@@ -33,19 +37,25 @@ export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | 
   const context = useMemo<ChatContext>(() => {
     const getFilteredProviders = () => {
       // Start with base providers (includes agent repo, skills, bridges, and conditionally enabled built-in tools)
-      let filteredProviders = providers.filter((p: ToolProvider) => getProviderState(p.id) === ProviderState.Connected);
+      let filteredProviders = providers.filter(
+        (p: ToolProvider) => getProviderState(p.id) === ProviderState.Connected,
+      );
 
       // Add the artifacts provider whenever the feature is available (the
       // provider is null otherwise). It may already be present if explicitly
       // enabled via the agent tools toggle.
-      const artifactsAlreadyIncluded = filteredProviders.some((p: ToolProvider) => p.id === "artifacts");
+      const artifactsAlreadyIncluded = filteredProviders.some(
+        (p: ToolProvider) => p.id === "artifacts",
+      );
       if (!artifactsAlreadyIncluded && artifactsProvider) {
         filteredProviders = [...filteredProviders, artifactsProvider];
       }
 
       // Further filter based on model configuration
       const filterModel: Pick<Model, "tools"> | null | undefined =
-        mode === "voice" && (model?.id === "realtime" || !model?.tools) && currentAgent?.model
+        mode === "voice" &&
+        (model?.id === "realtime" || !model?.tools) &&
+        currentAgent?.model
           ? (models.find((m) => m.id === currentAgent.model) ?? model)
           : model;
 
@@ -53,14 +63,16 @@ export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | 
         const enabledTools = new Set(filterModel.tools.enabled || []);
         const disabledTools = new Set(filterModel.tools.disabled || []);
 
-        filteredProviders = filteredProviders.filter((provider: ToolProvider) => {
-          const matchId = provider.id;
+        filteredProviders = filteredProviders.filter(
+          (provider: ToolProvider) => {
+            const matchId = provider.id;
 
-          if (enabledTools.size > 0) {
-            return enabledTools.has(matchId);
-          }
-          return !disabledTools.has(matchId);
-        });
+            if (enabledTools.size > 0) {
+              return enabledTools.has(matchId);
+            }
+            return !disabledTools.has(matchId);
+          },
+        );
       }
 
       return filteredProviders;
@@ -83,7 +95,10 @@ export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | 
 
         const subagentModel =
           mode === "voice"
-            ? (models.find((m) => m.id !== "realtime" && (!m.type || m.type === "completer"))?.id ?? null)
+            ? (models.find(
+                (m) =>
+                  m.id !== "realtime" && (!m.type || m.type === "completer"),
+              )?.id ?? null)
             : (model?.id ?? null);
 
         if (baseTools.length === 0 || !subagentModel) {
@@ -95,7 +110,10 @@ export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | 
           .filter((s): s is string => !!s)
           .join("\n\n");
 
-        return [...baseTools, createSubagentTool(subagentModel, providerInstructions, baseTools)];
+        return [
+          ...baseTools,
+          createSubagentTool(subagentModel, providerInstructions, baseTools),
+        ];
       },
 
       instructions: () => {
@@ -104,28 +122,32 @@ export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | 
 
         const instructionsList: string[] = [];
 
-        // Model-level instructions form the start of the system prompt.
-        // Placeholders like {{date}} are resolved at send time.
-        if (model?.instructions?.trim()) {
-          instructionsList.push(renderTemplate(model.instructions));
+        const globalInstructions = getConfig().chat?.instructions;
+        if (globalInstructions?.trim()) {
+          instructionsList.push(renderTemplate(globalInstructions));
         }
 
-        if (profileInstructions.trim()) {
-          instructionsList.push(profileInstructions);
+        if (model?.instructions?.trim()) {
+          instructionsList.push(renderTemplate(model.instructions));
         }
 
         if (defaultInstructions.trim()) {
           instructionsList.push(defaultInstructions);
         }
 
-        // Add agent-level instructions
+        if (profileInstructions.trim()) {
+          instructionsList.push(profileInstructions);
+        }
+
         if (currentAgent?.instructions?.trim()) {
           instructionsList.push(currentAgent.instructions);
         }
 
         if (mode === "voice") {
           instructionsList.push(voiceInstructions);
-          const hasTools = filteredProviders.some((p: ToolProvider) => p.tools.length > 0);
+          const hasTools = filteredProviders.some(
+            (p: ToolProvider) => p.tools.length > 0,
+          );
           if (hasTools) instructionsList.push(voiceToolsInstructions);
         }
 
@@ -141,7 +163,16 @@ export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | 
         return instructionsList.join("\n\n");
       },
     };
-  }, [mode, model, models, generateInstructions, providers, getProviderState, artifactsProvider, currentAgent]);
+  }, [
+    mode,
+    model,
+    models,
+    generateInstructions,
+    providers,
+    getProviderState,
+    artifactsProvider,
+    currentAgent,
+  ]);
 
   return context;
 }
