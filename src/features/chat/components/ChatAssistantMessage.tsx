@@ -125,6 +125,10 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
 }: ChatAssistantMessageProps) {
   const { messages, pendingElicitation, resolveElicitation, retryMessage, toolMeta } = useChat();
 
+  // JS-driven hover (not CSS :hover) for the action bar — Safari leaves :hover
+  // sticky after trackpad taps, so the buttons wouldn't reliably hide.
+  const [hovered, setHovered] = useState(false);
+
   // Files written during this turn (create_file + python/bash), surfaced as
   // clickable chips on the turn's completion message rather than auto-opening
   // the artifacts drawer.
@@ -313,7 +317,12 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
 
   // Render assistant message with content
   return (
-    <div className={cn("flex justify-start pb-2 text-neutral-900 dark:text-neutral-200 group")}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover only toggles the action bar; the buttons stay focusable on their own
+    <div
+      className="flex justify-start pb-2 text-neutral-900 dark:text-neutral-200"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div className="flex-1 py-3 wrap-break-words overflow-x-auto">
         {/* Render content parts in order */}
         {message.content.map((part, index) => {
@@ -409,7 +418,14 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
           </div>
         )}
 
-        <div className="flex justify-between items-center mt-1 transition-opacity duration-200 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+        <div
+          className={cn(
+            "flex justify-between items-center mt-1 transition-opacity duration-200",
+            // The completed last message keeps its actions always visible; while it's
+            // still streaming, hover-gate them (avoids flicker as content reflows).
+            isLast && !isResponding ? "opacity-100" : hovered ? "opacity-100" : "opacity-100 md:opacity-0",
+          )}
+        >
           <div className="flex items-center gap-2">
             <CopyButton markdown={textContent} className="h-4 w-4" />
             <ConvertButton markdown={textContent} className="h-4 w-4" />

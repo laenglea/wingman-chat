@@ -25,6 +25,10 @@ export const ChatUserMessage = memo(function ChatUserMessage({
   onGoToLatest,
 }: ChatUserMessageProps) {
   const [isEditing, setIsEditing] = useState(false);
+  // Drive the action-bar reveal with JS hover instead of CSS :hover — Safari
+  // leaves :hover sticky (notably after a trackpad tap), so the buttons wouldn't
+  // hide on mouse-leave.
+  const [hovered, setHovered] = useState(false);
   // Get first text content only (user's typed message)
   const textContent = message.content.find((p) => p.type === "text")?.text ?? "";
   const [editContent, setEditContent] = useState(textContent);
@@ -138,7 +142,12 @@ export const ChatUserMessage = memo(function ChatUserMessage({
   };
 
   return (
-    <div className="flex justify-end pb-2 group text-neutral-900 dark:text-neutral-200">
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover only toggles the action bar; the buttons stay focusable on their own
+    <div
+      className="flex justify-end pb-2 text-neutral-900 dark:text-neutral-200"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div className={cn("flex flex-col items-end", isEditing ? "flex-1" : "max-w-[85%]")}>
         {isEditing ? (
           <ChatMessageEditor
@@ -183,13 +192,13 @@ export const ChatUserMessage = memo(function ChatUserMessage({
             <div
               className={cn(
                 "flex items-center gap-2 justify-end mt-1 pr-1 transition-opacity duration-200",
-                isResponding ? "invisible" : "opacity-100 md:opacity-0 md:group-hover:opacity-100",
+                isResponding ? "invisible" : hovered ? "opacity-100" : "opacity-100 md:opacity-0",
               )}
             >
               <CopyButton markdown={textContent} className="h-4 w-4" />
               <button
                 onClick={handleStartEdit}
-                className="p-2 -m-1 text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors"
+                className="p-2 -m-1 text-neutral-400 hover:text-neutral-600 dark:text-neutral-400 dark:hover:text-neutral-300 transition-colors opacity-60 hover:opacity-100"
                 title="Edit message"
                 type="button"
               >

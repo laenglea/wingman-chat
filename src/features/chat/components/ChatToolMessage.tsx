@@ -34,6 +34,11 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
     return undefined;
   }, [toolResult?.name, providers]);
   const isToolError = !!message.error;
+  // When a result carries an MCP UI app, the app is the primary renderer; per the
+  // MCP Apps spec the `content` blocks are for model context / text-only fallback,
+  // so we don't also render the (redundant) media inline.
+  const hasMcpApp =
+    typeof toolResult?.meta?.toolProvider === "string" && typeof toolResult?.meta?.toolResource === "string";
   const codeData = toolResult?.arguments ? extractToolCode(toolResult.arguments) : null;
   const pres = toolPresentation(toolResult?.name ?? "", toolResult?.arguments, { error: isToolError });
   const queryPreview =
@@ -145,15 +150,16 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
           </div>
         )}
 
-        {/* Always render media content (images, audio, files) from tool results */}
-        {toolResult?.result?.some((c) => c.type === "image" || c.type === "audio" || c.type === "file") && (
-          <div className="mt-2">
-            <RenderContents contents={toolResult.result} />
-          </div>
-        )}
+        {/* Render media content (images, audio, files) — unless an MCP app owns the display */}
+        {!hasMcpApp &&
+          toolResult?.result?.some((c) => c.type === "image" || c.type === "audio" || c.type === "file") && (
+            <div className="mt-2">
+              <RenderContents contents={toolResult.result} />
+            </div>
+          )}
 
         {/* Render inline MCP app for tool results with UI metadata */}
-        {typeof toolResult?.meta?.toolProvider === "string" && typeof toolResult?.meta?.toolResource === "string" && (
+        {hasMcpApp && (
           <InlineMcpApp
             key={`${chat?.id}-${index}`}
             toolResult={toolResult}

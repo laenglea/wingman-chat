@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
 import { parseToolArguments } from "@/shared/lib/toolArguments";
 import type { ToolContext, ToolResultContent } from "@/shared/types/chat";
+import { ACTION_ICON_SIZE, actionButtonClassName } from "@/shared/ui/actionButton";
 import { useApp } from "@/shell/hooks/useApp";
 
 interface InlineMcpAppProps {
@@ -197,31 +198,30 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
   }
 
   return (
-    <div className="mt-2 mb-2 relative rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-900/40 min-h-[60px]">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-neutral-950/80 z-10 min-h-[60px]">
-          <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+    <div className="mt-2 mb-2">
+      {!isInlineOnly && !isFullscreenOnly && (
+        <div className="flex justify-end mb-1">
+          <button type="button" onClick={expandToFullscreen} className={actionButtonClassName} title="Expand to panel">
+            <Maximize2 size={ACTION_ICON_SIZE} />
+            <span>Open in panel</span>
+          </button>
         </div>
       )}
-      {!isInlineOnly && !isFullscreenOnly && (
-        <button
-          type="button"
-          onClick={expandToFullscreen}
-          className="absolute top-2 right-2 z-20 flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-white/90 dark:bg-neutral-800/90 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 shadow-sm border border-neutral-200/60 dark:border-neutral-700/60 opacity-0 hover:opacity-100 focus:opacity-100 transition-all text-xs"
-          title="Expand to panel"
-        >
-          <Maximize2 size={12} />
-          <span>Open in panel</span>
-        </button>
-      )}
-      <iframe
-        ref={iframeRef}
-        className="w-full border-none"
-        style={{ height: 0 }}
-        sandbox="allow-scripts"
-        referrerPolicy="no-referrer"
-        title={`MCP App: ${toolResult.name}`}
-      />
+      <div className="relative rounded-md overflow-hidden bg-neutral-100 dark:bg-neutral-900/40 min-h-[60px]">
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-neutral-950/80 z-10 min-h-[60px]">
+            <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
+          </div>
+        )}
+        <iframe
+          ref={iframeRef}
+          className="w-full border-none"
+          style={{ height: 0 }}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          title={`MCP App: ${toolResult.name}`}
+        />
+      </div>
     </div>
   );
 }
