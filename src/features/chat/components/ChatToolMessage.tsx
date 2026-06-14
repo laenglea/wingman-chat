@@ -7,6 +7,7 @@ import { cn } from "@/shared/lib/cn";
 import type { Content, Message, ToolResultContent } from "@/shared/types/chat";
 import { CodeRenderer } from "@/shared/ui/CodeRenderer";
 import { RenderContents } from "@/shared/ui/ContentRenderer";
+import { McpProviderIcon } from "@/shared/ui/McpProviderIcon";
 import { getToolCallPreview } from "./chatMessageUtils";
 import { InlineMcpApp } from "./InlineMcpApp";
 import { extractToolCode, toolPresentation } from "./toolDisplay";
@@ -25,14 +26,15 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
 
   const toolResult = toolResultParts[0]; // Usually just one
 
-  const toolIcon = useMemo(() => {
+  const toolDef = useMemo(() => {
     if (!toolResult?.name) return undefined;
     for (const provider of providers) {
       const tool = provider.tools.find((t) => t.name === toolResult.name);
-      if (tool?.icon) return tool.icon;
+      if (tool) return tool;
     }
     return undefined;
   }, [toolResult?.name, providers]);
+  const toolIcon = toolDef?.icon;
   const isToolError = !!message.error;
   // When a result carries an MCP UI app, the app is the primary renderer; per the
   // MCP Apps spec the `content` blocks are for model context / text-only fallback,
@@ -112,7 +114,7 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
               ) : pres.Icon ? (
                 <pres.Icon className="w-3 h-3 text-neutral-400 dark:text-neutral-500 shrink-0" />
               ) : toolIcon ? (
-                <img src={toolIcon} alt="" className="shrink-0 w-3 h-3 object-contain" />
+                <McpProviderIcon src={toolIcon} size={12} className="shrink-0 w-3 h-3 object-contain" />
               ) : (
                 <Wrench className="w-3 h-3 text-neutral-400 dark:text-neutral-500 shrink-0" />
               )}
@@ -123,7 +125,7 @@ export const ChatToolMessage = memo(function ChatToolMessage({ message, index }:
                   isToolError ? "text-red-500 dark:text-red-400" : "text-neutral-500 dark:text-neutral-400",
                 )}
               >
-                {isToolError && !pres.Icon ? "Tool Error" : pres.label}
+                {isToolError && !pres.Icon ? "Tool Error" : !pres.Icon && toolDef?.title ? toolDef.title : pres.label}
               </span>
               {!pres.Icon && !toolResultExpanded && queryPreview && (
                 <span className="text-xs text-neutral-400 dark:text-neutral-500 font-mono truncate">

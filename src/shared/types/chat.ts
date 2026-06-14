@@ -62,7 +62,8 @@ export interface ToolProvider {
 
 export type Tool = {
   name: string;
-  description: string;
+  title?: string;
+  description?: string;
   icon?: string;
 
   parameters: Record<string, unknown>;
@@ -89,6 +90,7 @@ export interface ToolContext {
   setMeta?(meta: Record<string, unknown>): void;
   updateMeta?(meta: Record<string, unknown>): void;
   setError?(error: MessageError): void;
+  setContent?(content: Record<string, unknown>): void;
   setContext?(text: string | null): Promise<void>;
   /** Trace context for nested agents spawned from this tool. */
   agentContext?: AgentContext;
@@ -116,6 +118,7 @@ export type ToolResultContent = {
   arguments: string;
   meta?: Record<string, unknown>;
   result: (TextContent | ImageContent | AudioContent | FileContent)[];
+  content?: Record<string, unknown>;
 };
 
 export type SummaryContent = {

@@ -64,12 +64,26 @@ export const ArtifactChip = memo(function ArtifactChip({ path, className }: { pa
         className,
       )}
     >
-      <span className="relative shrink-0">
-        <File className="h-7 w-7 text-neutral-400 dark:text-neutral-500" strokeWidth={1.5} />
+      <span className="relative h-7 w-7 shrink-0">
+        <File
+          className={cn(
+            "h-7 w-7 text-neutral-400 dark:text-neutral-500 transition-opacity",
+            exists && "group-hover/artifact:opacity-0",
+          )}
+          strokeWidth={1.5}
+        />
         {ext && (
-          <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded bg-neutral-500 px-1 text-[8px] font-bold leading-snug text-white dark:bg-neutral-600">
+          <span
+            className={cn(
+              "absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded bg-neutral-500 px-1 text-[8px] font-bold leading-snug text-white transition-opacity dark:bg-neutral-600",
+              exists && "group-hover/artifact:opacity-0",
+            )}
+          >
             {ext}
           </span>
+        )}
+        {exists && (
+          <PanelRightOpen className="absolute inset-0 m-auto h-6 w-6 text-neutral-500 opacity-0 transition-opacity group-hover/artifact:opacity-100 dark:text-neutral-300" />
         )}
       </span>
 
@@ -81,10 +95,6 @@ export const ArtifactChip = memo(function ArtifactChip({ path, className }: { pa
       >
         {name}
       </span>
-
-      {exists && (
-        <PanelRightOpen className="h-4 w-4 shrink-0 text-neutral-400 opacity-0 transition-opacity group-hover/artifact:opacity-100" />
-      )}
     </button>
   );
 });

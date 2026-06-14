@@ -141,6 +141,7 @@ async function dispatchToolCall(
   try {
     let resultMeta: Record<string, unknown> | undefined;
     let resultError: MessageError | undefined;
+    let resultContent: Record<string, unknown> | undefined;
 
     const result = await traceExecuteTool(
       toolCall.name,
@@ -164,6 +165,9 @@ async function dispatchToolCall(
           setError: (error) => {
             resultError = error;
           },
+          setContent: (content) => {
+            resultContent = content;
+          },
           agentContext: executeCtx,
         };
         return tool.function(args, toolContext);
@@ -180,6 +184,7 @@ async function dispatchToolCall(
           arguments: toolCall.arguments,
           result,
           ...(resultMeta ? { meta: resultMeta } : {}),
+          ...(resultContent ? { content: resultContent } : {}),
         },
       ],
       ...(resultError ? { error: resultError } : {}),

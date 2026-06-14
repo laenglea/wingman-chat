@@ -337,6 +337,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
       resourceUri: string,
       args: Record<string, unknown>,
       result: (TextContent | ImageContent | AudioContent | FileContent)[],
+      content: Record<string, unknown> | undefined,
       context: ToolContext,
       displayModeOptions?: import("@/features/settings/lib/mcp").DisplayModeOptions,
     ) => {
@@ -352,7 +353,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
         throw new Error(`Cannot restore tool UI: MCP client ${providerId} not connected`);
       }
 
-      await client.restoreToolUI(toolName, resourceUri, args, result, context, displayModeOptions);
+      await client.restoreToolUI(toolName, resourceUri, args, result, content, context, displayModeOptions);
     },
     [allMcpClients, connectMcp],
   );

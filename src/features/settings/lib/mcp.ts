@@ -11,7 +11,6 @@ import {
   PostMessageTransport,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/app-bridge";
-import { trace } from "@opentelemetry/api";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport as ClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -29,6 +28,8 @@ import {
   McpError,
   ToolListChangedNotificationSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { trace } from "@opentelemetry/api";
+import { textToDataUrl } from "@/shared/lib/fileContent";
 import {
   type AudioContent,
   type FileContent,
@@ -41,7 +42,6 @@ import {
   type ToolIcon,
   type ToolProvider,
 } from "@/shared/types/chat";
-import { textToDataUrl } from "@/shared/lib/fileContent";
 import type { ElicitationSchema } from "@/shared/types/elicitation";
 import { BrowserOAuthClientProvider } from "./mcpAuth";
 
@@ -341,6 +341,7 @@ export class MCPClient implements ToolProvider {
             pickIcon(tool.icons as McpIcon[] | undefined) ?? (typeof this.icon === "string" ? this.icon : undefined);
           return {
             name: tool.name,
+            title: tool.title ?? (tool.annotations as { title?: string } | undefined)?.title,
             icon,
 
             description: tool.description || "",
@@ -383,6 +384,10 @@ export class MCPClient implements ToolProvider {
                     ...(toolUiMeta?.defaultDisplayMode ? { defaultDisplayMode: toolUiMeta.defaultDisplayMode } : {}),
                     ...(toolUiMeta?.availableDisplayModes ? { appDisplayModes: toolUiMeta.availableDisplayModes } : {}),
                   });
+
+                  if (normalizedResult.structuredContent) {
+                    context.setContent?.(normalizedResult.structuredContent);
+                  }
                 }
 
                 return await processContent(normalizedResult.content as MCPContentBlock[], activeClient);
@@ -433,6 +438,24 @@ export class MCPClient implements ToolProvider {
     const iframeWindow = iframe.contentWindow;
     if (!iframeWindow) {
       throw new Error(`MCP iframe content window unavailable for ${toolName}`);
+    }
+
+    // Tear down any bridge still active for this provider before creating a new
+    // one. Two live bridges would both answer the app's requests, so the guest
+    // sees duplicate JSON-RPC responses ("unknown message ID") and fails.
+    if (this.activeBridge) {
+      const stale = this.activeBridge;
+      this.activeBridge = null;
+      try {
+        await stale.teardownResource({});
+      } catch {
+        // ignore — the stale session may still be booting
+      }
+      try {
+        await stale.close();
+      } catch (error) {
+        console.error("Error closing stale MCP app bridge:", error);
+      }
     }
 
     const bridge = new AppBridge(
@@ -617,6 +640,7 @@ export class MCPClient implements ToolProvider {
     uiResourceUri: string,
     args: Record<string, unknown>,
     storedResult: (TextContent | ImageContent | AudioContent | FileContent)[],
+    content: Record<string, unknown> | undefined,
     context: ToolContext,
     displayModeOptions?: DisplayModeOptions,
   ): Promise<void> {
@@ -639,6 +663,7 @@ export class MCPClient implements ToolProvider {
         }
         return { type: "text" as const, text: JSON.stringify(c) };
       }),
+      ...(content ? { structuredContent: content } : {}),
     };
 
     // Try to use cached resource, otherwise re-fetch

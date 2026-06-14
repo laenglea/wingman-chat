@@ -25,6 +25,7 @@ export interface ToolsContextValue {
     resourceUri: string,
     args: Record<string, unknown>,
     result: (TextContent | ImageContent | AudioContent | FileContent)[],
+    content: Record<string, unknown> | undefined,
     context: ToolContext,
     displayModeOptions?: DisplayModeOptions,
   ) => Promise<void>;

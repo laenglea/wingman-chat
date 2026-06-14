@@ -32,6 +32,8 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
   const providerId = toolResult.meta?.toolProvider as string;
   const resourceUri = toolResult.meta?.toolResource as string;
   const appKey = `${providerId}-${resourceUri}-${toolResult.id}`;
+  // Persisted by the MCP tool function; the app reads it (e.g. viewUUID/url) to render.
+  const content = toolResult.content;
 
   const appDisplayModes = getAppDisplayModes(toolResult);
 
@@ -71,7 +73,7 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
         render: () => renderApp(),
       };
 
-      await restoreToolUI(providerId, toolResult.name, resourceUri, args, toolResult.result, context, {
+      await restoreToolUI(providerId, toolResult.name, resourceUri, args, toolResult.result, content, context, {
         displayMode: "fullscreen",
       });
     } catch (error) {
@@ -90,6 +92,7 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
     renderApp,
     restoreToolUI,
     setActiveAppKey,
+    content,
   ]);
 
   const renderInline = useCallback(async () => {
@@ -119,7 +122,7 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
         },
       };
 
-      await restoreToolUI(providerId, toolResult.name, resourceUri, args, toolResult.result, context, {
+      await restoreToolUI(providerId, toolResult.name, resourceUri, args, toolResult.result, content, context, {
         displayMode: "inline",
         onDisplayModeRequested: (mode) => setDisplayMode(mode as AppDisplayMode),
       });
@@ -129,7 +132,7 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
       console.error("Failed to render inline MCP app:", error);
       setIsLoading(false);
     }
-  }, [toolResult, providerId, resourceUri, setProviderEnabled, renderAppInto, restoreToolUI]);
+  }, [toolResult, providerId, resourceUri, setProviderEnabled, renderAppInto, restoreToolUI, content]);
 
   const [prevShowAppDrawer, setPrevShowAppDrawer] = useState(showAppDrawer);
   if (showAppDrawer !== prevShowAppDrawer) {
@@ -149,13 +152,22 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
     }
   }
 
+  // Read the render fns via refs so the effect below only re-runs on actual mode
+  // changes — not when context callbacks (restoreToolUI, etc.) change identity as
+  // the MCP client connects. Re-running on every identity change would spawn a
+  // second AppBridge and the guest would see duplicate JSON-RPC responses.
+  const expandToFullscreenRef = useRef(expandToFullscreen);
+  expandToFullscreenRef.current = expandToFullscreen;
+  const renderInlineRef = useRef(renderInline);
+  renderInlineRef.current = renderInline;
+
   useEffect(() => {
     if (displayMode === "fullscreen" && !isFullscreenOnly) {
-      expandToFullscreen();
+      expandToFullscreenRef.current();
     } else if (displayMode === "fullscreen" && isFullscreenOnly && isLastFullscreenApp) {
-      expandToFullscreen();
+      expandToFullscreenRef.current();
     } else if (displayMode === "inline") {
-      renderInline();
+      renderInlineRef.current();
     }
 
     return () => {
@@ -165,7 +177,7 @@ export function InlineMcpApp({ toolResult, isLastFullscreenApp }: InlineMcpAppPr
         Promise.resolve(cleanup()).catch(console.error);
       }
     };
-  }, [displayMode, isFullscreenOnly, isLastFullscreenApp, expandToFullscreen, renderInline]);
+  }, [displayMode, isFullscreenOnly, isLastFullscreenApp]);
 
   if (isFullscreenOnly) {
     return (
