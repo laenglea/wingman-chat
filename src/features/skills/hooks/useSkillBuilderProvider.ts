@@ -1,20 +1,34 @@
 import { PenTool } from "lucide-react";
 import { useMemo } from "react";
 import { useAgents } from "@/features/agent/hooks/useAgents";
-import { validateSkillName } from "@/features/skills/lib/skillParser";
+import { validateSkillDescription, validateSkillName } from "@/features/skills/lib/skillParser";
+import skillBuilderPrompt from "@/features/skills/prompts/skill-builder.txt?raw";
 import type { Tool, ToolProvider } from "@/shared/types/chat";
 import { useSkills } from "./useSkills";
 
 export function useSkillBuilderProvider(): ToolProvider {
-  const { getSkill, addSkill, updateSkill: updateSkillInLibrary } = useSkills();
+  const { skills, getSkill, addSkill, updateSkill: updateSkillInLibrary, removeSkill } = useSkills();
   const { currentAgent, updateAgent } = useAgents();
 
   return useMemo<ToolProvider>(() => {
     const tools: Tool[] = [
       {
+        name: "list_skills",
+        description:
+          "List the skills already in the library (name and description only). Use it to avoid creating duplicates and to find the exact name of a skill to update.",
+        parameters: {
+          type: "object",
+          properties: {},
+        },
+        function: async () => {
+          const list = skills.map((s) => ({ name: s.name, description: s.description }));
+          return [{ type: "text" as const, text: JSON.stringify({ skills: list }) }];
+        },
+      },
+      {
         name: "create_skill",
         description:
-          "Create a new skill. Skills are specialized prompts with a name, description, and markdown content body. The skill is automatically enabled on the current agent.",
+          "Create a new skill and add it to the library. Skills are reusable, specialized prompts with a name, description, and markdown content body. When an agent is active, the new skill is also enabled on it.",
         parameters: {
           type: "object",
           properties: {
@@ -25,7 +39,8 @@ export function useSkillBuilderProvider(): ToolProvider {
             },
             description: {
               type: "string",
-              description: "Short description of what the skill does (max 1024 chars).",
+              description:
+                "What the skill does and when to use it — this is how the skill is matched to a request (max 1024 chars).",
             },
             content: {
               type: "string",
@@ -48,15 +63,14 @@ export function useSkillBuilderProvider(): ToolProvider {
             ];
           }
 
-          const validation = validateSkillName(name);
-          if (!validation.valid) {
-            return [{ type: "text" as const, text: JSON.stringify({ error: validation.error }) }];
+          const nameValidation = validateSkillName(name);
+          if (!nameValidation.valid) {
+            return [{ type: "text" as const, text: JSON.stringify({ error: nameValidation.error }) }];
           }
 
-          if (description.length > 1024) {
-            return [
-              { type: "text" as const, text: JSON.stringify({ error: "Description must be 1024 characters or less" }) },
-            ];
+          const descriptionValidation = validateSkillDescription(description);
+          if (!descriptionValidation.valid) {
+            return [{ type: "text" as const, text: JSON.stringify({ error: descriptionValidation.error }) }];
           }
 
           const existing = getSkill(name);
@@ -82,14 +96,19 @@ export function useSkillBuilderProvider(): ToolProvider {
           return [
             {
               type: "text" as const,
-              text: JSON.stringify({ success: true, skill: { name: skill.name, description: skill.description } }),
+              text: JSON.stringify({
+                success: true,
+                enabledOnAgent: currentAgent ? currentAgent.name : null,
+                skill: { name: skill.name, description: skill.description },
+              }),
             },
           ];
         },
       },
       {
         name: "update_skill",
-        description: "Update an existing skill's description and/or content.",
+        description:
+          "Replace an existing skill's description and/or content. This overwrites the field wholesale — pass the complete new value, not a diff. Read the skill's current content first (read_skill or list_skills) before modifying one you didn't just author.",
         parameters: {
           type: "object",
           properties: {
@@ -122,13 +141,9 @@ export function useSkillBuilderProvider(): ToolProvider {
           const updates: Partial<{ description: string; content: string }> = {};
           if (args.description !== undefined) {
             const desc = (args.description as string).trim();
-            if (desc.length > 1024) {
-              return [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify({ error: "Description must be 1024 characters or less" }),
-                },
-              ];
+            const descriptionValidation = validateSkillDescription(desc);
+            if (!descriptionValidation.valid) {
+              return [{ type: "text" as const, text: JSON.stringify({ error: descriptionValidation.error }) }];
             }
             updates.description = desc;
           }
@@ -150,6 +165,45 @@ export function useSkillBuilderProvider(): ToolProvider {
           return [{ type: "text" as const, text: JSON.stringify({ success: true, skill: { name, ...updates } }) }];
         },
       },
+      {
+        name: "delete_skill",
+        description:
+          "Permanently delete a skill from the library. This cannot be undone — confirm with the user before deleting a skill you didn't just create. If the active agent has the skill enabled, it is also removed from that agent.",
+        parameters: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "The name of the skill to delete.",
+            },
+          },
+          required: ["name"],
+        },
+        function: async (args: Record<string, unknown>) => {
+          const name = (args.name as string)?.trim();
+          if (!name) {
+            return [{ type: "text" as const, text: JSON.stringify({ error: "Skill name is required" }) }];
+          }
+
+          const existing = getSkill(name);
+          if (!existing) {
+            return [{ type: "text" as const, text: JSON.stringify({ error: `Skill "${name}" not found` }) }];
+          }
+
+          removeSkill(existing.id);
+
+          // Drop the now-deleted skill from the active agent (symmetric with
+          // create_skill's auto-enable); references on other agents are harmless
+          // — they're filtered out when their skills are resolved.
+          let removedFromAgent: string | null = null;
+          if (currentAgent && (currentAgent.skills || []).includes(name)) {
+            updateAgent(currentAgent.id, { skills: currentAgent.skills.filter((s) => s !== name) });
+            removedFromAgent = currentAgent.name;
+          }
+
+          return [{ type: "text" as const, text: JSON.stringify({ success: true, deleted: name, removedFromAgent }) }];
+        },
+      },
     ];
 
     return {
@@ -157,7 +211,8 @@ export function useSkillBuilderProvider(): ToolProvider {
       name: "Skill Builder",
       description: "Create and edit skills",
       icon: PenTool,
+      instructions: skillBuilderPrompt || undefined,
       tools,
     };
-  }, [getSkill, addSkill, updateSkillInLibrary, currentAgent, updateAgent]);
+  }, [skills, getSkill, addSkill, updateSkillInLibrary, removeSkill, currentAgent, updateAgent]);
 }

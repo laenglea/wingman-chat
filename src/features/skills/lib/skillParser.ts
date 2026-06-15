@@ -27,6 +27,8 @@ export type SkillParseResult =
 // No start/end hyphens, no consecutive hyphens
 const SKILL_NAME_REGEX = /^[\p{Ll}\p{N}]+(-[\p{Ll}\p{N}]+)*$/u;
 
+export const SKILL_DESCRIPTION_MAX_LENGTH = 1024;
+
 /**
  * Validate a skill name against the agentskills.io specification
  */
@@ -45,6 +47,21 @@ export function validateSkillName(name: string): { valid: boolean; error?: strin
       error:
         "Name must contain only lowercase alphanumeric characters and hyphens. Cannot start or end with a hyphen or have consecutive hyphens.",
     };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate a skill description (required, max length)
+ */
+export function validateSkillDescription(description: string): { valid: boolean; error?: string } {
+  if (!description) {
+    return { valid: false, error: "Description is required" };
+  }
+
+  if (description.length > SKILL_DESCRIPTION_MAX_LENGTH) {
+    return { valid: false, error: `Description must be ${SKILL_DESCRIPTION_MAX_LENGTH} characters or less` };
   }
 
   return { valid: true };
@@ -117,8 +134,11 @@ export function parseSkillFile(content: string): SkillParseResult {
   const description = frontmatter.description;
   if (!description) {
     errors.push({ field: "description", message: "Description is required in frontmatter" });
-  } else if (description.length > 1024) {
-    errors.push({ field: "description", message: "Description must be 1024 characters or less" });
+  } else if (description.length > SKILL_DESCRIPTION_MAX_LENGTH) {
+    errors.push({
+      field: "description",
+      message: `Description must be ${SKILL_DESCRIPTION_MAX_LENGTH} characters or less`,
+    });
   }
 
   if (errors.length > 0) {

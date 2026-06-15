@@ -3,7 +3,6 @@ import {
   Bot,
   Loader2,
   LoaderCircle,
-  MessageSquare,
   Mic,
   Rocket,
   ScreenShare,
@@ -19,6 +18,7 @@ import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
 import { processUploadedFile } from "@/features/artifacts/lib/artifacts";
 import { useChat } from "@/features/chat/hooks/useChat";
 import { chatAcceptString, useFileAttachments } from "@/features/chat/hooks/useFileAttachments";
+import { getSavedModelId } from "@/features/chat/hooks/useModels";
 import { useScreenCapture } from "@/features/chat/hooks/useScreenCapture";
 import { useSettings } from "@/features/settings/hooks/useSettings";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
@@ -37,7 +37,6 @@ import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/Dropdown
 import { ModelDropdown } from "@/shared/ui/ModelDropdown";
 import { Tooltip } from "@/shared/ui/Tooltip";
 import { useAudioDevices } from "@/shell/hooks/useAudioDevices";
-import { useBackground } from "@/shell/hooks/useBackground";
 import { ChatInputAddMenu } from "./ChatInputAddMenu";
 import { ChatInputAttachments } from "./ChatInputAttachments";
 import { formatArtifactReference } from "./chatMessageUtils";
@@ -60,24 +59,44 @@ export function ChatInput() {
   const {
     isAvailable: voiceAvailable,
     isListening,
+    isConnecting,
     audioLevel,
     startVoice,
     stopVoice,
     sendText: sendVoiceText,
   } = useVoice();
   const { inputDeviceId, inputDevices, setInputDevice, requestPermission: requestAudioPermission } = useAudioDevices();
-  const { backgroundSetting } = useBackground();
 
   // Track if realtime mode model is selected (either via model picker or agent's model)
   const isRealtimeSelected = model?.id === "realtime" || currentAgent?.model === "realtime";
 
-  // Request microphone permission when entering voice mode so the device
-  // selector can immediately show real device names without an extra click.
+  // Request mic permission once per voice-mode entry so the device selector shows real names.
+  const permissionRequestedRef = useRef(false);
   useEffect(() => {
-    if (isRealtimeSelected && voiceAvailable && inputDevices.length === 0) {
+    if (!isRealtimeSelected || !voiceAvailable) {
+      permissionRequestedRef.current = false;
+      return;
+    }
+    if (inputDevices.length === 0 && !permissionRequestedRef.current) {
+      permissionRequestedRef.current = true;
       void requestAudioPermission();
     }
   }, [isRealtimeSelected, voiceAvailable, inputDevices.length, requestAudioPermission]);
+
+  // Auto-start voice when entering via the mode toggle (not via a realtime agent).
+  // Attempt once per entry to avoid a retry loop if startVoice() fails.
+  const isRealtimeViaToggle = model?.id === "realtime" && currentAgent?.model !== "realtime";
+  const autoStartAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!isRealtimeViaToggle || !voiceAvailable) {
+      autoStartAttemptedRef.current = false;
+      return;
+    }
+    if (!isListening && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void startVoice();
+    }
+  }, [isRealtimeViaToggle, voiceAvailable, isListening, startVoice]);
 
   const [content, setContent] = useState("");
   const [transcribingContent, setTranscribingContent] = useState(false);
@@ -105,19 +124,7 @@ export function ChatInput() {
   const contentInputRef = useRef<HTMLTextAreaElement>(null);
   const voiceInputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const modeSliderRef = useRef<HTMLDivElement>(null);
-  const [modeSliderStyle, setModeSliderStyle] = useState({ left: 0, width: 0 });
   const profileName = profile?.name;
-
-  useEffect(() => {
-    const container = modeSliderRef.current;
-    if (!container) return;
-    const active = container.querySelector<HTMLElement>(`[data-mode="${isRealtimeSelected ? "voice" : "chat"}"]`);
-    if (!active) return;
-    const cr = container.getBoundingClientRect();
-    const br = active.getBoundingClientRect();
-    setModeSliderStyle({ left: br.left - cr.left, width: br.width });
-  }, [isRealtimeSelected]);
 
   // Generate static random placeholder text for new chats only
   const randomPlaceholder = useMemo(() => {
@@ -524,22 +531,6 @@ export function ChatInput() {
                     }
                   }}
                 />
-
-                {isListening && !voiceTextInput && (
-                  <div
-                    className="absolute top-3 md:top-4 left-3 md:left-4 pointer-events-none flex items-center gap-2 text-neutral-500 dark:text-neutral-400"
-                    aria-live="polite"
-                  >
-                    <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/50 animate-ping" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                    </span>
-                    <span className="text-sm">
-                      <span className="font-medium text-neutral-700 dark:text-neutral-300">Listening</span>
-                      <span className="text-neutral-500 dark:text-neutral-400"> — speak or type a message</span>
-                    </span>
-                  </div>
-                )}
               </>
             ) : (
               <>
@@ -623,22 +614,6 @@ export function ChatInput() {
               isDragging && "blur-sm",
             )}
           >
-            {isRealtimeSelected && !isListening && (
-              <button
-                type="button"
-                className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 pb-10 group"
-                onClick={startVoice}
-              >
-                <div className="flex items-center justify-center w-8 h-8 shrink-0 rounded-full bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 group-hover:bg-neutral-300 dark:group-hover:bg-neutral-600 group-hover:text-neutral-800 dark:group-hover:text-neutral-100 transition-all duration-200">
-                  <Mic size={15} />
-                </div>
-                <span className="text-xs text-neutral-500 dark:text-neutral-400 group-hover:text-neutral-700 dark:group-hover:text-neutral-200 transition-colors whitespace-nowrap">
-                  <span className="hidden @xl:inline">Click to start voice conversation</span>
-                  <span className="@xl:hidden">Click to start</span>
-                </span>
-              </button>
-            )}
-
             {isRealtimeSelected && isListening && (
               <div
                 className="pointer-events-none absolute inset-0 p-3 pt-0 pb-8 md:pb-3 flex items-center justify-center"
@@ -678,6 +653,21 @@ export function ChatInput() {
               </div>
             )}
             <div className="flex items-center gap-2">
+              {/* Listening hint — bottom row, left side */}
+              {isRealtimeSelected && isListening && !voiceTextInput && (
+                <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400" aria-live="polite">
+                  <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/50 animate-ping" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  </span>
+                  <span className="text-xs">
+                    <span className="font-medium text-neutral-700 dark:text-neutral-300">
+                      {currentAgent?.name ?? "Listening"}
+                    </span>
+                    <span className="text-neutral-500 dark:text-neutral-400"> — speak or type a message</span>
+                  </span>
+                </div>
+              )}
               {!isRealtimeSelected && (
                 <ChatInputAddMenu
                   isScreenCaptureAvailable={isScreenCaptureAvailable}
@@ -711,15 +701,17 @@ export function ChatInput() {
                       onPointerDownCapture={onPointerDownCapture}
                       className="flex items-center gap-1.5 pl-1 py-0 rounded-lg text-xs font-medium text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors max-w-48"
                     >
-                      <span className="shrink-0 flex justify-center">{toolIndicator}</span>
-                      <span className="truncate min-w-0">{model?.name ?? model?.id ?? "Select Model"}</span>
+                      <Tooltip content="Switch model" side="bottom" className="flex items-center gap-1.5 min-w-0">
+                        <span className="shrink-0 flex justify-center">{toolIndicator}</span>
+                        <span className="truncate min-w-0">{model?.name ?? model?.id ?? "Select Model"}</span>
+                      </Tooltip>
                     </button>
                   )}
                 />
               )}
 
-              {/* Agent picker — combined trigger + active-agent badge */}
-              {currentAgent && (
+              {/* Agent picker — combined trigger + active-agent badge (hidden when listening, agent name shown in hint) */}
+              {currentAgent && !(isRealtimeSelected && isListening) && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -758,84 +750,118 @@ export function ChatInput() {
                   <span>Sharing</span>
                 </button>
               )}
-
-              {voiceAvailable && isRealtimeSelected && (
-                <DropdownMenu
-                  anchor="bottom start"
-                  panelClassName="max-h-[50vh]! min-w-52"
-                  trigger={
-                    <MenuButton
-                      className="flex items-center gap-1.5 pl-1 py-0 rounded-lg text-xs font-medium text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors max-w-48"
-                      title="Select microphone"
-                      aria-label="Select microphone"
-                    >
-                      <span className="shrink-0 flex justify-center">
-                        <Mic size={14} />
-                      </span>
-                      <span className="hidden @md:inline truncate min-w-0">
-                        {(() => {
-                          const selected = inputDevices.find((d) => d.deviceId === inputDeviceId);
-                          if (selected) return selected.label || "Microphone";
-                          return "Default";
-                        })()}
-                      </span>
-                    </MenuButton>
-                  }
-                >
-                  {inputDevices.length === 0 ? (
-                    <DropdownMenuItem
-                      icon={<Mic size={14} className="shrink-0" />}
-                      onClick={() => {
-                        void requestAudioPermission();
-                      }}
-                    >
-                      Allow microphone access
-                    </DropdownMenuItem>
-                  ) : (
-                    <>
-                      <DropdownMenuItem onClick={() => setInputDevice(undefined)}>System Default</DropdownMenuItem>
-                      {inputDevices.map((device) => (
-                        <DropdownMenuItem key={device.deviceId} onClick={() => setInputDevice(device.deviceId)}>
-                          {device.label || `Microphone (${device.deviceId.slice(0, 8)})`}
-                        </DropdownMenuItem>
-                      ))}
-                    </>
-                  )}
-                </DropdownMenu>
-              )}
             </div>
 
             <div className="flex items-center gap-2 md:gap-1 min-h-9 md:min-h-7">
               {/* Dynamic Send/Mic/Voice/Loading Button */}
               {isRealtimeSelected ? (
-                isListening ? (
-                  <>
-                    {voiceTextInput.trim() && (
-                      <button
-                        type="button"
-                        className="p-2.5 md:p-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
-                        onClick={() => {
-                          sendVoiceText(voiceTextInput.trim());
-                          setVoiceTextInput("");
-                        }}
-                        title="Send text"
-                      >
-                        <Send size={16} />
-                      </button>
-                    )}
+                <>
+                  {isListening && voiceTextInput.trim() ? (
+                    // When the user has typed text during a live session, show the
+                    // Send action in the microphone selector's slot.
                     <button
                       type="button"
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-800 dark:hover:text-neutral-200 transition-all text-xs font-medium"
+                      className="p-2.5 md:p-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                      onClick={() => {
+                        sendVoiceText(voiceTextInput.trim());
+                        setVoiceTextInput("");
+                      }}
+                      title="Send text"
+                    >
+                      <Send size={16} />
+                    </button>
+                  ) : (
+                    voiceAvailable && (
+                      <DropdownMenu
+                        anchor="bottom start"
+                        panelClassName="max-h-[50vh]! min-w-52"
+                        trigger={
+                          <MenuButton
+                            className="flex items-center gap-1.5 pl-1 pr-2 py-0 mr-1 rounded-lg text-xs font-medium text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors max-w-48"
+                            title="Select microphone"
+                            aria-label="Select microphone"
+                          >
+                            <span className="shrink-0 flex justify-center">
+                              <Mic size={14} />
+                            </span>
+                            <span className="hidden @md:inline truncate min-w-0">
+                              {(() => {
+                                const selected = inputDevices.find((d) => d.deviceId === inputDeviceId);
+                                if (selected) return selected.label || "Microphone";
+                                return "Default Mic";
+                              })()}
+                            </span>
+                          </MenuButton>
+                        }
+                      >
+                        {inputDevices.length === 0 ? (
+                          <DropdownMenuItem
+                            icon={<Mic size={14} className="shrink-0" />}
+                            onClick={() => {
+                              void requestAudioPermission();
+                            }}
+                          >
+                            Allow microphone access
+                          </DropdownMenuItem>
+                        ) : (
+                          <>
+                            <DropdownMenuItem onClick={() => setInputDevice(undefined)}>
+                              System Default
+                            </DropdownMenuItem>
+                            {inputDevices.map((device) => (
+                              <DropdownMenuItem key={device.deviceId} onClick={() => setInputDevice(device.deviceId)}>
+                                {device.label || `Microphone (${device.deviceId.slice(0, 8)})`}
+                              </DropdownMenuItem>
+                            ))}
+                          </>
+                        )}
+                      </DropdownMenu>
+                    )
+                  )}
+                  {isConnecting && !isListening ? (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-neutral-300/50 dark:border-neutral-600/50 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100/50 dark:hover:bg-neutral-800/50 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors text-xs font-medium"
+                      title="Cancel connecting"
                       onClick={async () => {
                         await stopVoice();
+                        const savedId = getSavedModelId();
+                        const restored = (savedId && models.find((m) => m.id === savedId)) || models[0];
+                        onModelChange(restored ?? null);
                       }}
-                      title="Stop voice mode"
                     >
-                      <Square size={12} />
-                      <span>Stop</span>
+                      <LoaderCircle size={12} className="animate-spin" />
+                      <span>Cancel</span>
                     </button>
-                  </>
-                ) : null
+                  ) : (
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-neutral-300/50 dark:border-neutral-600/50 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100/50 dark:hover:bg-neutral-800/50 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors text-xs font-medium"
+                      onClick={async () => {
+                        if (!isListening) {
+                          await startVoice();
+                          return;
+                        }
+                        await stopVoice();
+                        const savedId = getSavedModelId();
+                        const restored = (savedId && models.find((m) => m.id === savedId)) || models[0];
+                        onModelChange(restored ?? null);
+                      }}
+                    >
+                      {isListening ? (
+                        <>
+                          <Square size={12} />
+                          <span>Stop</span>
+                        </>
+                      ) : (
+                        <>
+                          <AudioLines size={12} />
+                          <span>Start audio</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </>
               ) : isResponding ? (
                 <button
                   type="button"
@@ -875,7 +901,7 @@ export function ChatInput() {
                     <Square size={16} />
                   </button>
                 ) : (
-                  // Not yet recording — desktop shows mic button; mobile uses the + menu
+                  // Not yet recording — desktop shows dictate mic + voice-mode wave; mobile uses the + menu and wave
                   <>
                     <Tooltip content="Start dictate" side="bottom" className="hidden md:block">
                       <button
@@ -887,102 +913,57 @@ export function ChatInput() {
                         <Mic size={16} />
                       </button>
                     </Tooltip>
-                    <button
-                      className="md:hidden p-2.5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-                      type="submit"
-                      disabled={isResponding}
-                    >
-                      <Send size={16} />
-                    </button>
+                    {voiceAvailable && !currentAgent?.model ? (
+                      <Tooltip content="Voice mode" side="bottom">
+                        <button
+                          type="button"
+                          className="p-2.5 md:p-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                          onClick={() =>
+                            onModelChange({
+                              id: "realtime",
+                              name: "Voice Mode",
+                              description: "Real-time voice conversation",
+                            })
+                          }
+                          title="Voice mode"
+                          aria-label="Start voice mode"
+                        >
+                          <AudioLines size={16} />
+                        </button>
+                      </Tooltip>
+                    ) : (
+                      <button
+                        className="md:hidden p-2.5 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
+                        type="submit"
+                        disabled={isResponding}
+                      >
+                        <Send size={16} />
+                      </button>
+                    )}
                   </>
                 )
-              ) : (
-                <button
-                  className="p-2.5 md:p-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
-                  type="submit"
-                  disabled={isResponding}
-                >
-                  <Send size={16} />
-                </button>
-              )}
-
-              {voiceAvailable && !currentAgent?.model && (
-                <div
-                  ref={modeSliderRef}
-                  role="tablist"
-                  aria-label="Input mode"
-                  className={cn(
-                    "relative flex items-center gap-0.5 rounded-full p-0.5",
-                    backgroundSetting
-                      ? "bg-black/15 dark:bg-white/15 ring-1 ring-black/15 dark:ring-white/15 backdrop-blur-sm shadow-sm"
-                      : "bg-neutral-200/50 dark:bg-neutral-800/50",
-                  )}
-                >
-                  {/* Animated slider background */}
-                  {modeSliderStyle.width > 0 && (
-                    <div
-                      className="absolute bg-white dark:bg-neutral-950 rounded-full shadow-sm ring-1 ring-black/5 dark:ring-white/10 transition-[left,width] duration-300 ease-out"
-                      style={{
-                        left: `${modeSliderStyle.left}px`,
-                        width: `${modeSliderStyle.width}px`,
-                        height: "calc(100% - 4px)",
-                        top: "2px",
-                      }}
-                    />
-                  )}
+              ) : voiceAvailable && !currentAgent?.model ? (
+                <Tooltip content="Voice mode" side="bottom">
                   <button
                     type="button"
-                    data-mode="chat"
-                    role="tab"
-                    aria-selected={!isRealtimeSelected}
-                    aria-label="Chat mode"
-                    className={`relative z-10 flex items-center justify-start gap-1.5 py-1 pl-3 pr-3 text-xs font-medium rounded-full transition-colors duration-200 ${
-                      !isRealtimeSelected
-                        ? "w-9 text-neutral-900 dark:text-neutral-50"
-                        : "w-9 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-                    }`}
-                    title="Chat mode"
-                    onClick={() => {
-                      if (!isRealtimeSelected) return;
-                      void stopVoice();
-                      const savedId = (() => {
-                        try {
-                          return localStorage.getItem("app_model");
-                        } catch {
-                          return null;
-                        }
-                      })();
-                      const restored = (savedId && models.find((m) => m.id === savedId)) || models[0];
-                      onModelChange(restored);
-                    }}
-                  >
-                    <MessageSquare size={12} strokeWidth={2.25} className="shrink-0" />
-                  </button>
-                  <button
-                    type="button"
-                    data-mode="voice"
-                    role="tab"
-                    aria-selected={isRealtimeSelected}
-                    aria-label="Voice mode"
-                    className={`relative z-10 flex items-center justify-end gap-1.5 py-1 pl-3 pr-3 text-xs font-medium rounded-full transition-colors duration-200 ${
-                      isRealtimeSelected
-                        ? "w-9 text-neutral-900 dark:text-neutral-50"
-                        : "w-9 text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-                    }`}
-                    title="Voice mode"
+                    className="p-2.5 md:p-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
                     onClick={() =>
-                      !isRealtimeSelected
-                        ? onModelChange({
-                            id: "realtime",
-                            name: "Voice Mode",
-                            description: "Real-time voice conversation",
-                          })
-                        : undefined
+                      onModelChange({
+                        id: "realtime",
+                        name: "Voice Mode",
+                        description: "Real-time voice conversation",
+                      })
                     }
+                    title="Voice mode"
+                    aria-label="Start voice mode"
                   >
-                    <AudioLines size={12} strokeWidth={2.25} className="shrink-0" />
+                    <AudioLines size={16} />
                   </button>
-                </div>
+                </Tooltip>
+              ) : (
+                <span className="p-2.5 md:p-1.5 text-neutral-400 dark:text-neutral-500">
+                  <AudioLines size={16} />
+                </span>
               )}
             </div>
           </div>

@@ -7,6 +7,7 @@ import { useCanvasProvider } from "@/features/canvas/hooks/useCanvasProvider";
 import { useInternetProvider } from "@/features/research/hooks/useInternetProvider";
 import { MCPClient } from "@/features/settings/lib/mcp";
 import { useSkillBuilderProvider } from "@/features/skills/hooks/useSkillBuilderProvider";
+import { useSkillsProvider } from "@/features/skills/hooks/useSkillsProvider";
 import { COMPANION_ID, companionMcpUrl, useCompanion } from "@/features/tools/hooks/useCompanion";
 import { getConfig } from "@/shared/config";
 import type {
@@ -111,6 +112,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   const internetProvider = useInternetProvider();
   const canvasProvider = useCanvasProvider();
   const artifactsProvider = useArtifactsProvider();
+  const skillsProvider = useSkillsProvider();
   const skillBuilderProvider = useSkillBuilderProvider();
 
   // All MCP clients & lookup set (include local wingman only when the app is detected)
@@ -159,6 +161,11 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     if (internetProvider) list.push(internetProvider);
     if (canvasProvider) list.push(canvasProvider);
     if (artifactsProvider) list.push(artifactsProvider);
+    // Global Skills tool: only when no agent is active. With an agent, skills are
+    // governed solely by its curated set (useAgentProviders, which owns the
+    // "skills" id) — otherwise a stale session toggle could leak the whole
+    // library into an agent that curated few or no skills.
+    if (!currentAgent && skillsProvider) list.push(skillsProvider);
     list.push(skillBuilderProvider);
     list.push(...visibleConfigMcpClients);
     if (companionAvailable && companionClient) list.push(companionClient);
@@ -168,6 +175,8 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     internetProvider,
     canvasProvider,
     artifactsProvider,
+    skillsProvider,
+    currentAgent,
     skillBuilderProvider,
     visibleConfigMcpClients,
     companionAvailable,

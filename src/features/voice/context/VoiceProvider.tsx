@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgents } from "@/features/agent/hooks/useAgents";
 import { useChat } from "@/features/chat/hooks/useChat";
 import { useChatContext } from "@/features/chat/hooks/useChatContext";
+import { getSavedModelId } from "@/features/chat/hooks/useModels";
 import type { ToolContextFactory } from "@/features/voice/hooks/useVoiceWebSockets";
 import { useVoiceWebSockets } from "@/features/voice/hooks/useVoiceWebSockets";
 import { getConfig } from "@/shared/config";
@@ -31,6 +32,9 @@ function sessionSignature(instructions: string, tools: { name: string }[]): stri
 
 export function VoiceProvider({ children }: VoiceProviderProps) {
   const [isListening, setIsListening] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  // Synchronous re-entrancy guard for startVoice() (state updates can be batched/stale).
+  const sessionBusyRef = useRef(false);
   const [audioLevel, setAudioLevel] = useState(0);
   const lastLevelUpdateRef = useRef(0);
   const config = getConfig();
@@ -48,6 +52,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
     chat,
     models,
     model: selectedModel,
+    setModel,
     setVoiceToolCall,
     requestElicitation,
     updateToolMeta,
@@ -78,6 +83,10 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   pauseAudioRef.current = pauseAudio;
   const resumeAudioRef = useRef(resumeAudio);
   resumeAudioRef.current = resumeAudio;
+  const setModelRef = useRef(setModel);
+  setModelRef.current = setModel;
+  const modelsRef = useRef(models);
+  modelsRef.current = models;
 
   function onUserTranscriptCallback(text: string) {
     if (text.trim()) {
@@ -99,12 +108,25 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
     setVoiceToolCallRef.current(null);
   }
 
-  // The hook already released mic/player after an unexpected disconnect —
-  // just bring the UI state back in sync.
-  function onClosedCallback() {
+  // The hook already released mic/player after an unexpected disconnect — sync UI state.
+  // On a fatal error also exit realtime mode to prevent auto-start reconnect loop.
+  function onClosedCallback(reason?: { fatal: boolean; message: string }) {
     setIsListening(false);
+    setIsConnecting(false);
+    sessionBusyRef.current = false;
     setAudioLevel(0);
     setVoiceToolCallRef.current(null);
+
+    if (reason?.fatal) {
+      const savedId = getSavedModelId();
+      const restored =
+        (savedId && modelsRef.current.find((m) => m.id === savedId)) ||
+        modelsRef.current.find((m) => m.id !== "realtime") ||
+        null;
+      setModelRef.current(restored);
+      console.error("[voice] session ended:", reason.message);
+      alert(`Voice mode stopped: ${reason.message}`);
+    }
   }
 
   function onToolResultCallback(
@@ -157,6 +179,9 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
 
   const lastSessionSignatureRef = useRef<string>("");
 
+  // Device the live session started with; used to detect mid-session mic switches.
+  const activeInputDeviceRef = useRef<string | undefined>(undefined);
+
   // The realtime model can't run completions for subagents/tool context, so we
   // resolve the first non-realtime completer model to back those operations.
   const underlyingModelId = useMemo(
@@ -181,6 +206,8 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const stopVoice = useCallback(async () => {
     await stop();
     setIsListening(false);
+    setIsConnecting(false);
+    sessionBusyRef.current = false;
     setAudioLevel(0);
     setVoiceToolCall(null);
   }, [stop, setVoiceToolCall]);
@@ -193,7 +220,11 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   }, [isRealtimeSelected, isListening, stopVoice]);
 
   const startVoice = useCallback(async () => {
+    // Guard against re-entrancy from auto-start, Start-audio button, and mic-switch effect.
+    if (sessionBusyRef.current) return;
+    sessionBusyRef.current = true;
     try {
+      setIsConnecting(true);
       const realtimeModel = config.voice?.model;
       const transcribeModel = config.voice?.transcriber ?? config.stt?.model;
       const tools = await chatTools();
@@ -218,8 +249,13 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
           }
         },
         toolContextFactory,
+        // Flip to "listening" only once recording has actually started.
+        () => {
+          setIsConnecting(false);
+          setIsListening(true);
+        },
       );
-      setIsListening(true);
+      activeInputDeviceRef.current = inputDeviceId;
     } catch (error) {
       console.error("Failed to start voice mode:", error);
       const errorMessage = error?.toString() || "";
@@ -228,6 +264,8 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
       } else {
         notify.error("Couldn't start voice mode", "Check your microphone permissions and try again.");
       }
+      setIsConnecting(false);
+      sessionBusyRef.current = false;
     }
   }, [
     buildToolContextFactory,
@@ -243,6 +281,21 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
     outputDeviceId,
   ]);
 
+  // Restart when the user picks a different mic while listening (recorder is bound at start()).
+  useEffect(() => {
+    if (!isListening) return;
+    if (activeInputDeviceRef.current === inputDeviceId) return;
+    // Record target up front so this effect doesn't re-fire during restart.
+    activeInputDeviceRef.current = inputDeviceId;
+    void (async () => {
+      await stop();
+      setIsListening(false);
+      // Clear busy guard so the restart isn't blocked by re-entrancy protection.
+      sessionBusyRef.current = false;
+      await startVoice();
+    })();
+  }, [inputDeviceId, isListening, stop, startVoice]);
+
   const sendVoiceText = useCallback(
     (text: string) => {
       addMessage({ role: Role.User, content: [{ type: "text", text }] });
@@ -254,6 +307,7 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
   const value: VoiceContextType = {
     isAvailable,
     isListening,
+    isConnecting,
     audioLevel,
     startVoice,
     stopVoice,

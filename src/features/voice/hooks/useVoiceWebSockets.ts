@@ -39,7 +39,7 @@ export function useVoiceWebSockets(
     callId: string,
     result: (TextContent | ImageContent | AudioContent | FileContent)[],
   ) => void,
-  onClosed?: () => void,
+  onClosed?: (reason?: { fatal: boolean; message: string }) => void,
 ) {
   const wsRef = useRef<WebSocket | null>(null);
   const wavPlayerRef = useRef<AudioStreamPlayer | null>(null);
@@ -49,6 +49,9 @@ export function useVoiceWebSockets(
 
   const isActiveRef = useRef(false);
   const audioPausedRef = useRef(false);
+
+  // Recent error timestamp; a close shortly after is treated as session-fatal.
+  const lastErrorRef = useRef<{ message: string; at: number } | null>(null);
 
   const pendingResponsesRef = useRef<Map<string, PendingResponse>>(new Map());
   // response_id → assistant audio item_id, needed to truncate the right item
@@ -145,9 +148,11 @@ export function useVoiceWebSockets(
     outputDeviceId?: string,
     onAudioLevel?: (level: number) => void,
     toolContextFactory?: ToolContextFactory,
+    onReady?: () => void,
   ) => {
     if (isActiveRef.current) return;
     isActiveRef.current = true;
+    lastErrorRef.current = null;
 
     toolsRef.current = tools;
     toolContextFactoryRef.current = toolContextFactory;
@@ -196,9 +201,18 @@ export function useVoiceWebSockets(
       const startRecording = () => {
         const cb = buildRecordCallback();
         recordCallbackRef.current = cb;
-        recorder.record(cb).catch((error) => {
-          console.error("Failed to start recording:", error);
-        });
+        recorder
+          .record(cb)
+          .then(() => {
+            // Report ready only once the mic is actually capturing.
+            onReady?.();
+          })
+          .catch((error) => {
+            console.error("Failed to start recording:", error);
+            void stop().finally(() =>
+              onClosedRef.current?.({ fatal: true, message: "Couldn't access the microphone." }),
+            );
+          });
       };
 
       let sessionReady = false;
@@ -481,9 +495,18 @@ export function useVoiceWebSockets(
             break;
           }
 
-          case "error":
-            console.error("[voice] API error:", (msg.error as Record<string, unknown>) ?? msg.type);
+          case "error": {
+            const apiError = (msg.error as Record<string, unknown>) ?? msg;
+            console.error("[voice] API error:", apiError ?? msg.type);
+            // Record API error so the close handler can surface it and prevent auto-restart loops.
+            const code = typeof apiError?.code === "string" ? apiError.code : "";
+            const message = typeof apiError?.message === "string" ? apiError.message : "";
+            lastErrorRef.current = {
+              message: message || code || "The voice service reported an error.",
+              at: Date.now(),
+            };
             break;
+          }
         }
       });
 
@@ -498,7 +521,12 @@ export function useVoiceWebSockets(
         // release mic/player and let the owner reset its UI state.
         if (isActiveRef.current && wsRef.current === ws) {
           console.warn("[voice] connection closed unexpectedly — stopping session");
-          void stop().finally(() => onClosedRef.current?.());
+          // A recent API error before this close means it's fatal; surface it
+          // so the owner can exit realtime mode instead of auto-reconnecting.
+          const recentError =
+            lastErrorRef.current && Date.now() - lastErrorRef.current.at < 5000 ? lastErrorRef.current.message : null;
+          const reason = recentError ? { fatal: true, message: recentError } : undefined;
+          void stop().finally(() => onClosedRef.current?.(reason));
         }
       });
 
