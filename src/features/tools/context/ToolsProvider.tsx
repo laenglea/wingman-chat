@@ -161,9 +161,11 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     if (internetProvider) list.push(internetProvider);
     if (canvasProvider) list.push(canvasProvider);
     if (artifactsProvider) list.push(artifactsProvider);
-    // Global Skills tool shares the "skills" id with the agent-scoped provider;
-    // skip it when the active agent already contributes one (agent skills win).
-    if (skillsProvider && !agentProviders.some((p) => p.id === skillsProvider.id)) list.push(skillsProvider);
+    // Global Skills tool: only when no agent is active. With an agent, skills are
+    // governed solely by its curated set (useAgentProviders, which owns the
+    // "skills" id) — otherwise a stale session toggle could leak the whole
+    // library into an agent that curated few or no skills.
+    if (!currentAgent && skillsProvider) list.push(skillsProvider);
     list.push(skillBuilderProvider);
     list.push(...visibleConfigMcpClients);
     if (companionAvailable && companionClient) list.push(companionClient);
@@ -174,6 +176,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     canvasProvider,
     artifactsProvider,
     skillsProvider,
+    currentAgent,
     skillBuilderProvider,
     visibleConfigMcpClients,
     companionAvailable,

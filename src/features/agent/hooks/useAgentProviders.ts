@@ -1,4 +1,4 @@
-import { BrainCircuit, Package, Sparkles } from "lucide-react";
+import { BrainCircuit, Package } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import memoryPrompt from "@/features/agent/prompts/memory.txt?raw";
 import type { Agent } from "@/features/agent/types/agent";
@@ -6,7 +6,7 @@ import { createRepositoryTools } from "@/features/repository/lib/repository-tool
 import repositoryInstructions from "@/features/repository/prompts/repository.txt?raw";
 import { MCPClient } from "@/features/settings/lib/mcp";
 import { useSkills } from "@/features/skills/hooks/useSkills";
-import skillsPrompt from "@/features/skills/prompts/skills.txt?raw";
+import { createSkillsProvider } from "@/features/skills/lib/skillsProvider";
 import { getConfig } from "@/shared/config";
 import * as opfs from "@/shared/lib/opfs";
 import type { Tool, ToolProvider } from "@/shared/types/chat";
@@ -31,7 +31,7 @@ export interface AgentProviders {
 export function useAgentProviders(agent: Agent | null): AgentProviders {
   const agentId = agent?.id || "";
   const { files, queryChunks } = useAgentFiles(agentId);
-  const { skills: allSkills, getSkill } = useSkills();
+  const { skills: allSkills } = useSkills();
 
   // Track MCP clients for agent's bridge servers
   const [mcpClients, setMcpClients] = useState<MCPClient[]>([]);
@@ -108,78 +108,11 @@ export function useAgentProviders(agent: Agent | null): AgentProviders {
     };
   }, [agent, files, queryChunks]);
 
-  // --- Skills provider ---
-  const agentSkillIds = useMemo(() => new Set(agent?.skills || []), [agent?.skills]);
-
-  const enabledSkills = useMemo(() => {
-    if (!agent || agentSkillIds.size === 0) return [];
-    return allSkills.filter((s) => agentSkillIds.has(s.name));
-  }, [agent, allSkills, agentSkillIds]);
-
+  // --- Skills provider (the subset of the library this agent enabled) ---
   const skillsProvider = useMemo<ToolProvider | null>(() => {
-    if (enabledSkills.length === 0) return null;
-
-    const tools: Tool[] = [
-      {
-        name: "read_skill",
-        description: "Read the full content and instructions of an available skill.",
-        parameters: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "The name of the skill to read.",
-            },
-          },
-          required: ["name"],
-        },
-        function: async (args: Record<string, unknown>) => {
-          const skillName = args.name as string;
-          if (!skillName) {
-            return [{ type: "text" as const, text: JSON.stringify({ error: "No skill name provided" }) }];
-          }
-          const skill = getSkill(skillName);
-          if (!skill) {
-            return [{ type: "text" as const, text: JSON.stringify({ error: `Skill "${skillName}" not found` }) }];
-          }
-          if (!agentSkillIds.has(skill.name)) {
-            return [
-              {
-                type: "text" as const,
-                text: JSON.stringify({ error: `Skill "${skillName}" is not enabled for this agent` }),
-              },
-            ];
-          }
-          return [
-            {
-              type: "text" as const,
-              text: JSON.stringify({
-                name: skill.name,
-                description: skill.description,
-                instructions: skill.content,
-              }),
-            },
-          ];
-        },
-      },
-    ];
-
-    const skillsXml = enabledSkills
-      .map(
-        (skill) =>
-          `  <skill>\n    <name>${skill.name}</name>\n    <description>${skill.description}</description>\n  </skill>`,
-      )
-      .join("\n");
-
-    return {
-      id: "skills",
-      name: "Skills",
-      description: "Specialized agent skills",
-      icon: Sparkles,
-      instructions: skillsPrompt.replace("{skillsXml}", skillsXml) || undefined,
-      tools,
-    };
-  }, [enabledSkills, getSkill, agentSkillIds]);
+    const ids = new Set(agent?.skills || []);
+    return createSkillsProvider(allSkills.filter((s) => ids.has(s.name)));
+  }, [agent?.skills, allSkills]);
 
   // --- Memory provider ---
   const config = getConfig();
