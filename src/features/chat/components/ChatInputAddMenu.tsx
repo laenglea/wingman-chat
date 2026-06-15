@@ -155,13 +155,14 @@ export function ChatInputAddMenu({
       {/* Desktop: Add menu (screen share, file upload, drives, features) */}
       <div className="hidden md:contents">
         <Menu>
-          <MenuButton
-            className="p-2.5 md:pl-1.5 md:pr-0.5 md:py-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
-            title="Add"
-            aria-label="Add"
-          >
-            <Plus size={16} />
-          </MenuButton>
+          <Tooltip content="Add files, tools and more" side="bottom">
+            <MenuButton
+              className="p-2.5 md:pl-1.5 md:pr-0.5 md:py-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+              aria-label="Add"
+            >
+              <Plus size={16} />
+            </MenuButton>
+          </Tooltip>
           <MenuItems
             modal={false}
             transition
