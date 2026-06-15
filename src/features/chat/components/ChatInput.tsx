@@ -531,22 +531,6 @@ export function ChatInput() {
                     }
                   }}
                 />
-
-                {isListening && !voiceTextInput && (
-                  <div
-                    className="absolute top-3 md:top-4 left-3 md:left-4 pointer-events-none flex items-center gap-2 text-neutral-500 dark:text-neutral-400"
-                    aria-live="polite"
-                  >
-                    <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
-                      <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/50 animate-ping" />
-                      <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                    </span>
-                    <span className="text-sm">
-                      <span className="font-medium text-neutral-700 dark:text-neutral-300">Listening</span>
-                      <span className="text-neutral-500 dark:text-neutral-400"> — speak or type a message</span>
-                    </span>
-                  </div>
-                )}
               </>
             ) : (
               <>
@@ -669,6 +653,21 @@ export function ChatInput() {
               </div>
             )}
             <div className="flex items-center gap-2">
+              {/* Listening hint — bottom row, left side */}
+              {isRealtimeSelected && isListening && !voiceTextInput && (
+                <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400" aria-live="polite">
+                  <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-red-500/50 animate-ping" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  </span>
+                  <span className="text-xs">
+                    <span className="font-medium text-neutral-700 dark:text-neutral-300">
+                      {currentAgent?.name ?? "Listening"}
+                    </span>
+                    <span className="text-neutral-500 dark:text-neutral-400"> — speak or type a message</span>
+                  </span>
+                </div>
+              )}
               {!isRealtimeSelected && (
                 <ChatInputAddMenu
                   isScreenCaptureAvailable={isScreenCaptureAvailable}
@@ -711,8 +710,8 @@ export function ChatInput() {
                 />
               )}
 
-              {/* Agent picker — combined trigger + active-agent badge */}
-              {currentAgent && (
+              {/* Agent picker — combined trigger + active-agent badge (hidden when listening, agent name shown in hint) */}
+              {currentAgent && !(isRealtimeSelected && isListening) && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -820,13 +819,24 @@ export function ChatInput() {
                     )
                   )}
                   {isConnecting && !isListening ? (
-                    <span className="p-2.5 md:p-1.5 text-neutral-600 dark:text-neutral-400" title="Connecting…">
-                      <LoaderCircle size={16} className="animate-spin" />
-                    </span>
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-neutral-300/50 dark:border-neutral-600/50 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100/50 dark:hover:bg-neutral-800/50 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors text-xs font-medium"
+                      title="Cancel connecting"
+                      onClick={async () => {
+                        await stopVoice();
+                        const savedId = getSavedModelId();
+                        const restored = (savedId && models.find((m) => m.id === savedId)) || models[0];
+                        onModelChange(restored ?? null);
+                      }}
+                    >
+                      <LoaderCircle size={12} className="animate-spin" />
+                      <span>Cancel</span>
+                    </button>
                   ) : (
                     <button
                       type="button"
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 hover:text-neutral-800 dark:hover:text-neutral-200 transition-all text-xs font-medium"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-neutral-300/50 dark:border-neutral-600/50 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100/50 dark:hover:bg-neutral-800/50 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors text-xs font-medium"
                       onClick={async () => {
                         if (!isListening) {
                           await startVoice();
@@ -840,8 +850,8 @@ export function ChatInput() {
                     >
                       {isListening ? (
                         <>
-                          <X size={12} />
-                          <span>Cancel</span>
+                          <Square size={12} />
+                          <span>Stop</span>
                         </>
                       ) : (
                         <>
