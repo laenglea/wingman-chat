@@ -24,11 +24,39 @@ import { ToolsContext } from "./ToolsContext";
 const MCP_CONNECT_MAX_RETRIES = 2;
 const MCP_CONNECT_RETRY_DELAY_MS = 500;
 
+// Persisted tool selections (built-in tools and MCP servers) so they stick
+// across new chats and reloads. Applied only outside agent mode — an active
+// agent's own config governs its tools. Persisted MCP servers reconnect on
+// load; an OAuth server that needs fresh auth surfaces that as usual (and only
+// in no-agent mode, since agent mode ignores these selections).
+const TOOLS_STORAGE_KEY = "app_tools";
+
+function loadSavedTools(): Set<string> {
+  try {
+    const raw = localStorage.getItem(TOOLS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? new Set(parsed.filter((id): id is string => typeof id === "string")) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function saveTools(ids: Set<string>): void {
+  try {
+    localStorage.setItem(TOOLS_STORAGE_KEY, JSON.stringify([...ids]));
+  } catch {
+    // Silently handle localStorage errors (private mode, quota, etc.)
+  }
+}
+
 export function ToolsProvider({ children }: { children: React.ReactNode }) {
   const config = getConfig();
 
-  // User-selected tools (session-only, reset on new chat)
-  const [userTools, setUserTools] = useState<Set<string>>(new Set());
+  // User-selected tools. Sticky: selections are restored from storage and
+  // persist across chats/reloads (see persist effect below). Applied only
+  // outside agent mode — an active agent's own config governs its tools.
+  const [userTools, setUserTools] = useState<Set<string>>(() => loadSavedTools());
   const [modelEnabledTools, setModelEnabledTools] = useState<Set<string>>(new Set());
   const [modelDisabledTools, setModelDisabledTools] = useState<Set<string>>(new Set());
 
@@ -126,6 +154,11 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   );
   const mcpIds = useMemo(() => new Set(allMcpClients.map((c) => c.id)), [allMcpClients]);
 
+  // Persist tool selections (built-in + MCP) so they stick across chats/reloads.
+  useEffect(() => {
+    saveTools(userTools);
+  }, [userTools]);
+
   // Agent-required: built-in tools + assembled providers (repo, skills, memory, bridges)
   const agentRequired = useMemo(() => {
     const ids = new Set(agentTools);
@@ -139,12 +172,14 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   // MCP server because the current model has it in tools.disabled would clear this.client
   // and break any in-flight tool call.
   const mcpConnectionDesired = useMemo(() => {
-    const merged = new Set(userTools);
+    // Sticky/user tool selections apply only outside agent mode: an active agent's
+    // own config governs its tools, and we never auto-add persisted tools on top.
+    const merged = new Set<string>(currentAgent ? [] : userTools);
     for (const id of agentRequired) merged.add(id);
     for (const id of modelEnabledTools) merged.add(id);
     if (companionAvailable && companionEnabled) merged.add(COMPANION_ID);
     return merged;
-  }, [userTools, agentRequired, modelEnabledTools, companionAvailable, companionEnabled]);
+  }, [userTools, currentAgent, agentRequired, modelEnabledTools, companionAvailable, companionEnabled]);
 
   // Full desired set including model overrides — used by getProviderState for non-MCP
   // built-in providers (internet, canvas, …) which have no lifecycle to manage.
@@ -154,8 +189,9 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     return merged;
   }, [mcpConnectionDesired, modelDisabledTools]);
 
-  // All available providers
-  // biome-ignore lint/correctness/useExhaustiveDependencies: toolsVersion is a cache-bust trigger, not a real dependency
+  // All available providers. `toolsVersion` is a deliberate cache-bust dep: it
+  // bumps when an MCP client mutates its tool list in place, forcing this memo
+  // to rebuild even though the client references are unchanged.
   const providers = useMemo<ToolProvider[]>(() => {
     const list: ToolProvider[] = [];
     if (internetProvider) list.push(internetProvider);
@@ -333,11 +369,6 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     [mcpIds, connectMcp],
   );
 
-  // Reset user tool selections (called on new/switch chat)
-  const resetTools = useCallback(() => {
-    setUserTools(new Set());
-  }, []);
-
   // Restore an MCP app UI from persisted chat data
   const restoreToolUI = useCallback(
     async (
@@ -394,7 +425,6 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
         getProviderState,
         setProviderEnabled,
         setModelOverrides,
-        resetTools,
         companionAvailable: companionAvailable,
         companionEnabled: companionEnabled,
         toggleCompanion: toggleCompanion,

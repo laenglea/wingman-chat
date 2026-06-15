@@ -6,7 +6,6 @@ import { FileSystemManager } from "@/features/artifacts/lib/fs";
 import { useChatContext } from "@/features/chat/hooks/useChatContext";
 import { useChats } from "@/features/chat/hooks/useChats";
 import { useModels } from "@/features/chat/hooks/useModels";
-import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
 import { setModel as setInterpreterModel } from "@/features/tools/lib/llmCommand";
 import { type CategoryConfig, categorySlug, getConfig, type RiskConfig, riskSlug } from "@/shared/config";
 import { run as agentRun } from "@/shared/lib/agent";
@@ -123,7 +122,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const { isAvailable: artifactsEnabled, setFileSystem: setArtifactsFileSystem } = useArtifacts();
   const { closeApp } = useApp();
   const { currentAgent } = useAgents();
-  const { resetTools } = useToolsContext();
   const [chatId, setChatId] = useState<string | null>(null);
   const [isResponding, setIsResponding] = useState<boolean>(false);
   const [pendingElicitation, setPendingElicitation] = useState<PendingElicitation | null>(null);
@@ -200,9 +198,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const createChat = useCallback(async () => {
     const newChat = await createChatHook();
     setChatId(newChat.id);
-    resetTools();
     return newChat;
-  }, [createChatHook, resetTools]);
+  }, [createChatHook]);
 
   const chatIdRef = useRef(chatId);
   chatIdRef.current = chatId;
@@ -214,7 +211,6 @@ export function ChatProvider({ children }: ChatProviderProps) {
       setChatId(id);
       // Clear any stale post-turn notice so prompts from one thread don't leak into another.
       setPendingConsent(null);
-      resetTools();
       closeApp();
 
       // When starting a new chat, reset realtime model back to the last saved chat model
@@ -224,7 +220,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         setSelectedModel(restored ?? null);
       }
     },
-    [resetTools, closeApp, selectedModel, chatModel, models, setSelectedModel, getSavedModelId],
+    [closeApp, selectedModel, chatModel, models, setSelectedModel, getSavedModelId],
   );
 
   const deleteChat = useCallback(
@@ -255,8 +251,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
   // together with its `FileSystemManager`. The fs is bound eagerly and cached
   // in `fsRef` so callers get it without waiting for React to re-derive `fs`.
   // Used by message sending, addMessage, and ensureChat alike — there is no
-  // separate creation logic. Note: unlike `createChat`, this preserves the
-  // draft's tool selections (no resetTools) so they carry into the first turn.
+  // separate creation logic. Tool selections are sticky (persisted), so any
+  // toggled while composing carry into the first turn.
   const getOrCreateChat = useCallback(async () => {
     if (!model) {
       throw new Error("no model selected");

@@ -15,7 +15,6 @@ export interface ToolsContextValue {
   getProviderState: (id: string) => ProviderState;
   setProviderEnabled: (id: string, enabled: boolean) => Promise<void>;
   setModelOverrides: (enabled: string[], disabled: string[]) => void;
-  resetTools: () => void;
   companionAvailable: boolean;
   companionEnabled: boolean;
   toggleCompanion: () => void;
