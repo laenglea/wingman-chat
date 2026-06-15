@@ -7,6 +7,7 @@ import { useCanvasProvider } from "@/features/canvas/hooks/useCanvasProvider";
 import { useInternetProvider } from "@/features/research/hooks/useInternetProvider";
 import { MCPClient } from "@/features/settings/lib/mcp";
 import { useSkillBuilderProvider } from "@/features/skills/hooks/useSkillBuilderProvider";
+import { useSkillsProvider } from "@/features/skills/hooks/useSkillsProvider";
 import { COMPANION_ID, companionMcpUrl, useCompanion } from "@/features/tools/hooks/useCompanion";
 import { getConfig } from "@/shared/config";
 import type {
@@ -111,6 +112,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   const internetProvider = useInternetProvider();
   const canvasProvider = useCanvasProvider();
   const artifactsProvider = useArtifactsProvider();
+  const skillsProvider = useSkillsProvider();
   const skillBuilderProvider = useSkillBuilderProvider();
 
   // All MCP clients & lookup set (include local wingman only when the app is detected)
@@ -159,6 +161,9 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     if (internetProvider) list.push(internetProvider);
     if (canvasProvider) list.push(canvasProvider);
     if (artifactsProvider) list.push(artifactsProvider);
+    // Global Skills tool shares the "skills" id with the agent-scoped provider;
+    // skip it when the active agent already contributes one (agent skills win).
+    if (skillsProvider && !agentProviders.some((p) => p.id === skillsProvider.id)) list.push(skillsProvider);
     list.push(skillBuilderProvider);
     list.push(...visibleConfigMcpClients);
     if (companionAvailable && companionClient) list.push(companionClient);
@@ -168,6 +173,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     internetProvider,
     canvasProvider,
     artifactsProvider,
+    skillsProvider,
     skillBuilderProvider,
     visibleConfigMcpClients,
     companionAvailable,
