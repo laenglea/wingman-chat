@@ -17,7 +17,7 @@
  * download pipeline used by SVG / PNG.
  */
 
-import type { DataCatalog, Dataset, DataContract, GlossaryTerm, LineageEdge, LineageNode } from "../types/notebook";
+import type { DataCatalog, DataContract, Dataset, GlossaryTerm, LineageEdge, LineageNode } from "../types/notebook";
 // `&apos;` is a valid HTML5 entity, so the XML escaper doubles as our HTML escaper.
 import { escapeXml as escapeHtml } from "./pptx-utils";
 

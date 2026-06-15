@@ -583,7 +583,6 @@ export function ArtifactsDrawer() {
   };
 
   // Update slider position whenever viewMode changes or the switcher mounts (activeFile change)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: activeFile triggers remeasurement when preview/code buttons appear or disappear
   useEffect(() => {
     const measure = () => {
       const container = viewSliderRef.current;

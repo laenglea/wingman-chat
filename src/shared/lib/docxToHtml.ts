@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import { ommlToMathml } from "./ommlToMathml";
 import {
   child,
   childList,
@@ -24,7 +25,6 @@ import {
   toRoman,
   twipToPx,
 } from "./ooxml";
-import { ommlToMathml } from "./ommlToMathml";
 
 /**
  * Converts a DOCX file to a single self-contained HTML document with high

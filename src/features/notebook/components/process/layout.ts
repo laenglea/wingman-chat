@@ -9,7 +9,7 @@
  * shape nodes on top) plus the source/target handles to use for each edge.
  */
 
-import { MarkerType, Position, type Edge, type Node } from "@xyflow/react";
+import { type Edge, MarkerType, type Node, Position } from "@xyflow/react";
 import type { ProcessDiagram, ProcessNodeKind } from "../../types/notebook";
 import type { ProcessEdgeData } from "./ProcessEdge";
 import type { ProcessLaneNodeData } from "./ProcessLaneNode";

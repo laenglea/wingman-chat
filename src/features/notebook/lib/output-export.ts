@@ -17,9 +17,9 @@
 
 import { renderArchitectureDiagramSvg, svgToPngDataUrl } from "../components/architecture/svg-export";
 import { renderProcessSvg } from "../components/process/svg-export";
+import type { NotebookOutput } from "../types/notebook";
 import { toDCATJSONLD, toODCSYAML, toOpenLineageJSON } from "./data-catalog-export";
 import { renderDataCatalogPdf } from "./data-catalog-pdf";
-import type { NotebookOutput } from "../types/notebook";
 
 export interface ExportFormat {
   /** Stable id used by the UI (e.g. "png", "svg", "dcat"). */

@@ -7,21 +7,21 @@
  */
 
 import {
+  BaseEdge,
   Controls,
   type Edge,
+  EdgeLabelRenderer,
   type EdgeProps,
+  type EdgeTypes,
+  getSmoothStepPath,
   Handle,
   MarkerType,
   type Node,
   type NodeProps,
   type NodeTypes,
-  type EdgeTypes,
   Position,
   ReactFlow,
   ReactFlowProvider,
-  BaseEdge,
-  EdgeLabelRenderer,
-  getSmoothStepPath,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useMemo } from "react";

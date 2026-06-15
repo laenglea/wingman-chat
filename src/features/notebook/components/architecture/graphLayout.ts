@@ -14,15 +14,15 @@
  * edges with handles picked based on relative position.
  */
 
-import { type Edge, type Node, MarkerType, Position } from "@xyflow/react";
+import { type Edge, MarkerType, type Node, Position } from "@xyflow/react";
 import type {
   ArchitectureDiagram,
   ArchitectureElement,
   ArchitectureElementKind,
   ArchitectureView,
 } from "../../types/notebook";
-import type { ArchitectureRelationEdgeData } from "./ArchitectureRelationEdge";
 import type { ArchitectureGroupNodeData } from "./ArchitectureGroupNode";
+import type { ArchitectureRelationEdgeData } from "./ArchitectureRelationEdge";
 import type { ArchitectureShapeNodeData } from "./ArchitectureShapeNode";
 
 // ── Visual constants ──────────────────────────────────────────────────

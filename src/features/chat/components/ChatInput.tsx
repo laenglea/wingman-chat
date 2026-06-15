@@ -511,27 +511,25 @@ export function ChatInput() {
           {/* Input area */}
           <div className={cn("relative flex-1 transition-all duration-200", isDragging && "blur-sm")}>
             {isRealtimeSelected ? (
-              <>
-                <textarea
-                  className="block w-full resize-none border-0 bg-transparent p-3 md:p-4 max-h-[40vh] overflow-y-auto min-h-10 whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200 focus:outline-none"
-                  style={{ scrollbarWidth: "thin", minHeight: "2.5rem", height: "auto" }}
-                  ref={voiceInputRef}
-                  value={voiceTextInput}
-                  rows={1}
-                  aria-label="Voice text input"
-                  inputMode="text"
-                  enterKeyHint="send"
-                  readOnly={!isListening}
-                  onChange={(e) => isListening && setVoiceTextInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (isListening && e.key === "Enter" && !e.shiftKey && voiceTextInput.trim()) {
-                      e.preventDefault();
-                      sendVoiceText(voiceTextInput.trim());
-                      setVoiceTextInput("");
-                    }
-                  }}
-                />
-              </>
+              <textarea
+                className="block w-full resize-none border-0 bg-transparent p-3 md:p-4 max-h-[40vh] overflow-y-auto min-h-10 whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200 focus:outline-none"
+                style={{ scrollbarWidth: "thin", minHeight: "2.5rem", height: "auto" }}
+                ref={voiceInputRef}
+                value={voiceTextInput}
+                rows={1}
+                aria-label="Voice text input"
+                inputMode="text"
+                enterKeyHint="send"
+                readOnly={!isListening}
+                onChange={(e) => isListening && setVoiceTextInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (isListening && e.key === "Enter" && !e.shiftKey && voiceTextInput.trim()) {
+                    e.preventDefault();
+                    sendVoiceText(voiceTextInput.trim());
+                    setVoiceTextInput("");
+                  }
+                }}
+              />
             ) : (
               <>
                 <textarea

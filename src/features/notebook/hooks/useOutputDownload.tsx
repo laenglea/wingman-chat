@@ -17,9 +17,9 @@
 import { AlertCircle, FileImage, FileText, Loader2, Presentation, X } from "lucide-react";
 import { useState } from "react";
 import { downloadFromUrl } from "@/shared/lib/utils";
-import type { NotebookOutput } from "../types/notebook";
 import { ExportModal, exportFormatsToOptions } from "../components/ExportModal";
-import { downloadFormat, type ExportFormat as OutputExportFormat, getExportFormats } from "../lib/output-export";
+import { downloadFormat, getExportFormats, type ExportFormat as OutputExportFormat } from "../lib/output-export";
+import type { NotebookOutput } from "../types/notebook";
 
 type SlideFormat = "pdf" | "pptx-image" | "pptx-hybrid" | "png";
 

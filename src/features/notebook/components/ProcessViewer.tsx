@@ -4,10 +4,10 @@ import { Loader2, SparklesIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { refineProcess } from "../lib/process-refine";
 import type { NotebookOutput } from "../types/notebook";
+import { buildProcessFlow } from "./process/layout";
 import { ProcessCustomEdge } from "./process/ProcessEdge";
 import { ProcessLaneNode } from "./process/ProcessLaneNode";
 import { ProcessShapeNode } from "./process/ProcessShapeNode";
-import { buildProcessFlow } from "./process/layout";
 
 interface ProcessViewerProps {
   output: NotebookOutput;

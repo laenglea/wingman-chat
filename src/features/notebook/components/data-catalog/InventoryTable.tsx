@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Dataset, DataCatalog } from "../../types/notebook";
+import type { DataCatalog, Dataset } from "../../types/notebook";
 
 interface InventoryTableProps {
   catalog: DataCatalog;

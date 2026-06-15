@@ -23,7 +23,6 @@ export const XlsxEditor = memo(function XlsxEditor({ path, content, contentType 
   const [activeSheet, setActiveSheet] = useState(0);
 
   // New workbook → back to the first sheet
-  // biome-ignore lint/correctness/useExhaustiveDependencies: result triggers reset intentionally
   useEffect(() => {
     setActiveSheet(0);
   }, [result]);

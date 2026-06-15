@@ -95,7 +95,7 @@ export function SkillCatalog({
     };
   }, []);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: editMode triggers remeasurement when the switcher mounts
+  // editMode is a deliberate extra dep: it triggers remeasurement when the switcher mounts.
   useEffect(() => {
     const measure = () => {
       const container = previewSliderRef.current;
@@ -128,7 +128,6 @@ export function SkillCatalog({
   }, []);
 
   // Capture order only on open so toggling doesn't re-sort.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: order is intentionally captured only on open
   useEffect(() => {
     if (!isOpen) return;
     setStableOrder(
