@@ -1,5 +1,6 @@
 import { createContext } from "react";
 import type { DisplayMode, DisplayModeOptions } from "@/features/settings/lib/mcp";
+import type { SkillSources } from "@/features/skills/lib/skillsProvider";
 import type {
   AudioContent,
   FileContent,
@@ -15,6 +16,9 @@ export interface ToolsContextValue {
   getProviderState: (id: string) => ProviderState;
   setProviderEnabled: (id: string, enabled: boolean) => Promise<void>;
   setModelOverrides: (enabled: string[], disabled: string[]) => void;
+  /** Which sources the global Skills tool exposes (personal and/or catalog). */
+  skillSources: SkillSources;
+  setSkillSources: (sources: SkillSources) => void;
   companionAvailable: boolean;
   companionEnabled: boolean;
   toggleCompanion: () => void;

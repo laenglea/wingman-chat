@@ -55,7 +55,8 @@ export function ChatInput() {
     stopCapture,
     captureFrame,
   } = useScreenCapture();
-  const { providers, getProviderState, setProviderEnabled, setModelOverrides } = useToolsContext();
+  const { providers, getProviderState, setProviderEnabled, setModelOverrides, skillSources, setSkillSources } =
+    useToolsContext();
   const {
     isAvailable: voiceAvailable,
     isListening,
@@ -676,6 +677,8 @@ export function ChatInput() {
                   visibleProviders={visibleProviders}
                   getProviderState={getProviderState}
                   setProviderEnabled={setProviderEnabled}
+                  skillSources={skillSources}
+                  setSkillSources={setSkillSources}
                   onAttachmentClick={handleAttachmentClick}
                   onContinuousCaptureToggle={handleContinuousCaptureToggle}
                   onTranscriptionClick={handleTranscriptionClick}

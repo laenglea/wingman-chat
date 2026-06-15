@@ -35,27 +35,33 @@ import { Markdown } from "@/shared/ui/Markdown";
 interface SkillCatalogProps {
   isOpen: boolean;
   onClose: () => void;
-  enabledSkillNames: Set<string>;
-  onToggle: (skillName: string) => void;
+  /**
+   * Per-skill activation handler. When provided, the catalog shows add/remove
+   * toggles to enable each skill on the active agent. Omit it (along with
+   * `enabledSkillNames`) for a view/edit-only catalog with no agent context —
+   * creating, editing, deleting, and importing skills still work either way.
+   */
+  onToggle?: (skillName: string) => void;
+  /** Skills currently enabled on the agent. Only meaningful alongside `onToggle`. */
+  enabledSkillNames?: ReadonlySet<string>;
   onSkillSaved: (skill: Skill, isNew: boolean, oldName?: string) => void;
   onImported: (names: string[]) => void;
   initialView?: "list" | "new";
   /** When set, pre-selects this skill in preview (read-only) mode on open. */
   initialSkillName?: string;
-  /** When true, hides all activation toggles — the catalog is for viewing/editing only. */
-  readOnlyActivation?: boolean;
 }
+
+const NO_ENABLED_SKILLS: ReadonlySet<string> = new Set();
 
 export function SkillCatalog({
   isOpen,
   onClose,
-  enabledSkillNames,
   onToggle,
+  enabledSkillNames = NO_ENABLED_SKILLS,
   onSkillSaved,
   onImported,
   initialView = "list",
   initialSkillName,
-  readOnlyActivation = false,
 }: SkillCatalogProps) {
   const { skills: allSkills, addSkill, updateSkill, removeSkill } = useSkills();
   const { templates, loadTemplate } = useSkillTemplates();
@@ -342,7 +348,7 @@ export function SkillCatalog({
   const handleDeleteConfirm = (skill: Skill) => {
     removeSkill(skill.id);
     if (enabledSkillNames.has(skill.name)) {
-      onToggle(skill.name);
+      onToggle?.(skill.name);
     }
     setSelectedSkill(null);
     setEditMode(false);
@@ -676,7 +682,7 @@ export function SkillCatalog({
                                   : "hover:bg-neutral-50 dark:hover:bg-neutral-800/40"
                               }`}
                             >
-                              {!readOnlyActivation && (
+                              {onToggle && (
                                 <button
                                   type="button"
                                   onClick={() => onToggle(skill.name)}
@@ -996,13 +1002,13 @@ export function SkillCatalog({
                             <span className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                               {selectedSkill.name}
                             </span>
-                            {!readOnlyActivation && enabledSkillNames.has(selectedSkill.name) && (
+                            {onToggle && enabledSkillNames.has(selectedSkill.name) && (
                               <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
                                 Active
                               </span>
                             )}
                           </div>
-                          {!readOnlyActivation && (
+                          {onToggle && (
                             <button
                               type="button"
                               role="switch"

@@ -15,14 +15,17 @@ import {
   ChevronRight,
   FolderCog,
   HardDrive,
+  Library,
   LoaderCircle,
   Mic,
   Paperclip,
+  PenTool,
   Plus,
   ScreenShare,
   Settings2,
   Sparkles,
   TriangleAlert,
+  User,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -31,6 +34,10 @@ import { AgentWizard } from "@/features/agent/components/wizard/AgentWizard";
 import { useAgentFiles } from "@/features/agent/hooks/useAgentFiles";
 import { useAgents } from "@/features/agent/hooks/useAgents";
 import type { Agent } from "@/features/agent/types/agent";
+import { SKILL_BUILDER_ID } from "@/features/skills/hooks/useSkillBuilderProvider";
+import { useSkills } from "@/features/skills/hooks/useSkills";
+import { useSkillTemplates } from "@/features/skills/hooks/useSkillTemplates";
+import { SKILLS_PROVIDER_ID, type SkillSources } from "@/features/skills/lib/skillsProvider";
 import { getConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
 import type { ToolProvider } from "@/shared/types/chat";
@@ -47,6 +54,8 @@ interface ChatInputAddMenuProps {
   visibleProviders: ToolProvider[];
   getProviderState: (id: string) => ProviderState;
   setProviderEnabled: (id: string, enabled: boolean) => Promise<void>;
+  skillSources: SkillSources;
+  setSkillSources: (sources: SkillSources) => void;
   onAttachmentClick: () => void;
   onContinuousCaptureToggle: () => Promise<void>;
   onTranscriptionClick: () => Promise<void>;
@@ -62,6 +71,8 @@ export function ChatInputAddMenu({
   visibleProviders,
   getProviderState,
   setProviderEnabled,
+  skillSources,
+  setSkillSources,
   onAttachmentClick,
   onContinuousCaptureToggle,
   onTranscriptionClick,
@@ -69,14 +80,32 @@ export function ChatInputAddMenu({
 }: ChatInputAddMenuProps) {
   const config = getConfig();
   const { agents, currentAgent, setCurrentAgent, setShowAgentDrawer, setAgentDrawerView } = useAgents();
+  const { skills, openSkillCatalog } = useSkills();
+  const { templates } = useSkillTemplates();
+
+  // The Skills tool and Skill Builder are grouped into the "Skills" submenu, so
+  // they're filtered out of the flat tool list below.
+  const otherProviders = visibleProviders.filter((p) => p.id !== SKILLS_PROVIDER_ID && p.id !== SKILL_BUILDER_ID);
+  const skillBuilder = visibleProviders.find((p) => p.id === SKILL_BUILDER_ID);
+  // Skills submenu shows whenever no agent is active — My Skills / Catalog / Manage
+  // are always meaningful; the Skill Builder row is rendered only if available.
+  const showSkillsMenu = !currentAgent;
+
+  // The two Skills sources toggle independently (personal + catalog).
+  const toggleSkillSource = useCallback(
+    (key: "personal" | "catalog") => {
+      setSkillSources({ ...skillSources, [key]: !skillSources[key] });
+    },
+    [skillSources, setSkillSources],
+  );
 
   const [showMobileSheet, setShowMobileSheet] = useState(false);
 
   // Submenus — only one can be active at a time
-  const [activeSubmenu, setActiveSubmenu] = useState<"file" | "agent" | null>(null);
+  const [activeSubmenu, setActiveSubmenu] = useState<"file" | "agent" | "skills" | null>(null);
   const submenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const openSubmenu = useCallback((name: "file" | "agent") => {
+  const openSubmenu = useCallback((name: "file" | "agent" | "skills") => {
     if (submenuTimer.current) clearTimeout(submenuTimer.current);
     setActiveSubmenu(name);
   }, []);
@@ -101,6 +130,15 @@ export function ChatInputAddMenu({
   });
 
   const { refs: agentRefs, floatingStyles: agentFloatingStyles } = useFloating({
+    placement: "right-start",
+    middleware: [
+      offset(4),
+      flip({ fallbackPlacements: ["right-end", "left-start", "left-end"] }),
+      shift({ padding: 8 }),
+    ],
+  });
+
+  const { refs: skillsRefs, floatingStyles: skillsFloatingStyles } = useFloating({
     placement: "right-start",
     middleware: [
       offset(4),
@@ -273,6 +311,21 @@ export function ChatInputAddMenu({
                 </div>,
                 document.body,
               )}
+            {showSkillsMenu && (
+              <MenuItem>
+                <button
+                  ref={skillsRefs.setReference}
+                  type="button"
+                  onMouseEnter={() => openSubmenu("skills")}
+                  onMouseLeave={scheduleCloseSubmenu}
+                  className="group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                >
+                  <Sparkles size={16} className="shrink-0" />
+                  <span className="font-medium text-sm flex-1 text-left">Skills</span>
+                  <ChevronRight size={14} className="shrink-0 text-neutral-400" />
+                </button>
+              </MenuItem>
+            )}
             <MenuItem>
               <button
                 ref={agentRefs.setReference}
@@ -354,10 +407,88 @@ export function ChatInputAddMenu({
                 </div>,
                 document.body,
               )}
-            {visibleProviders.length > 0 && (
-              <div className="border-t border-neutral-200 dark:border-neutral-700 my-1" />
-            )}
-            {visibleProviders.map((provider: ToolProvider) => {
+            {activeSubmenu === "skills" &&
+              createPortal(
+                <div
+                  ref={skillsRefs.setFloating}
+                  data-skills-submenu
+                  role="none"
+                  style={skillsFloatingStyles}
+                  className="z-9999"
+                  onMouseEnter={() => openSubmenu("skills")}
+                  onMouseLeave={scheduleCloseSubmenu}
+                >
+                  <div className="rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1 min-w-48 flex flex-col overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => toggleSkillSource("personal")}
+                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                    >
+                      <User size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left">
+                        My Skills <span className="text-neutral-400 dark:text-neutral-500">({skills.length})</span>
+                      </span>
+                      <span className="shrink-0 w-4 flex justify-center">
+                        {skillSources.personal && (
+                          <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
+                        )}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleSkillSource("catalog")}
+                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                    >
+                      <Library size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left">
+                        Catalog <span className="text-neutral-400 dark:text-neutral-500">({templates.length})</span>
+                      </span>
+                      <span className="shrink-0 w-4 flex justify-center">
+                        {skillSources.catalog && <Check size={13} className="text-neutral-600 dark:text-neutral-400" />}
+                      </span>
+                    </button>
+                    {skillBuilder && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await setProviderEnabled(
+                              SKILL_BUILDER_ID,
+                              getProviderState(SKILL_BUILDER_ID) !== ProviderState.Connected,
+                            );
+                          } catch (error) {
+                            console.error("Failed to toggle Skill Builder:", error);
+                          }
+                        }}
+                        className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                      >
+                        <PenTool size={16} className="shrink-0" />
+                        <span className="font-medium text-sm flex-1 text-left">Skill Builder</span>
+                        <span className="shrink-0 w-4 flex justify-center">
+                          {getProviderState(SKILL_BUILDER_ID) === ProviderState.Connected && (
+                            <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
+                          )}
+                        </span>
+                      </button>
+                    )}
+                    <div className="border-t border-neutral-200 dark:border-neutral-700 mt-1" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveSubmenu(null);
+                        openSkillCatalog();
+                      }}
+                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                    >
+                      <FolderCog size={16} className="shrink-0" />
+                      <span className="font-medium text-sm">Manage Skills</span>
+                    </button>
+                  </div>
+                </div>,
+                document.body,
+              )}
+            {otherProviders.length > 0 && <div className="border-t border-neutral-200 dark:border-neutral-700 my-1" />}
+            {otherProviders.map((provider: ToolProvider) => {
               const state = getProviderState(provider.id);
               const providerEnabled = state === ProviderState.Connected;
               const providerInitializing = state === ProviderState.Initializing;
@@ -522,7 +653,7 @@ export function ChatInputAddMenu({
               </div>
 
               {/* Features section */}
-              {visibleProviders.length > 0 && (
+              {otherProviders.length > 0 && (
                 <>
                   <div className="mx-3 mb-2 border-t border-neutral-200/60 dark:border-neutral-800/60" />
                   <div className="px-4 pb-1">
@@ -531,7 +662,7 @@ export function ChatInputAddMenu({
                     </p>
                   </div>
                   <div className="px-2">
-                    {visibleProviders.map((provider: ToolProvider) => {
+                    {otherProviders.map((provider: ToolProvider) => {
                       const state = getProviderState(provider.id);
                       const providerEnabled = state === ProviderState.Connected;
                       const providerInitializing = state === ProviderState.Initializing;
@@ -574,6 +705,98 @@ export function ChatInputAddMenu({
                         </button>
                       );
                     })}
+                  </div>
+                </>
+              )}
+
+              {/* Skills section */}
+              {showSkillsMenu && (
+                <>
+                  <div className="mx-3 mb-2 border-t border-neutral-200/60 dark:border-neutral-800/60" />
+                  <div className="px-4 pb-1 flex items-center justify-between">
+                    <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+                      Skills
+                    </p>
+                    <button
+                      type="button"
+                      title="Manage Skills"
+                      onClick={() => {
+                        setShowMobileSheet(false);
+                        openSkillCatalog();
+                      }}
+                      className="p-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800 dark:hover:text-neutral-300 transition-colors"
+                    >
+                      <Settings2 size={16} />
+                    </button>
+                  </div>
+                  <div className="px-2 pb-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSkillSource("personal");
+                      }}
+                      className={`flex w-full items-center gap-3 px-3 py-1.5 rounded-xl transition-colors ${
+                        skillSources.personal
+                          ? "text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800"
+                          : "text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100/60 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <User size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left">
+                        My Skills <span className="text-neutral-400 dark:text-neutral-500">({skills.length})</span>
+                      </span>
+                      {skillSources.personal && (
+                        <Check size={16} className="shrink-0 text-neutral-600 dark:text-neutral-400" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSkillSource("catalog");
+                      }}
+                      className={`flex w-full items-center gap-3 px-3 py-1.5 rounded-xl transition-colors ${
+                        skillSources.catalog
+                          ? "text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800"
+                          : "text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100/60 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <Library size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left">
+                        Catalog <span className="text-neutral-400 dark:text-neutral-500">({templates.length})</span>
+                      </span>
+                      {skillSources.catalog && (
+                        <Check size={16} className="shrink-0 text-neutral-600 dark:text-neutral-400" />
+                      )}
+                    </button>
+                    {skillBuilder && (
+                      <button
+                        type="button"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await setProviderEnabled(
+                              SKILL_BUILDER_ID,
+                              getProviderState(SKILL_BUILDER_ID) !== ProviderState.Connected,
+                            );
+                          } catch (error) {
+                            console.error("Failed to toggle Skill Builder:", error);
+                          }
+                        }}
+                        className={`flex w-full items-center gap-3 px-3 py-1.5 rounded-xl transition-colors ${
+                          getProviderState(SKILL_BUILDER_ID) === ProviderState.Connected
+                            ? "text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800"
+                            : "text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100/60 dark:hover:bg-white/5"
+                        }`}
+                      >
+                        <PenTool size={16} className="shrink-0" />
+                        <span className="font-medium text-sm flex-1 text-left">Skill Builder</span>
+                        {getProviderState(SKILL_BUILDER_ID) === ProviderState.Connected && (
+                          <Check size={16} className="shrink-0 text-neutral-600 dark:text-neutral-400" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </>
               )}

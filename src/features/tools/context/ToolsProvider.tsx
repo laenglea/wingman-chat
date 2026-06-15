@@ -8,6 +8,7 @@ import { useInternetProvider } from "@/features/research/hooks/useInternetProvid
 import { MCPClient } from "@/features/settings/lib/mcp";
 import { useSkillBuilderProvider } from "@/features/skills/hooks/useSkillBuilderProvider";
 import { useSkillsProvider } from "@/features/skills/hooks/useSkillsProvider";
+import { SKILLS_PROVIDER_ID, type SkillSources } from "@/features/skills/lib/skillsProvider";
 import { COMPANION_ID, companionMcpUrl, useCompanion } from "@/features/tools/hooks/useCompanion";
 import { getConfig } from "@/shared/config";
 import type {
@@ -23,6 +24,20 @@ import { ToolsContext } from "./ToolsContext";
 
 const MCP_CONNECT_MAX_RETRIES = 2;
 const MCP_CONNECT_RETRY_DELAY_MS = 500;
+
+// Persisted source selection for the global Skills tool. "personal" exposes the
+// user's own skills, "catalog" the shipped templates; either, both, or neither
+// may be on. The tool is enabled whenever at least one source is selected.
+const SKILL_SOURCES_STORAGE_KEY = "app_skills";
+
+function loadSavedSkillSources(): SkillSources {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SKILL_SOURCES_STORAGE_KEY) ?? "{}");
+    return { personal: parsed?.personal === true, catalog: parsed?.catalog === true };
+  } catch {
+    return { personal: false, catalog: false };
+  }
+}
 
 // Persisted tool selections (built-in tools and MCP servers) so they stick
 // across new chats and reloads. Applied only outside agent mode — an active
@@ -59,6 +74,18 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   const [userTools, setUserTools] = useState<Set<string>>(() => loadSavedTools());
   const [modelEnabledTools, setModelEnabledTools] = useState<Set<string>>(new Set());
   const [modelDisabledTools, setModelDisabledTools] = useState<Set<string>>(new Set());
+
+  // Source selection for the global Skills tool (persisted). The tool is enabled
+  // whenever at least one source is on — see mcpConnectionDesired below.
+  const [skillSources, setSkillSourcesState] = useState<SkillSources>(() => loadSavedSkillSources());
+  const setSkillSources = useCallback((sources: SkillSources) => {
+    setSkillSourcesState(sources);
+    try {
+      localStorage.setItem(SKILL_SOURCES_STORAGE_KEY, JSON.stringify(sources));
+    } catch {
+      // Silently handle localStorage errors (private mode, quota, etc.)
+    }
+  }, []);
 
   // MCP connection lifecycle (only MCP clients need Initializing/Failed states)
   const [mcpStates, setMcpStates] = useState<Map<string, ProviderState>>(new Map());
@@ -140,7 +167,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   const internetProvider = useInternetProvider();
   const canvasProvider = useCanvasProvider();
   const artifactsProvider = useArtifactsProvider();
-  const skillsProvider = useSkillsProvider();
+  const skillsProvider = useSkillsProvider(skillSources);
   const skillBuilderProvider = useSkillBuilderProvider();
 
   // All MCP clients & lookup set (include local wingman only when the app is detected)
@@ -175,11 +202,23 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     // Sticky/user tool selections apply only outside agent mode: an active agent's
     // own config governs its tools, and we never auto-add persisted tools on top.
     const merged = new Set<string>(currentAgent ? [] : userTools);
+    // The global Skills tool is enabled by its source selection rather than a
+    // plain userTools toggle (only outside agent mode).
+    if (!currentAgent && (skillSources.personal || skillSources.catalog)) merged.add(SKILLS_PROVIDER_ID);
     for (const id of agentRequired) merged.add(id);
     for (const id of modelEnabledTools) merged.add(id);
     if (companionAvailable && companionEnabled) merged.add(COMPANION_ID);
     return merged;
-  }, [userTools, currentAgent, agentRequired, modelEnabledTools, companionAvailable, companionEnabled]);
+  }, [
+    userTools,
+    currentAgent,
+    skillSources.personal,
+    skillSources.catalog,
+    agentRequired,
+    modelEnabledTools,
+    companionAvailable,
+    companionEnabled,
+  ]);
 
   // Full desired set including model overrides — used by getProviderState for non-MCP
   // built-in providers (internet, canvas, …) which have no lifecycle to manage.
@@ -197,8 +236,8 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     if (internetProvider) list.push(internetProvider);
     if (canvasProvider) list.push(canvasProvider);
     if (artifactsProvider) list.push(artifactsProvider);
-    // Global Skills tool: only when no agent is active. With an agent, skills are
-    // governed solely by its curated set (useAgentProviders, which owns the
+    // Global Skills tool: only when no agent is active. With an agent, skills
+    // are governed solely by its curated set (useAgentProviders, which owns the
     // "skills" id) — otherwise a stale session toggle could leak the whole
     // library into an agent that curated few or no skills.
     if (!currentAgent && skillsProvider) list.push(skillsProvider);
@@ -425,6 +464,8 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
         getProviderState,
         setProviderEnabled,
         setModelOverrides,
+        skillSources,
+        setSkillSources,
         companionAvailable: companionAvailable,
         companionEnabled: companionEnabled,
         toggleCompanion: toggleCompanion,

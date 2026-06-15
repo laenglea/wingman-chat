@@ -6,7 +6,7 @@ import { createRepositoryTools } from "@/features/repository/lib/repository-tool
 import repositoryInstructions from "@/features/repository/prompts/repository.txt?raw";
 import { MCPClient } from "@/features/settings/lib/mcp";
 import { useSkills } from "@/features/skills/hooks/useSkills";
-import { createSkillsProvider } from "@/features/skills/lib/skillsProvider";
+import { createSkillsProvider, libraryEntries, SKILLS_PROVIDER_ID } from "@/features/skills/lib/skillsProvider";
 import { getConfig } from "@/shared/config";
 import * as opfs from "@/shared/lib/opfs";
 import type { Tool, ToolProvider } from "@/shared/types/chat";
@@ -111,7 +111,11 @@ export function useAgentProviders(agent: Agent | null): AgentProviders {
   // --- Skills provider (the subset of the library this agent enabled) ---
   const skillsProvider = useMemo<ToolProvider | null>(() => {
     const ids = new Set(agent?.skills || []);
-    return createSkillsProvider(allSkills.filter((s) => ids.has(s.name)));
+    return createSkillsProvider(libraryEntries(allSkills.filter((s) => ids.has(s.name))), {
+      id: SKILLS_PROVIDER_ID,
+      name: "Skills",
+      description: "Specialized agent skills",
+    });
   }, [agent?.skills, allSkills]);
 
   // --- Memory provider ---

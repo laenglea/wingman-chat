@@ -6,6 +6,9 @@ import skillBuilderPrompt from "@/features/skills/prompts/skill-builder.txt?raw"
 import type { Tool, ToolProvider } from "@/shared/types/chat";
 import { useSkills } from "./useSkills";
 
+/** Provider id of the "Skill Builder" tool (create/update/delete skills). */
+export const SKILL_BUILDER_ID = "skill-builder";
+
 export function useSkillBuilderProvider(): ToolProvider {
   const { skills, getSkill, addSkill, updateSkill: updateSkillInLibrary, removeSkill } = useSkills();
   const { currentAgent, updateAgent } = useAgents();
@@ -207,7 +210,7 @@ export function useSkillBuilderProvider(): ToolProvider {
     ];
 
     return {
-      id: "skill-builder",
+      id: SKILL_BUILDER_ID,
       name: "Skill Builder",
       description: "Create and edit skills",
       icon: PenTool,

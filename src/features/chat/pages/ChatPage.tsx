@@ -770,11 +770,10 @@ export function ChatPage() {
         isOpen={showSkillCatalog}
         onClose={closeSkillCatalog}
         enabledSkillNames={agentSkillIds}
-        onToggle={handleSkillToggle}
+        onToggle={currentAgent && !skillCatalogReadOnly ? handleSkillToggle : undefined}
         onSkillSaved={handleSkillSaved}
         onImported={handleSkillImported}
         initialSkillName={skillCatalogTarget ?? undefined}
-        readOnlyActivation={skillCatalogReadOnly}
       />
     </div>
   );
