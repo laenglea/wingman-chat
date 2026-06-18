@@ -17,6 +17,7 @@ import {
   HardDrive,
   Library,
   LoaderCircle,
+  Lock,
   Mic,
   Paperclip,
   PenTool,
@@ -37,7 +38,7 @@ import type { Agent } from "@/features/agent/types/agent";
 import { SKILL_BUILDER_ID } from "@/features/skills/hooks/useSkillBuilderProvider";
 import { useSkills } from "@/features/skills/hooks/useSkills";
 import { useSkillTemplates } from "@/features/skills/hooks/useSkillTemplates";
-import { SKILLS_PROVIDER_ID, type SkillSources } from "@/features/skills/lib/skillsProvider";
+import { isStudioSkillCategory, SKILLS_PROVIDER_ID, type SkillSources } from "@/features/skills/lib/skillsProvider";
 import { getConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
 import type { ToolProvider } from "@/shared/types/chat";
@@ -53,6 +54,7 @@ interface ChatInputAddMenuProps {
   isResponding: boolean;
   visibleProviders: ToolProvider[];
   getProviderState: (id: string) => ProviderState;
+  getProviderPolicy: (id: string) => "required" | "optional";
   setProviderEnabled: (id: string, enabled: boolean) => Promise<void>;
   skillSources: SkillSources;
   setSkillSources: (sources: SkillSources) => void;
@@ -70,6 +72,7 @@ export function ChatInputAddMenu({
   isResponding,
   visibleProviders,
   getProviderState,
+  getProviderPolicy,
   setProviderEnabled,
   skillSources,
   setSkillSources,
@@ -82,16 +85,24 @@ export function ChatInputAddMenu({
   const { agents, currentAgent, setCurrentAgent, setShowAgentDrawer, setAgentDrawerView } = useAgents();
   const { skills, openSkillCatalog } = useSkills();
   const { templates } = useSkillTemplates();
+  // The Studio skill pack is split out of the general catalog by category.
+  const studioTemplateCount = templates.filter((t) => isStudioSkillCategory(t.category)).length;
+  const catalogTemplateCount = templates.length - studioTemplateCount;
 
-  // The Skills tool and Skill Builder are grouped into the "Skills" submenu, so
-  // they're filtered out of the flat tool list below.
-  const otherProviders = visibleProviders.filter((p) => p.id !== SKILLS_PROVIDER_ID && p.id !== SKILL_BUILDER_ID);
+  // The Skills tool / Skill Builder are grouped into their own submenu, and the
+  // agent-internal infra (repository/memory) isn't a user-toggleable tool, so all
+  // are filtered out of the flat tool list below. The unified Studio capability
+  // renders as a normal flat toggle alongside the other tools.
+  const otherProviders = visibleProviders.filter(
+    (p) => p.id !== SKILLS_PROVIDER_ID && p.id !== SKILL_BUILDER_ID && p.id !== "repository" && p.id !== "memory",
+  );
   const skillBuilder = visibleProviders.find((p) => p.id === SKILL_BUILDER_ID);
   // Skills submenu shows whenever no agent is active — My Skills / Catalog / Manage
   // are always meaningful; the Skill Builder row is rendered only if available.
   const showSkillsMenu = !currentAgent;
 
-  // The two Skills sources toggle independently (personal + catalog).
+  // The Skills sources toggle independently (personal + catalog). The Studio pack
+  // is not a source here — it rides the Studio capability toggle.
   const toggleSkillSource = useCallback(
     (key: "personal" | "catalog") => {
       setSkillSources({ ...skillSources, [key]: !skillSources[key] });
@@ -207,6 +218,23 @@ export function ChatInputAddMenu({
             anchor="top start"
             className="max-h-[60vh]! mb-2 rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1 overflow-y-auto z-50 min-w-40 transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0"
           >
+            <MenuItem>
+              <button
+                ref={fileRefs.setReference}
+                type="button"
+                onClick={() => (config.drives.length === 0 ? onAttachmentClick() : undefined)}
+                onMouseEnter={() => {
+                  if (config.drives.length === 0) return;
+                  openSubmenu("file");
+                }}
+                onMouseLeave={scheduleCloseSubmenu}
+                className="group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+              >
+                <Paperclip size={16} className="shrink-0" />
+                <span className="font-medium text-sm flex-1 text-left">Add File</span>
+                {config.drives.length > 0 && <ChevronRight size={14} className="shrink-0 text-neutral-400" />}
+              </button>
+            </MenuItem>
             {isScreenCaptureAvailable && (
               <MenuItem>
                 {({ close }) => (
@@ -241,23 +269,6 @@ export function ChatInputAddMenu({
                 )}
               </MenuItem>
             )}
-            <MenuItem>
-              <button
-                ref={fileRefs.setReference}
-                type="button"
-                onClick={() => (config.drives.length === 0 ? onAttachmentClick() : undefined)}
-                onMouseEnter={() => {
-                  if (config.drives.length === 0) return;
-                  openSubmenu("file");
-                }}
-                onMouseLeave={scheduleCloseSubmenu}
-                className="group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-              >
-                <Paperclip size={16} className="shrink-0" />
-                <span className="font-medium text-sm flex-1 text-left">Add File</span>
-                {config.drives.length > 0 && <ChevronRight size={14} className="shrink-0 text-neutral-400" />}
-              </button>
-            </MenuItem>
             {activeSubmenu === "file" &&
               createPortal(
                 <div
@@ -419,34 +430,45 @@ export function ChatInputAddMenu({
                   onMouseLeave={scheduleCloseSubmenu}
                 >
                   <div className="rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1 min-w-48 flex flex-col overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => toggleSkillSource("personal")}
-                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                    <Tooltip
+                      content="Skills you've created — editable in Manage Skills"
+                      side="right"
+                      className="w-full"
                     >
-                      <User size={16} className="shrink-0" />
-                      <span className="font-medium text-sm flex-1 text-left">
-                        My Skills <span className="text-neutral-400 dark:text-neutral-500">({skills.length})</span>
-                      </span>
-                      <span className="shrink-0 w-4 flex justify-center">
-                        {skillSources.personal && (
-                          <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
-                        )}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleSkillSource("catalog")}
-                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                    >
-                      <Library size={16} className="shrink-0" />
-                      <span className="font-medium text-sm flex-1 text-left">
-                        Catalog <span className="text-neutral-400 dark:text-neutral-500">({templates.length})</span>
-                      </span>
-                      <span className="shrink-0 w-4 flex justify-center">
-                        {skillSources.catalog && <Check size={13} className="text-neutral-600 dark:text-neutral-400" />}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleSkillSource("personal")}
+                        className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                      >
+                        <User size={16} className="shrink-0" />
+                        <span className="font-medium text-sm flex-1 text-left">
+                          My Skills <span className="text-neutral-400 dark:text-neutral-500">({skills.length})</span>
+                        </span>
+                        <span className="shrink-0 w-4 flex justify-center">
+                          {skillSources.personal && (
+                            <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
+                          )}
+                        </span>
+                      </button>
+                    </Tooltip>
+                    <Tooltip content="Ready-made skills shipped with the app" side="right" className="w-full">
+                      <button
+                        type="button"
+                        onClick={() => toggleSkillSource("catalog")}
+                        className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
+                      >
+                        <Library size={16} className="shrink-0" />
+                        <span className="font-medium text-sm flex-1 text-left">
+                          Catalog{" "}
+                          <span className="text-neutral-400 dark:text-neutral-500">({catalogTemplateCount})</span>
+                        </span>
+                        <span className="shrink-0 w-4 flex justify-center">
+                          {skillSources.catalog && (
+                            <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
+                          )}
+                        </span>
+                      </button>
+                    </Tooltip>
                     {skillBuilder && (
                       <button
                         type="button"
@@ -493,19 +515,22 @@ export function ChatInputAddMenu({
               const providerEnabled = state === ProviderState.Connected;
               const providerInitializing = state === ProviderState.Initializing;
               const providerFailed = state === ProviderState.Failed;
+              const providerRequired = getProviderPolicy(provider.id) === "required";
 
               return (
                 <MenuItem key={provider.id}>
                   <Tooltip
                     content={
-                      providerFailed
-                        ? `${provider.name} failed to connect`
-                        : providerInitializing
-                          ? `${provider.name} is connecting…`
-                          : (provider.description ??
-                            (providerEnabled
-                              ? `Disable ${provider.name} tools for this conversation`
-                              : `Enable ${provider.name} tools for this conversation`))
+                      providerRequired
+                        ? `${provider.name} is required by this agent`
+                        : providerFailed
+                          ? `${provider.name} failed to connect`
+                          : providerInitializing
+                            ? `${provider.name} is connecting…`
+                            : (provider.description ??
+                              (providerEnabled
+                                ? `Disable ${provider.name} tools for this conversation`
+                                : `Enable ${provider.name} tools for this conversation`))
                     }
                     side="right"
                     className="w-full"
@@ -514,21 +539,28 @@ export function ChatInputAddMenu({
                       type="button"
                       onClick={async (e) => {
                         e.preventDefault();
-                        if (providerInitializing) return;
+                        if (providerInitializing || providerRequired) return;
                         try {
                           await setProviderEnabled(provider.id, !providerEnabled);
                         } catch (error) {
                           console.error(`Failed to toggle provider ${provider.name}:`, error);
                         }
                       }}
-                      disabled={providerInitializing}
-                      className="group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors disabled:opacity-50"
+                      disabled={providerInitializing || providerRequired}
+                      className={cn(
+                        "group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors",
+                        providerInitializing && !providerRequired && "opacity-50",
+                      )}
                     >
                       {renderProviderIcon(provider, state)}
                       <span className="font-medium text-sm flex-1 text-left truncate">{provider.name}</span>
                       <span className="shrink-0 w-4 flex justify-center">
-                        {providerEnabled && !providerInitializing && !providerFailed && (
-                          <Check size={13} className="ml-1 text-neutral-600 dark:text-neutral-400" />
+                        {providerRequired ? (
+                          <Lock size={12} className="text-neutral-400 dark:text-neutral-500" />
+                        ) : (
+                          providerEnabled &&
+                          !providerInitializing &&
+                          !providerFailed && <Check size={13} className="ml-1 text-neutral-600 dark:text-neutral-400" />
                         )}
                       </span>
                     </button>
@@ -667,6 +699,7 @@ export function ChatInputAddMenu({
                       const providerEnabled = state === ProviderState.Connected;
                       const providerInitializing = state === ProviderState.Initializing;
                       const providerFailed = state === ProviderState.Failed;
+                      const providerRequired = getProviderPolicy(provider.id) === "required";
 
                       return (
                         <button
@@ -675,15 +708,17 @@ export function ChatInputAddMenu({
                           onClick={async (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (providerInitializing) return;
+                            if (providerInitializing || providerRequired) return;
                             try {
                               await setProviderEnabled(provider.id, !providerEnabled);
                             } catch (error) {
                               console.error(`Failed to toggle provider ${provider.name}:`, error);
                             }
                           }}
-                          disabled={providerInitializing}
-                          className={`flex w-full items-center gap-3 px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 ${
+                          disabled={providerInitializing || providerRequired}
+                          className={`flex w-full items-center gap-3 px-3 py-1.5 rounded-xl transition-colors ${
+                            providerInitializing && !providerRequired ? "opacity-50" : ""
+                          } ${
                             providerEnabled
                               ? "text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800"
                               : "text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100/60 dark:hover:bg-white/5"
@@ -694,14 +729,20 @@ export function ChatInputAddMenu({
                             <span className="font-medium text-sm">{provider.name}</span>
                             {provider.description && (
                               <span className="text-xs text-neutral-500 dark:text-neutral-400 truncate w-full">
-                                {provider.description}
+                                {providerRequired ? "Required by this agent" : provider.description}
                               </span>
                             )}
                           </div>
-                          {providerEnabled && !providerInitializing && !providerFailed && (
-                            <Check size={16} className="shrink-0 text-neutral-600 dark:text-neutral-400" />
+                          {providerRequired ? (
+                            <Lock size={15} className="shrink-0 text-neutral-400 dark:text-neutral-500" />
+                          ) : (
+                            <>
+                              {providerEnabled && !providerInitializing && !providerFailed && (
+                                <Check size={16} className="shrink-0 text-neutral-600 dark:text-neutral-400" />
+                              )}
+                              {providerFailed && <TriangleAlert size={16} className="shrink-0 text-neutral-400" />}
+                            </>
                           )}
-                          {providerFailed && <TriangleAlert size={16} className="shrink-0 text-neutral-400" />}
                         </button>
                       );
                     })}
@@ -764,7 +805,7 @@ export function ChatInputAddMenu({
                     >
                       <Library size={16} className="shrink-0" />
                       <span className="font-medium text-sm flex-1 text-left">
-                        Catalog <span className="text-neutral-400 dark:text-neutral-500">({templates.length})</span>
+                        Catalog <span className="text-neutral-400 dark:text-neutral-500">({catalogTemplateCount})</span>
                       </span>
                       {skillSources.catalog && (
                         <Check size={16} className="shrink-0 text-neutral-600 dark:text-neutral-400" />

@@ -1,17 +1,34 @@
 import JSZip from "jszip";
 import { downloadBlob } from "@/shared/lib/utils";
 
+/**
+ * A bundled support file shipped alongside a skill (script, reference, asset).
+ * Mirrors the on-disk layout: `path` is relative to the skill folder.
+ */
+export interface SkillResource {
+  /** Path relative to the skill folder, e.g. "scripts/extract.py". */
+  path: string;
+  /** Raw text content, or a data: URL for binary files. */
+  content: string;
+  /** MIME type inferred from the path; picks text vs. binary storage. */
+  contentType?: string;
+}
+
 export interface Skill {
   id: string;
   name: string;
   description: string;
   content: string;
+  compatibility?: string;
+  resources?: SkillResource[];
 }
 
 export interface ParsedSkill {
   name: string;
   description: string;
   content: string;
+  compatibility?: string;
+  resources?: SkillResource[];
 }
 
 export interface SkillValidationError {
@@ -158,6 +175,7 @@ export function parseSkillFile(content: string): SkillParseResult {
       name,
       description,
       content: body,
+      ...(frontmatter.compatibility ? { compatibility: frontmatter.compatibility } : {}),
     },
   };
 }
@@ -166,7 +184,9 @@ export function parseSkillFile(content: string): SkillParseResult {
  * Serialize a skill to SKILL.md format with YAML frontmatter
  */
 export function serializeSkill(skill: Skill): string {
-  const lines = ["---", `name: ${skill.name}`, `description: ${skill.description}`, "---", "", skill.content];
+  const lines = ["---", `name: ${skill.name}`, `description: ${skill.description}`];
+  if (skill.compatibility) lines.push(`compatibility: ${skill.compatibility}`);
+  lines.push("---", "", skill.content);
 
   return lines.join("\n");
 }

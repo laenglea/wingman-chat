@@ -105,7 +105,20 @@ function getWorker(): Worker {
  * killed, while an infinite loop recovers in ~this long instead of minutes. */
 const COMPUTE_STALL_MS = 120_000;
 
-export async function executeCode(request: CodeExecutionRequest): Promise<CodeExecutionResult> {
+export interface ExecuteCodeOptions {
+  /** Aborts the run (e.g. the user's Stop): terminates the worker and settles. */
+  signal?: AbortSignal;
+  /** Override the compute-stall ceiling. */
+  timeoutMs?: number;
+}
+
+export async function executeCode(
+  request: CodeExecutionRequest,
+  options?: ExecuteCodeOptions,
+): Promise<CodeExecutionResult> {
+  const stallMs = options?.timeoutMs ?? COMPUTE_STALL_MS;
+  const signal = options?.signal;
+
   let target: Worker;
   try {
     target = getWorker();
@@ -113,7 +126,7 @@ export async function executeCode(request: CodeExecutionRequest): Promise<CodeEx
     return { success: false, output: "", error: error instanceof Error ? error.message : String(error) };
   }
 
-  // Every termination path (result, stall, crash) funnels through a single
+  // Every termination path (result, stall, abort, crash) funnels through a single
   // `settle`; `fail` is settle-with-error and also tears down the wedged worker.
   return new Promise<CodeExecutionResult>((resolve) => {
     const { port1, port2 } = new MessageChannel();
@@ -132,12 +145,11 @@ export async function executeCode(request: CodeExecutionRequest): Promise<CodeEx
     // (Re)arm the stall timer; runs only while no bridge call is in flight, so it
     // measures uninterrupted pure-compute time, not total wall-clock.
     const arm = () => {
-      if (settled) return;
+      if (settled || stallMs <= 0) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(
-        () =>
-          fail(`Code execution stalled — no progress for ${Math.round(COMPUTE_STALL_MS / 1000)}s (worker terminated)`),
-        COMPUTE_STALL_MS,
+        () => fail(`Code execution stalled — no progress for ${Math.round(stallMs / 1000)}s (worker terminated)`),
+        stallMs,
       );
     };
     const bridge = {
@@ -153,6 +165,7 @@ export async function executeCode(request: CodeExecutionRequest): Promise<CodeEx
       },
     };
     const onCrash = () => fail("Python interpreter worker crashed");
+    const onAbort = () => fail("Code execution aborted");
 
     function settle(result: CodeExecutionResult) {
       if (settled) return;
@@ -160,12 +173,20 @@ export async function executeCode(request: CodeExecutionRequest): Promise<CodeEx
       if (timer) clearTimeout(timer);
       if (activeBridge === bridge) activeBridge = null; // only the owner clears the shared slot
       pendingFailures.delete(onCrash);
+      signal?.removeEventListener("abort", onAbort);
       port1.close();
       resolve(result);
     }
 
     port1.onmessage = (event: MessageEvent<CodeExecutionResult>) => settle(event.data);
     pendingFailures.add(onCrash);
+    if (signal) {
+      if (signal.aborted) {
+        fail("Code execution aborted");
+        return;
+      }
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
     activeBridge = bridge;
     arm();
     target.postMessage({ type: "execute", request, port: port2 } satisfies ExecuteMessage, [port2]);

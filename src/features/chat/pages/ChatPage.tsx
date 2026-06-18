@@ -6,11 +6,13 @@ import { SkillCatalog } from "@/features/agent/components/SkillCatalog";
 import { useAgents } from "@/features/agent/hooks/useAgents";
 import { ArtifactsDrawer } from "@/features/artifacts/components/ArtifactsDrawer";
 import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
-import { AgentHintButton } from "@/features/chat/components/AgentHintButton";
+import { AgentButton } from "@/features/chat/components/AgentButton";
 import { ChatConsentBackdrop, ChatConsentBanner } from "@/features/chat/components/ChatConsentOverlay";
 import { ChatInput } from "@/features/chat/components/ChatInput";
 import { ChatMessage } from "@/features/chat/components/ChatMessage";
 import { ChatSidebar } from "@/features/chat/components/ChatSidebar";
+import { ChatToolGroup } from "@/features/chat/components/ChatToolGroup";
+import { groupRenderUnits, isToolResultMessage } from "@/features/chat/components/chatMessageUtils";
 import { useChat } from "@/features/chat/hooks/useChat";
 import { useChatNavigate } from "@/features/chat/hooks/useChatNavigate";
 import { useDrawerAnimation } from "@/features/chat/hooks/useDrawerAnimation";
@@ -197,7 +199,7 @@ export function ChatPage() {
     isResizing: isAgentResizing,
     handleMouseDown: handleAgentResizeMouseDown,
   } = useDrawerResize({
-    defaultWidthVw: 20,
+    defaultWidthVw: 22,
     closeThresholdPx: 200,
     minPanelPx: 280,
     maxPanelPx: 500,
@@ -346,6 +348,10 @@ export function ChatPage() {
     return messageKeysRef.current.slice(0, messages.length);
   }, [chat?.id, messages.length, routeChatId]);
 
+  // Fold runs of consecutive tool results into collapsible groups so tool-heavy
+  // turns read as one tidy "Used N tools" row instead of a scattered stack.
+  const renderUnits = useMemo(() => groupRenderUnits(messages, isResponding), [messages, isResponding]);
+
   const { handleScrollContainerRef, handleSpacerRef, isAtBottom, goToLatest } = useChatScroll({
     resetKey: chat?.id ?? routeChatId ?? "__draft__",
     messages,
@@ -395,7 +401,7 @@ export function ChatPage() {
             <Shapes size={20} />
           </button>
         )}
-        <AgentHintButton />
+        <AgentButton />
         <button
           type="button"
           className="p-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded transition-all duration-150 ease-out"
@@ -548,17 +554,33 @@ export function ChatPage() {
                 <Disclaimer />
 
                 <div>
-                  {messages.map((message, index) => (
-                    <div key={messageRenderKeys[index]} className="flow-root" data-role={message.role}>
-                      <ChatMessage
-                        index={index}
-                        message={message}
-                        isLast={index === messages.length - 1}
-                        isResponding={isResponding}
-                        onGoToLatest={goToLatest}
-                      />
-                    </div>
-                  ))}
+                  {renderUnits.map((unit) => {
+                    if (unit.kind === "toolGroup") {
+                      // Key off the first tool-call id — stable as the group grows and across restarts.
+                      const first = messages[unit.indices[0]].content.find((p) => p.type === "tool_result");
+                      const groupKey =
+                        first && "id" in first ? `group:${first.id}` : `group:${messageRenderKeys[unit.indices[0]]}`;
+                      return (
+                        <div key={groupKey} className="flow-root" data-role="tool-group">
+                          <ChatToolGroup messages={messages} indices={unit.indices} />
+                        </div>
+                      );
+                    }
+                    const index = unit.index;
+                    const message = messages[index];
+                    // Tool results are role "user" too; tag them so the scroll pin anchors to prompts.
+                    const dataRole = isToolResultMessage(message) ? "tool" : message.role;
+                    return (
+                      <div key={messageRenderKeys[index]} className="flow-root" data-role={dataRole}>
+                        <ChatMessage
+                          index={index}
+                          message={message}
+                          isLast={index === messages.length - 1}
+                          isResponding={isResponding}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
                 {/* Spacer — allows the last user message to scroll to the top */}
                 <div ref={handleSpacerRef} aria-hidden="true" />

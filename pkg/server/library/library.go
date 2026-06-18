@@ -110,10 +110,12 @@ func (inv *inventory[T]) serve(w http.ResponseWriter, _ *http.Request) {
 // ── Skills ──────────────────────────────────────────────────────────────────
 
 type skillEntry struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Category    string `json:"category"`
-	Path        string `json:"path"`
+	Name          string   `json:"name"`
+	Description   string   `json:"description"`
+	Category      string   `json:"category"`
+	Path          string   `json:"path"`
+	Compatibility string   `json:"compatibility,omitempty"`
+	Resources     []string `json:"resources,omitempty"`
 }
 
 type Skills struct {
@@ -158,8 +160,9 @@ func (h *Skills) build() []skillEntry {
 		}
 
 		var meta struct {
-			Name        string `yaml:"name"`
-			Description string `yaml:"description"`
+			Name          string `yaml:"name"`
+			Description   string `yaml:"description"`
+			Compatibility string `yaml:"compatibility"`
 		}
 		parseFrontmatter(data, &meta)
 
@@ -177,10 +180,12 @@ func (h *Skills) build() []skillEntry {
 		}
 
 		entries = append(entries, skillEntry{
-			Name:        meta.Name,
-			Description: meta.Description,
-			Category:    category,
-			Path:        "/skills/" + rel,
+			Name:          meta.Name,
+			Description:   meta.Description,
+			Category:      category,
+			Path:          "/skills/" + rel,
+			Compatibility: meta.Compatibility,
+			Resources:     skillResources(filepath.Dir(p)),
 		})
 
 		return nil
@@ -194,6 +199,37 @@ func (h *Skills) build() []skillEntry {
 	})
 
 	return entries
+}
+
+// skillResources lists a skill's bundled support files as paths relative to the
+// skill folder, so read_skill can surface them for on-demand loading. The skills
+// tree is curated, shipped content, so — like the SKILL.md scan in build — we
+// list everything except the SKILL.md itself and hidden files (e.g. .DS_Store).
+// read_skill_resource returns text, so non-text assets shouldn't be bundled.
+func skillResources(skillDir string) []string {
+	resources := []string{}
+
+	filepath.WalkDir(skillDir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() || d.Name() == "SKILL.md" {
+			return nil
+		}
+		if rel, err := filepath.Rel(skillDir, p); err == nil {
+			resources = append(resources, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+
+	sort.Strings(resources)
+	return resources
 }
 
 // ── Notebooks ───────────────────────────────────────────────────────────────

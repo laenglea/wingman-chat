@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentProviders } from "@/features/agent/hooks/useAgentProviders";
 import { useAgents } from "@/features/agent/hooks/useAgents";
 import { useArtifactsProvider } from "@/features/artifacts/hooks/useArtifactsProvider";
-import { useCanvasProvider } from "@/features/canvas/hooks/useCanvasProvider";
 import { useInternetProvider } from "@/features/research/hooks/useInternetProvider";
+import { STUDIO_PROVIDER_ID, useStudioProvider } from "@/features/studio/hooks/useStudioProvider";
 import { MCPClient } from "@/features/settings/lib/mcp";
 import { useSkillBuilderProvider } from "@/features/skills/hooks/useSkillBuilderProvider";
 import { useSkillsProvider } from "@/features/skills/hooks/useSkillsProvider";
@@ -25,15 +25,19 @@ import { ToolsContext } from "./ToolsContext";
 const MCP_CONNECT_MAX_RETRIES = 2;
 const MCP_CONNECT_RETRY_DELAY_MS = 500;
 
-// Persisted source selection for the global Skills tool. "personal" exposes the
-// user's own skills, "catalog" the shipped templates; either, both, or neither
-// may be on. The tool is enabled whenever at least one source is selected.
+// Persisted source selection for the Skills tool: "personal" exposes the user's
+// own skills, "catalog" the shipped templates. Either, both, or neither may be on.
+// The Studio skill pack is not a persisted source — it's slaved to the Studio
+// capability and passed to useSkillsProvider as a separate flag.
 const SKILL_SOURCES_STORAGE_KEY = "app_skills";
 
 function loadSavedSkillSources(): SkillSources {
   try {
     const parsed = JSON.parse(localStorage.getItem(SKILL_SOURCES_STORAGE_KEY) ?? "{}");
-    return { personal: parsed?.personal === true, catalog: parsed?.catalog === true };
+    return {
+      personal: parsed?.personal === true,
+      catalog: parsed?.catalog === true,
+    };
   } catch {
     return { personal: false, catalog: false };
   }
@@ -74,6 +78,11 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   const [userTools, setUserTools] = useState<Set<string>>(() => loadSavedTools());
   const [modelEnabledTools, setModelEnabledTools] = useState<Set<string>>(new Set());
   const [modelDisabledTools, setModelDisabledTools] = useState<Set<string>>(new Set());
+
+  // Optional tools the user turns on for the current agent chat. Reset whenever
+  // the active agent changes (see effect below) — selecting an agent starts from
+  // its required tools, not the global selection — and never persisted.
+  const [sessionTools, setSessionTools] = useState<Set<string>>(new Set());
 
   // Source selection for the global Skills tool (persisted). The tool is enabled
   // whenever at least one source is on — see mcpConnectionDesired below.
@@ -157,6 +166,22 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
 
   // Agent
   const { currentAgent } = useAgents();
+
+  // Reset the session optionals whenever the active agent changes (select / switch
+  // / deselect) — an agent chat starts from the agent's required tools only.
+  useEffect(() => {
+    setSessionTools(new Set());
+  }, [currentAgent?.id]);
+
+  // The user's editable tool selection: in agent mode the session optionals (the
+  // agent's required tools are added separately as the floor); otherwise the sticky
+  // global userTools.
+  const activeSelection = currentAgent ? sessionTools : userTools;
+
+  // Studio's skill pack must surface when the capability is on — a required tool
+  // (currentAgent.tools), a session addition, or the global userTools selection.
+  const studioEnabled = activeSelection.has(STUDIO_PROVIDER_ID) || !!currentAgent?.tools?.includes(STUDIO_PROVIDER_ID);
+
   const {
     providers: agentProviders,
     enabledTools: agentTools,
@@ -165,9 +190,9 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
 
   // Built-in providers
   const internetProvider = useInternetProvider();
-  const canvasProvider = useCanvasProvider();
   const artifactsProvider = useArtifactsProvider();
-  const skillsProvider = useSkillsProvider(skillSources);
+  const skillsProvider = useSkillsProvider(currentAgent, skillSources, studioEnabled);
+  const studioProvider = useStudioProvider();
   const skillBuilderProvider = useSkillBuilderProvider();
 
   // All MCP clients & lookup set (include local wingman only when the app is detected)
@@ -199,21 +224,22 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   // MCP server because the current model has it in tools.disabled would clear this.client
   // and break any in-flight tool call.
   const mcpConnectionDesired = useMemo(() => {
-    // Sticky/user tool selections apply only outside agent mode: an active agent's
-    // own config governs its tools, and we never auto-add persisted tools on top.
-    const merged = new Set<string>(currentAgent ? [] : userTools);
-    // The global Skills tool is enabled by its source selection rather than a
-    // plain userTools toggle (only outside agent mode).
-    if (!currentAgent && (skillSources.personal || skillSources.catalog)) merged.add(SKILLS_PROVIDER_ID);
+    // Baseline is the user's editable selection: outside agent mode the sticky
+    // userTools; in agent mode the session additions only (optionals reset to off
+    // on agent select — the global selection does not carry in). The agent's own
+    // tools are then unioned via agentRequired as the enforced floor.
+    const merged = new Set<string>(activeSelection);
+    // The Skills tool's connection tracks the assembled provider: it's non-null
+    // exactly when some source, the Studio pack, or an agent's curated set has
+    // skills to expose — so no source/agent branching is needed here.
+    if (skillsProvider) merged.add(SKILLS_PROVIDER_ID);
     for (const id of agentRequired) merged.add(id);
     for (const id of modelEnabledTools) merged.add(id);
     if (companionAvailable && companionEnabled) merged.add(COMPANION_ID);
     return merged;
   }, [
-    userTools,
-    currentAgent,
-    skillSources.personal,
-    skillSources.catalog,
+    activeSelection,
+    skillsProvider,
     agentRequired,
     modelEnabledTools,
     companionAvailable,
@@ -234,13 +260,15 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   const providers = useMemo<ToolProvider[]>(() => {
     const list: ToolProvider[] = [];
     if (internetProvider) list.push(internetProvider);
-    if (canvasProvider) list.push(canvasProvider);
+    // The unified "Studio" capability (documents, visuals & images). Always
+    // available — it's a session capability that layers on top of an agent too —
+    // and its create_image tool is present only when a renderer is configured.
+    list.push(studioProvider);
     if (artifactsProvider) list.push(artifactsProvider);
-    // Global Skills tool: only when no agent is active. With an agent, skills
-    // are governed solely by its curated set (useAgentProviders, which owns the
-    // "skills" id) — otherwise a stale session toggle could leak the whole
-    // library into an agent that curated few or no skills.
-    if (!currentAgent && skillsProvider) list.push(skillsProvider);
+    // The single Skills tool (one read_skill surface): an agent's curated subset
+    // under an agent, the selected global sources otherwise, plus the Studio pack
+    // when the capability is on. Assembled by useSkillsProvider; null when empty.
+    if (skillsProvider) list.push(skillsProvider);
     list.push(skillBuilderProvider);
     list.push(...visibleConfigMcpClients);
     if (companionAvailable && companionClient) list.push(companionClient);
@@ -248,10 +276,9 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
     return list;
   }, [
     internetProvider,
-    canvasProvider,
+    studioProvider,
     artifactsProvider,
     skillsProvider,
-    currentAgent,
     skillBuilderProvider,
     visibleConfigMcpClients,
     companionAvailable,
@@ -394,10 +421,16 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Update user tool set — this feeds into desiredTools which triggers the
-      // reconciliation effect as a safety net, but for MCP tools we also connect
-      // immediately so the tool is ready before the user can send a message.
-      setUserTools((prev) => {
+      // Agent mode: the agent's required tools are locked on — a disable is a
+      // no-op so we neither drop it nor disconnect its server.
+      if (currentAgent && !enabled && agentRequired.has(id)) return;
+
+      // Edit the active selection: session-local optionals in agent mode (reset on
+      // agent change), or the sticky global set otherwise. This feeds desiredTools
+      // which triggers the reconciliation effect as a safety net, but for MCP tools
+      // we also connect immediately so the tool is ready before the next message.
+      const setSelection = currentAgent ? setSessionTools : setUserTools;
+      setSelection((prev) => {
         const next = new Set(prev);
         if (enabled) next.add(id);
         else next.delete(id);
@@ -405,7 +438,15 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
       });
       if (mcpIds.has(id)) await connectMcp(id, enabled);
     },
-    [mcpIds, connectMcp],
+    [mcpIds, connectMcp, currentAgent, agentRequired],
+  );
+
+  // Tool policy for the active agent: "required" = locked on (the agent's tools +
+  // its always-on providers); "optional" = the user toggles it freely. Everything
+  // is "optional" with no agent.
+  const getProviderPolicy = useCallback(
+    (id: string): "required" | "optional" => (currentAgent && agentRequired.has(id) ? "required" : "optional"),
+    [currentAgent, agentRequired],
   );
 
   // Restore an MCP app UI from persisted chat data
@@ -462,6 +503,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
       value={{
         providers,
         getProviderState,
+        getProviderPolicy,
         setProviderEnabled,
         setModelOverrides,
         skillSources,
