@@ -312,7 +312,7 @@ export function ChatPage() {
   ]);
 
   // Sidebar integration (now only controls visibility)
-  const { setSidebarContent, showSidebar } = useSidebar();
+  const { setSidebarContent, showSidebar, sidebarWidth, isSidebarResizing } = useSidebar();
   const { setRightActions } = useNavigation();
 
   // Ref to track chat input height for dynamic padding
@@ -607,11 +607,14 @@ export function ChatPage() {
       <footer
         className={cn(
           "fixed bottom-0 left-0 px-2 md:px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4 pointer-events-none z-20 transition-[left,right] duration-500 ease-in-out",
-          showSidebar && chats.length > 0 && !showAgentDrawer && !showAppDrawer && !showArtifactsDrawer && "md:left-59",
           "right-0",
         )}
-        style={
-          !isMobile && showAppDrawer
+        style={{
+          // Offset past the (resizable) sidebar so the input never sits under it.
+          ...(!isMobile && showSidebar && chats.length > 0 && !showAgentDrawer && !showAppDrawer && !showArtifactsDrawer
+            ? { left: sidebarWidth + 12 }
+            : {}),
+          ...(!isMobile && showAppDrawer
             ? {
                 right: `calc(${appWidthVw}vw + ${showAgentDrawer ? `${agentWidthVw}vw + 1.5rem` : "0.75rem"})`,
                 ...(isAppResizing || isAgentResizing ? { transition: "right 50ms ease-out" } : {}),
@@ -626,8 +629,10 @@ export function ChatPage() {
                     right: `calc(${agentWidthVw}vw + 0.75rem)`,
                     ...(isAgentResizing ? { transition: "right 50ms ease-out" } : {}),
                   }
-                : undefined
-        }
+                : {}),
+          // While dragging the sidebar, track its edge instantly instead of the 500ms ease.
+          ...(isSidebarResizing ? { transition: "left 50ms ease-out" } : {}),
+        }}
       >
         <div
           className={cn(
