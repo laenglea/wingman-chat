@@ -237,39 +237,35 @@ export function ChatPage() {
     setShow: setShowArtifactsDrawer,
   });
 
-  // When agent and a sibling panel (artifacts or app) are both open on desktop,
-  // ensure the chat area stays at or above its 400px minimum by clamping both
-  // the agent width and the sibling width as needed.
+  // When the agent drawer and a sibling drawer (artifacts or app) are both open on
+  // desktop, their combined width can squeeze the chat column below its 400px
+  // minimum. Shrink the agent toward its minimum first (it's the secondary config
+  // panel), then take any remaining overflow out of the larger sibling.
   useEffect(() => {
     const siblingOpen = showArtifactsDrawer || showAppDrawer;
     if (!showAgentDrawer || !siblingOpen || window.innerWidth < 768) return;
+
     const vw = window.innerWidth;
-    const minChatPx = 400;
+    const MIN_CHAT_PX = 400;
     const MIN_AGENT_PX = 280;
     const MAX_AGENT_PX = 500;
-    // combined gap: 0.75rem (sibling) + 0.75rem (agent) = 1.5rem ≈ 24px
-    const gapPx = 24;
-    const agentPx = (agentWidthVw / 100) * vw;
+    const GAP_PX = 24; // 0.75rem (agent) + 0.75rem (sibling) ≈ 24px
+    const budget = vw - MIN_CHAT_PX - GAP_PX; // width shared by agent + sibling
+
     const siblingWidthVw = showAppDrawer ? appWidthVw : artifactsWidthVw;
     const setSiblingWidthVw = showAppDrawer ? setAppWidthVw : setArtifactsWidthVw;
+    const agentPx = (agentWidthVw / 100) * vw;
     const siblingPx = (siblingWidthVw / 100) * vw;
 
-    const totalUsed = agentPx + siblingPx + gapPx;
-    const available = vw - minChatPx;
-
-    if (totalUsed > available) {
-      // First try to shrink agent down to its minimum
-      const agentTarget = Math.min(MAX_AGENT_PX, Math.max(MIN_AGENT_PX, agentPx));
-      const remainingForSibling = available - agentTarget - gapPx;
-
-      if (remainingForSibling < siblingPx) {
-        // Sibling needs to shrink too
-        setSiblingWidthVw((Math.max(0, remainingForSibling) / vw) * 100);
-      }
-      if (agentPx > agentTarget) {
-        setAgentWidthVw((agentTarget / vw) * 100);
-      }
+    let nextAgentPx = Math.min(agentPx, MAX_AGENT_PX);
+    let nextSiblingPx = siblingPx;
+    if (nextAgentPx + nextSiblingPx > budget) {
+      nextAgentPx = Math.max(MIN_AGENT_PX, budget - siblingPx);
+      nextSiblingPx = Math.min(siblingPx, Math.max(0, budget - nextAgentPx));
     }
+
+    if (nextAgentPx !== agentPx) setAgentWidthVw((nextAgentPx / vw) * 100);
+    if (nextSiblingPx !== siblingPx) setSiblingWidthVw((nextSiblingPx / vw) * 100);
   }, [
     showArtifactsDrawer,
     showAppDrawer,
@@ -282,34 +278,20 @@ export function ChatPage() {
     setAppWidthVw,
   ]);
 
-  // When agent and a sibling panel (artifacts or app) are both open on desktop,
-  // clamp the agent width so the chat area stays at or above its 400px minimum.
-  useEffect(() => {
-    const siblingOpen = showArtifactsDrawer || showAppDrawer;
-    if (!showAgentDrawer || !siblingOpen || window.innerWidth < 768) return;
-    const vw = window.innerWidth;
-    const minChatPx = 400;
-    const MIN_AGENT_PX = 280;
-    const MAX_AGENT_PX = 500;
-    const siblingWidthVw = showAppDrawer ? appWidthVw : artifactsWidthVw;
-    const siblingPx = (siblingWidthVw / 100) * vw;
-    // combined gap: 0.75rem (sibling) + 0.75rem (agent) = 1.5rem ≈ 24px
-    const gapPx = 24;
-    const maxAgentPx = vw - minChatPx - siblingPx - gapPx;
-    const currentAgentPx = (agentWidthVw / 100) * vw;
-    if (currentAgentPx > maxAgentPx) {
-      const clampedPx = Math.min(MAX_AGENT_PX, Math.max(MIN_AGENT_PX, maxAgentPx));
-      setAgentWidthVw((clampedPx / vw) * 100);
-    }
-  }, [
-    showArtifactsDrawer,
-    showAppDrawer,
-    showAgentDrawer,
-    agentWidthVw,
-    artifactsWidthVw,
-    appWidthVw,
-    setAgentWidthVw,
-  ]);
+  // Right-edge offset for content (chat column + footer) that must clear the open
+  // right-side drawer(s). Both the main margin and the fixed footer use this, so it
+  // lives in one place to stay in sync. `null` when nothing needs offsetting.
+  const drawerSiblingVw = showAppDrawer ? appWidthVw : showArtifactsDrawer ? artifactsWidthVw : null;
+  const contentRightOffset = isMobile
+    ? undefined
+    : drawerSiblingVw !== null
+      ? `calc(${drawerSiblingVw}vw + ${showAgentDrawer ? `${agentWidthVw}vw + 1.5rem` : "0.75rem"})`
+      : showAgentDrawer
+        ? `calc(${agentWidthVw}vw + 0.75rem)`
+        : undefined;
+  // Whether the drawer driving that offset is mid-drag (so the footer tracks instantly).
+  const isContentOffsetResizing =
+    isAgentResizing || (showAppDrawer && isAppResizing) || (showArtifactsDrawer && isArtifactsResizing);
 
   // Sidebar integration (now only controls visibility)
   const { setSidebarContent, showSidebar, sidebarWidth, isSidebarResizing } = useSidebar();
@@ -509,17 +491,7 @@ export function ChatPage() {
 
       <div
         className={`flex-1 flex flex-col overflow-hidden relative ${isArtifactsResizing || isAppResizing || isAgentResizing ? "" : "transition-all duration-500 ease-in-out"}`}
-        style={
-          !isMobile && showAppDrawer
-            ? { marginRight: `calc(${appWidthVw}vw + ${showAgentDrawer ? `${agentWidthVw}vw + 1.5rem` : "0.75rem"})` }
-            : !isMobile && !showAppDrawer && showArtifactsDrawer
-              ? {
-                  marginRight: `calc(${artifactsWidthVw}vw + ${showAgentDrawer ? `${agentWidthVw}vw + 1.5rem` : "0.75rem"})`,
-                }
-              : !isMobile && showAgentDrawer && !showAppDrawer && !showArtifactsDrawer
-                ? { marginRight: `calc(${agentWidthVw}vw + 0.75rem)` }
-                : undefined
-        }
+        style={contentRightOffset ? { marginRight: contentRightOffset } : undefined}
       >
         <main className="flex-1 flex flex-col overflow-hidden relative">
           {messages.length === 0 ? (
@@ -614,22 +586,13 @@ export function ChatPage() {
           ...(!isMobile && showSidebar && chats.length > 0 && !showAgentDrawer && !showAppDrawer && !showArtifactsDrawer
             ? { left: sidebarWidth + 12 }
             : {}),
-          ...(!isMobile && showAppDrawer
+          // Offset past the open right-side drawer(s); track the edge instantly while dragging.
+          ...(contentRightOffset
             ? {
-                right: `calc(${appWidthVw}vw + ${showAgentDrawer ? `${agentWidthVw}vw + 1.5rem` : "0.75rem"})`,
-                ...(isAppResizing || isAgentResizing ? { transition: "right 50ms ease-out" } : {}),
+                right: contentRightOffset,
+                ...(isContentOffsetResizing ? { transition: "right 50ms ease-out" } : {}),
               }
-            : !isMobile && !showAppDrawer && showArtifactsDrawer
-              ? {
-                  right: `calc(${artifactsWidthVw}vw + ${showAgentDrawer ? `${agentWidthVw}vw + 1.5rem` : "0.75rem"})`,
-                  ...(isArtifactsResizing || isAgentResizing ? { transition: "right 50ms ease-out" } : {}),
-                }
-              : !isMobile && showAgentDrawer && !showAppDrawer && !showArtifactsDrawer
-                ? {
-                    right: `calc(${agentWidthVw}vw + 0.75rem)`,
-                    ...(isAgentResizing ? { transition: "right 50ms ease-out" } : {}),
-                  }
-                : {}),
+            : {}),
           // While dragging the sidebar, track its edge instantly instead of the 500ms ease.
           ...(isSidebarResizing ? { transition: "left 50ms ease-out" } : {}),
         }}
