@@ -165,5 +165,5 @@ export function ScreenCaptureProvider({ children }: ScreenCaptureProviderProps) 
     captureFrame,
   };
 
-  return <ScreenCaptureContext.Provider value={value}>{children}</ScreenCaptureContext.Provider>;
+  return <ScreenCaptureContext value={value}>{children}</ScreenCaptureContext>;
 }

@@ -288,5 +288,5 @@ export function TranslateProvider({ children }: TranslateProviderProps) {
     clearFile,
   };
 
-  return <TranslateContext.Provider value={contextValue}>{children}</TranslateContext.Provider>;
+  return <TranslateContext value={contextValue}>{children}</TranslateContext>;
 }

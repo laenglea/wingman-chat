@@ -499,7 +499,7 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   }, [configMcpClients]);
 
   return (
-    <ToolsContext.Provider
+    <ToolsContext
       value={{
         providers,
         getProviderState,
@@ -516,6 +516,6 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
-    </ToolsContext.Provider>
+    </ToolsContext>
   );
 }

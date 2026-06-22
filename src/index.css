@@ -79,67 +79,40 @@ html.emoji-native .noto-emoji {
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Hide scrollbar utility */
-@layer utilities {
-  .scrollbar-hide {
-    scrollbar-width: none;
-    /* Firefox */
-    -ms-overflow-style: none;
-    /* IE and Edge */
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-    /* Chrome, Safari, Opera */
-  }
-}
-
 :root {
   --viewport-height: 100dvh;
+  color-scheme: light;
 }
 
-/* Global scrollbar: thin and only visible while interacting (iOS-like) */
-/* biome-ignore lint: lower-specificity universal selector intentionally follows scoped rules above */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  -webkit-overflow-scrolling: touch;
-  overflow-anchor: none;
+/* Match native UI (scrollbars, form controls, etc.) to the active theme. */
+.dark {
+  color-scheme: dark;
 }
 
-*::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
-  background: transparent;
-}
+/* App-wide scrollbars: thin, and transparent until you interact (iOS-like).
+   Standard scrollbar-* properties only — no -webkit-scrollbar hacks (Chrome 121+,
+   Safari 18.2+, Firefox). Living in @layer base lets Tailwind's scrollbar-*
+   utilities (e.g. `scrollbar-none`) override these per element. */
+@layer base {
+  /* biome-ignore lint: universal selector intentionally lower-specificity than the body.resizing rule above; they set different properties */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    -webkit-overflow-scrolling: touch;
+    overflow-anchor: none;
+  }
 
-*::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 999px;
-}
+  *:hover,
+  *:focus-visible,
+  *:active {
+    scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
+  }
 
-*:hover,
-*:focus-visible,
-*:active {
-  scrollbar-color: rgba(0, 0, 0, 0.25) transparent;
-}
-
-*:hover::-webkit-scrollbar-thumb,
-*:focus-visible::-webkit-scrollbar-thumb,
-*:active::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.25);
-}
-
-.dark *:hover,
-.dark *:focus-visible,
-.dark *:active {
-  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
-}
-
-.dark *:hover::-webkit-scrollbar-thumb,
-.dark *:focus-visible::-webkit-scrollbar-thumb,
-.dark *:active::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.35);
+  .dark *:hover,
+  .dark *:focus-visible,
+  .dark *:active {
+    scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+  }
 }
 
 /* Prevent horizontal-only scroll containers from blocking vertical page scroll */

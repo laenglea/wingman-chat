@@ -72,5 +72,5 @@ export function AppProvider({ children }: AppProviderProps) {
     registerDrawerTarget,
   };
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return <AppContext value={value}>{children}</AppContext>;
 }

@@ -1,7 +1,19 @@
-import { arrow, autoUpdate, flip, offset, shift, useFloating } from "@floating-ui/react-dom";
-import type { ReactNode } from "react";
-import { useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import {
+  arrow,
+  autoUpdate,
+  flip,
+  FloatingArrow,
+  FloatingPortal,
+  offset,
+  shift,
+  useFloating,
+  useFocus,
+  useHover,
+  useInteractions,
+  useRole,
+  useTransitionStyles,
+} from "@floating-ui/react";
+import { type ReactNode, useRef, useState } from "react";
 import { cn } from "@/shared/lib/cn";
 
 interface TooltipProps {
@@ -12,61 +24,43 @@ interface TooltipProps {
 }
 
 export function Tooltip({ content, children, className, side = "right" }: TooltipProps) {
-  const [visible, setVisible] = useState(false);
-  const arrowRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  const arrowRef = useRef<SVGSVGElement>(null);
 
-  const { refs, floatingStyles, middlewareData, placement } = useFloating({
+  const { refs, floatingStyles, context } = useFloating({
+    open,
+    onOpenChange: setOpen,
     placement: side,
     whileElementsMounted: autoUpdate,
     middleware: [offset(8), flip(), shift({ padding: 8 }), arrow({ element: arrowRef })],
   });
 
-  const arrowSide = ({ top: "bottom", bottom: "top", left: "right", right: "left" } as const)[
-    placement.split("-")[0] as "top" | "bottom" | "left" | "right"
-  ];
+  // Hover and keyboard focus both reveal the tooltip; Escape dismisses it via useRole.
+  const hover = useHover(context, { move: false });
+  const focus = useFocus(context);
+  const role = useRole(context, { role: "tooltip" });
+  const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, role]);
 
-  const arrowPositionStyle: React.CSSProperties =
-    arrowSide === "left" || arrowSide === "right"
-      ? { top: middlewareData.arrow?.y, [arrowSide]: -8 }
-      : { left: middlewareData.arrow?.x, [arrowSide]: -8 };
-
-  const arrowColorClass = {
-    left: "border-r-neutral-900 dark:border-r-neutral-700",
-    right: "border-l-neutral-900 dark:border-l-neutral-700",
-    top: "border-b-neutral-900 dark:border-b-neutral-700",
-    bottom: "border-t-neutral-900 dark:border-t-neutral-700",
-  }[arrowSide];
+  const { isMounted, styles: transitionStyles } = useTransitionStyles(context, { duration: 150 });
 
   return (
-    <span
-      ref={refs.setReference}
-      role="none"
-      className={cn("group/tooltip block", className)}
-      onMouseEnter={() => setVisible(true)}
-      onMouseLeave={() => setVisible(false)}
-    >
-      {children}
-      {createPortal(
-        <span
-          ref={refs.setFloating}
-          role="tooltip"
-          aria-hidden={!visible}
-          style={{
-            ...floatingStyles,
-            opacity: visible ? 1 : 0,
-            transition: "opacity 150ms ease",
-          }}
-          className="pointer-events-none z-9999 px-2 py-1 rounded-md text-xs font-medium max-w-xs wrap-break-word whitespace-normal bg-neutral-900 text-white dark:bg-neutral-700 dark:text-neutral-100"
-        >
+    <>
+      <span ref={refs.setReference} className={cn("group/tooltip block", className)} {...getReferenceProps()}>
+        {children}
+      </span>
+      {isMounted && (
+        <FloatingPortal>
           <span
-            ref={arrowRef}
-            style={{ position: "absolute", ...arrowPositionStyle }}
-            className={cn("border-4 border-transparent", arrowColorClass)}
-          />
-          {content}
-        </span>,
-        document.body,
+            ref={refs.setFloating}
+            style={{ ...floatingStyles, ...transitionStyles }}
+            className="pointer-events-none z-9999 px-2 py-1 rounded-md text-xs font-medium max-w-xs wrap-break-word whitespace-normal bg-neutral-900 text-white dark:bg-neutral-700 dark:text-neutral-100"
+            {...getFloatingProps()}
+          >
+            <FloatingArrow ref={arrowRef} context={context} className="fill-neutral-900 dark:fill-neutral-700" />
+            {content}
+          </span>
+        </FloatingPortal>
       )}
-    </span>
+    </>
   );
 }

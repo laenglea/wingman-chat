@@ -24,6 +24,7 @@ import type { Skill } from "@/features/skills/lib/skillParser";
 import { useVoice } from "@/features/voice/hooks/useVoice";
 import { useChatScroll } from "@/shared";
 import { getConfig } from "@/shared/config";
+import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { cn } from "@/shared/lib/cn";
 import { sanitizeHtmlToReact } from "@/shared/lib/htmlToReact";
 import { AppDrawer } from "@/shell/components/AppDrawer";
@@ -189,7 +190,7 @@ export function ChatPage() {
   const { isAnimating: isAppDrawerAnimating, shouldRender: shouldRenderAppDrawer } = useDrawerAnimation(showAppDrawer);
 
   // Track if we're on mobile for drawer positioning
-  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
+  const isMobile = !useMediaQuery("(min-width: 768px)");
 
   // Drawer resize state — each hook owns widthVw + isResizing + the mousedown handler.
   // getSiblingOffsetPx is called once at drag-start to snapshot the combined sibling offset.
@@ -339,15 +340,6 @@ export function ChatPage() {
     messages,
     isResponding,
   });
-
-  // Track window resize for mobile detection
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // Set up navigation actions
   useEffect(() => {
@@ -636,8 +628,7 @@ export function ChatPage() {
             <button
               type="button"
               aria-label="Resize artifacts panel"
-              className="absolute -left-2 top-0 bottom-0 w-4 z-10 group flex items-center justify-center"
-              style={{ cursor: "ew-resize" }}
+              className="absolute -left-2 top-0 bottom-0 w-4 z-10 group flex items-center justify-center cursor-ew-resize"
               onMouseDown={handleArtifactsResizeMouseDown}
             >
               <div className="z-10 bg-neutral-300 rounded-sm dark:bg-neutral-700 shadow-sm opacity-60">
@@ -679,8 +670,7 @@ export function ChatPage() {
             <button
               type="button"
               aria-label="Resize agent panel"
-              className="absolute -left-2 top-0 bottom-0 w-4 z-10 group flex items-center justify-center"
-              style={{ cursor: "ew-resize" }}
+              className="absolute -left-2 top-0 bottom-0 w-4 z-10 group flex items-center justify-center cursor-ew-resize"
               onMouseDown={handleAgentResizeMouseDown}
             >
               <div className="z-10 bg-neutral-300 rounded-sm dark:bg-neutral-700 shadow-sm opacity-60">
@@ -723,8 +713,7 @@ export function ChatPage() {
           <button
             type="button"
             aria-label="Resize app panel"
-            className="absolute -left-2 top-0 bottom-0 w-4 z-10 group flex items-center justify-center"
-            style={{ cursor: "ew-resize" }}
+            className="absolute -left-2 top-0 bottom-0 w-4 z-10 group flex items-center justify-center cursor-ew-resize"
             onMouseDown={handleAppResizeMouseDown}
           >
             <div className="z-10 bg-neutral-300 rounded-sm dark:bg-neutral-700 shadow-sm opacity-60">

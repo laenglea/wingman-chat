@@ -282,26 +282,20 @@ export default defineConfig({
         warn(warning);
       },
       output: {
-        manualChunks(id) {
-          if (!id.includes("node_modules/")) return;
-
-          // Group vendor dependencies into logical chunks for caching.
-          // Shiki is intentionally excluded — it lazy-loads grammars/themes
-          // via dynamic import() and manages its own code splitting.
-          const chunks: Record<string, RegExp> = {
-            "vendor-react": /\/(react|react-dom)\//,
-            "vendor-openai": /\/openai\//,
-            "vendor-reactflow": /\/@xyflow\//,
-            "vendor-bash": /\/just-bash\//,
-            "vendor-docx": /\/(docx|marked|jspdf)\//,
-            "vendor-pdf": /\/pdfjs-dist\//,
-            "vendor-markdown": /\/(unified|rehype-|remark-|emoji-regex|@fontsource\/noto-emoji|katex)\//,
-            "vendor-ui": /\/(@headlessui|@floating-ui|lucide-react)\//,
-          };
-
-          for (const [chunk, re] of Object.entries(chunks)) {
-            if (re.test(id)) return chunk;
-          }
+        codeSplitting: {
+          groups: [
+            { name: "vendor-react", test: /node_modules[\\/](react|react-dom)[\\/]/ },
+            { name: "vendor-openai", test: /node_modules[\\/]openai[\\/]/ },
+            { name: "vendor-reactflow", test: /node_modules[\\/]@xyflow[\\/]/ },
+            { name: "vendor-bash", test: /node_modules[\\/]just-bash[\\/]/ },
+            { name: "vendor-docx", test: /node_modules[\\/](docx|marked|jspdf)[\\/]/ },
+            { name: "vendor-pdf", test: /node_modules[\\/]pdfjs-dist[\\/]/ },
+            {
+              name: "vendor-markdown",
+              test: /node_modules[\\/](unified|rehype-|remark-|emoji-regex|@fontsource[\\/]noto-emoji|katex)[\\/]/,
+            },
+            { name: "vendor-ui", test: /node_modules[\\/](@headlessui|@floating-ui|lucide-react)[\\/]/ },
+          ],
         },
       },
     },

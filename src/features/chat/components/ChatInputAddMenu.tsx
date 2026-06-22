@@ -1,15 +1,30 @@
-import { flip, offset, shift, useFloating } from "@floating-ui/react-dom";
 import {
-  Dialog,
-  DialogBackdrop,
-  DialogPanel,
-  DialogTitle,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuItems,
-  Portal,
-} from "@headlessui/react";
+  autoUpdate,
+  flip,
+  FloatingFocusManager,
+  FloatingList,
+  FloatingNode,
+  FloatingPortal,
+  FloatingTree,
+  offset,
+  safePolygon,
+  shift,
+  useClick,
+  useDismiss,
+  useFloating,
+  useFloatingNodeId,
+  useFloatingParentNodeId,
+  useFloatingTree,
+  useHover,
+  useInteractions,
+  useListItem,
+  useListNavigation,
+  useMergeRefs,
+  useRole,
+  useTransitionStyles,
+  useTypeahead,
+} from "@floating-ui/react";
+import { Dialog, DialogBackdrop, DialogPanel, DialogTitle } from "@headlessui/react";
 import {
   Bot,
   Check,
@@ -30,7 +45,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AgentWizard } from "@/features/agent/components/wizard/AgentWizard";
 import { useAgentFiles } from "@/features/agent/hooks/useAgentFiles";
 import { useAgents } from "@/features/agent/hooks/useAgents";
@@ -45,6 +60,254 @@ import type { ToolProvider } from "@/shared/types/chat";
 import { ProviderState } from "@/shared/types/chat";
 import { McpProviderIcon } from "@/shared/ui/McpProviderIcon";
 import { Tooltip } from "@/shared/ui/Tooltip";
+
+// ─── Floating UI menu primitives ──────────────────────────────────────────────
+// The Add menu and its flyouts share one FloatingTree, so the root's tree-aware
+// useDismiss treats a click inside a (portaled) submenu as "inside" — no manual
+// outside-click guard needed to keep the menu open while toggling submenu items.
+
+const MENU_PANEL_CLASS =
+  "rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1";
+
+const ROW_CLASS =
+  "group flex w-full items-center gap-3 px-3 py-2 rounded-lg text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100/60 dark:hover:bg-white/5 focus:bg-neutral-100/60 dark:focus:bg-white/5 focus:outline-none transition-colors";
+
+interface MenuContextValue {
+  getItemProps: (userProps?: React.HTMLProps<HTMLElement>) => Record<string, unknown>;
+  activeIndex: number | null;
+  closeMenu: () => void;
+}
+
+const MenuContext = createContext<MenuContextValue>({
+  getItemProps: () => ({}),
+  activeIndex: null,
+  closeMenu: () => {},
+});
+
+/** Root of the Add menu: owns the FloatingTree and the top-level item list. */
+function AddMenu({ children }: { children: ReactNode }) {
+  return (
+    <FloatingTree>
+      <AddMenuRoot>{children}</AddMenuRoot>
+    </FloatingTree>
+  );
+}
+
+function AddMenuRoot({ children }: { children: ReactNode }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
+  const elementsRef = useRef<Array<HTMLButtonElement | null>>([]);
+  const labelsRef = useRef<Array<string | null>>([]);
+
+  const tree = useFloatingTree();
+  const nodeId = useFloatingNodeId();
+
+  const { refs, floatingStyles, context } = useFloating({
+    nodeId,
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    placement: "top-start",
+    middleware: [offset(8), flip({ fallbackPlacements: ["bottom-start"] }), shift({ padding: 8 })],
+    whileElementsMounted: autoUpdate,
+  });
+
+  const click = useClick(context);
+  const role = useRole(context, { role: "menu" });
+  const dismiss = useDismiss(context, { bubbles: true });
+  const listNavigation = useListNavigation(context, {
+    listRef: elementsRef,
+    activeIndex,
+    onNavigate: setActiveIndex,
+  });
+  const typeahead = useTypeahead(context, {
+    listRef: labelsRef,
+    activeIndex,
+    onMatch: isOpen ? setActiveIndex : undefined,
+  });
+  const { getReferenceProps, getFloatingProps, getItemProps } = useInteractions([
+    click,
+    role,
+    dismiss,
+    listNavigation,
+    typeahead,
+  ]);
+
+  const { isMounted, styles: transitionStyles } = useTransitionStyles(context, {
+    duration: 100,
+    initial: { opacity: 0, transform: "scale(0.95)" },
+  });
+
+  // Any leaf item that activates emits a tree "click" to close the whole menu.
+  useEffect(() => {
+    if (!tree) return;
+    const close = () => setIsOpen(false);
+    tree.events.on("click", close);
+    return () => tree.events.off("click", close);
+  }, [tree]);
+
+  const closeMenu = useCallback(() => tree?.events.emit("click"), [tree]);
+
+  return (
+    <FloatingNode id={nodeId}>
+      <Tooltip content="Add files, tools and more" side="bottom">
+        <button
+          ref={refs.setReference}
+          type="button"
+          aria-label="Add"
+          className="p-2.5 md:pl-1.5 md:pr-0.5 md:py-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+          {...getReferenceProps()}
+        >
+          <Plus size={16} />
+        </button>
+      </Tooltip>
+      <MenuContext.Provider value={{ getItemProps, activeIndex, closeMenu }}>
+        <FloatingList elementsRef={elementsRef} labelsRef={labelsRef}>
+          {isMounted && (
+            <FloatingPortal>
+              <FloatingFocusManager context={context} modal={false} initialFocus={-1} returnFocus>
+                <div ref={refs.setFloating} style={floatingStyles} className="z-50" {...getFloatingProps()}>
+                  <div
+                    style={transitionStyles}
+                    className={cn(MENU_PANEL_CLASS, "max-h-[60vh] overflow-y-auto min-w-40")}
+                  >
+                    {children}
+                  </div>
+                </div>
+              </FloatingFocusManager>
+            </FloatingPortal>
+          )}
+        </FloatingList>
+      </MenuContext.Provider>
+    </FloatingNode>
+  );
+}
+
+interface MenuRowProps {
+  /** Label used for typeahead; not rendered (pass display content as children). */
+  label: string;
+  /** Emit a tree close after selecting. Toggles (which keep the menu open) pass false. */
+  closeOnClick?: boolean;
+  disabled?: boolean;
+  onSelect?: () => void | Promise<void>;
+  className?: string;
+  children: ReactNode;
+}
+
+/** A focusable leaf row in the Add menu, wired for keyboard list navigation. */
+function MenuRow({ label, closeOnClick = true, disabled, onSelect, className, children }: MenuRowProps) {
+  const menu = useContext(MenuContext);
+  const item = useListItem({ label: disabled ? null : label });
+  const isActive = item.index === menu.activeIndex;
+
+  return (
+    <button
+      ref={item.ref}
+      type="button"
+      role="menuitem"
+      tabIndex={isActive ? 0 : -1}
+      disabled={disabled}
+      className={cn(ROW_CLASS, className)}
+      {...menu.getItemProps({
+        onClick() {
+          if (disabled) return;
+          void onSelect?.();
+          if (closeOnClick) menu.closeMenu();
+        },
+      })}
+    >
+      {children}
+    </button>
+  );
+}
+
+interface SubmenuProps {
+  label: string;
+  icon: ReactNode;
+  /** Extra classes for the inner panel (min-width, flex layout, max-height). */
+  panelClassName?: string;
+  /** Receives a `close` that collapses the whole menu (for navigating actions). */
+  children: (close: () => void) => ReactNode;
+}
+
+/**
+ * A hover-activated flyout that is also a row in its parent menu. It registers as a
+ * list item (so keyboard navigation reaches it) and opens its own FloatingNode in the
+ * shared tree; the portal escapes the parent's scroll clipping, and useHover +
+ * safePolygon keeps it open while the cursor travels diagonally onto the panel.
+ */
+function Submenu({ label, icon, panelClassName, children }: SubmenuProps) {
+  const parent = useContext(MenuContext);
+  const item = useListItem({ label });
+  const isActive = item.index === parent.activeIndex;
+
+  const [isOpen, setIsOpen] = useState(false);
+
+  const tree = useFloatingTree();
+  const nodeId = useFloatingNodeId();
+  const parentId = useFloatingParentNodeId();
+
+  const { refs, floatingStyles, context } = useFloating({
+    nodeId,
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    placement: "right-start",
+    middleware: [
+      offset(4),
+      flip({ fallbackPlacements: ["right-end", "left-start", "left-end"] }),
+      shift({ padding: 8 }),
+    ],
+    whileElementsMounted: autoUpdate,
+  });
+
+  const hover = useHover(context, { handleClose: safePolygon(), delay: { close: 150 } });
+  const click = useClick(context, { event: "mousedown", toggle: false, ignoreMouse: true });
+  const dismiss = useDismiss(context, { bubbles: true });
+  const role = useRole(context, { role: "menu" });
+  const { getReferenceProps, getFloatingProps } = useInteractions([hover, click, dismiss, role]);
+
+  const triggerRef = useMergeRefs([refs.setReference, item.ref]);
+
+  // Collapse when a sibling submenu opens.
+  useEffect(() => {
+    if (!tree) return;
+    const onSiblingOpen = (event: { nodeId: string; parentId: string | null }) => {
+      if (event.nodeId !== nodeId && event.parentId === parentId) setIsOpen(false);
+    };
+    tree.events.on("menuopen", onSiblingOpen);
+    return () => tree.events.off("menuopen", onSiblingOpen);
+  }, [tree, nodeId, parentId]);
+  useEffect(() => {
+    if (isOpen && tree) tree.events.emit("menuopen", { nodeId, parentId });
+  }, [tree, isOpen, nodeId, parentId]);
+
+  const close = useCallback(() => tree?.events.emit("click"), [tree]);
+
+  return (
+    <FloatingNode id={nodeId}>
+      <button
+        ref={triggerRef}
+        type="button"
+        role="menuitem"
+        tabIndex={isActive ? 0 : -1}
+        data-open={isOpen ? "" : undefined}
+        className={ROW_CLASS}
+        {...getReferenceProps(parent.getItemProps())}
+      >
+        {icon}
+        <span className="font-medium text-sm flex-1 text-left">{label}</span>
+        <ChevronRight size={14} className="shrink-0 text-neutral-400" />
+      </button>
+      {isOpen && (
+        <FloatingPortal>
+          <div ref={refs.setFloating} style={floatingStyles} className="z-9999" {...getFloatingProps()}>
+            <div className={cn(MENU_PANEL_CLASS, panelClassName)}>{children(close)}</div>
+          </div>
+        </FloatingPortal>
+      )}
+    </FloatingNode>
+  );
+}
 
 interface ChatInputAddMenuProps {
   isScreenCaptureAvailable: boolean;
@@ -112,70 +375,6 @@ export function ChatInputAddMenu({
 
   const [showMobileSheet, setShowMobileSheet] = useState(false);
 
-  // Submenus — only one can be active at a time
-  const [activeSubmenu, setActiveSubmenu] = useState<"file" | "agent" | "skills" | null>(null);
-  const submenuTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const openSubmenu = useCallback((name: "file" | "agent" | "skills") => {
-    if (submenuTimer.current) clearTimeout(submenuTimer.current);
-    setActiveSubmenu(name);
-  }, []);
-
-  const scheduleCloseSubmenu = useCallback(() => {
-    submenuTimer.current = setTimeout(() => setActiveSubmenu(null), 150);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (submenuTimer.current) clearTimeout(submenuTimer.current);
-    };
-  }, []);
-
-  // Keep the Add menu open when toggling Skills sources. The portaled Skills submenu
-  // would otherwise trip HeadlessUI's outside-click close; a window capture-phase
-  // listener (runs before document) stops those pointer events from reaching it.
-  useEffect(() => {
-    if (activeSubmenu !== "skills") return;
-    const isInsideSkillsSubmenu = (target: EventTarget | null) =>
-      target instanceof Element && !!target.closest("[data-skills-submenu]");
-    const guard = (event: PointerEvent) => {
-      if (isInsideSkillsSubmenu(event.target)) event.stopPropagation();
-    };
-    window.addEventListener("pointerdown", guard, true);
-    window.addEventListener("pointerup", guard, true);
-    return () => {
-      window.removeEventListener("pointerdown", guard, true);
-      window.removeEventListener("pointerup", guard, true);
-    };
-  }, [activeSubmenu]);
-
-  const { refs: fileRefs, floatingStyles: fileFloatingStyles } = useFloating({
-    placement: "right-start",
-    middleware: [
-      offset(4),
-      flip({ fallbackPlacements: ["right-end", "left-start", "left-end"] }),
-      shift({ padding: 8 }),
-    ],
-  });
-
-  const { refs: agentRefs, floatingStyles: agentFloatingStyles } = useFloating({
-    placement: "right-start",
-    middleware: [
-      offset(4),
-      flip({ fallbackPlacements: ["right-end", "left-start", "left-end"] }),
-      shift({ padding: 8 }),
-    ],
-  });
-
-  const { refs: skillsRefs, floatingStyles: skillsFloatingStyles } = useFloating({
-    placement: "right-start",
-    middleware: [
-      offset(4),
-      flip({ fallbackPlacements: ["right-end", "left-start", "left-end"] }),
-      shift({ padding: 8 }),
-    ],
-  });
-
   // Agent wizard
   const [wizardOpen, setWizardOpen] = useState(false);
   const [pendingWizardFiles, setPendingWizardFiles] = useState<File[] | null>(null);
@@ -221,373 +420,268 @@ export function ChatInputAddMenu({
 
       {/* Desktop: Add menu (screen share, file upload, drives, features) */}
       <div className="hidden md:contents">
-        <Menu>
-          <Tooltip content="Add files, tools and more" side="bottom">
-            <MenuButton
-              className="p-2.5 md:pl-1.5 md:pr-0.5 md:py-1.5 transition-colors text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
-              aria-label="Add"
-            >
-              <Plus size={16} />
-            </MenuButton>
-          </Tooltip>
-          <MenuItems
-            modal={false}
-            transition
-            anchor="top start"
-            className="max-h-[60vh]! mb-2 rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1 overflow-y-auto z-50 min-w-40 transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0"
-          >
-            <MenuItem>
-              <button
-                ref={fileRefs.setReference}
-                type="button"
-                onClick={() => (config.drives.length === 0 ? onAttachmentClick() : undefined)}
-                onMouseEnter={() => {
-                  if (config.drives.length === 0) return;
-                  openSubmenu("file");
-                }}
-                onMouseLeave={scheduleCloseSubmenu}
-                className="group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-              >
-                <Paperclip size={16} className="shrink-0" />
-                <span className="font-medium text-sm flex-1 text-left">Add File</span>
-                {config.drives.length > 0 && <ChevronRight size={14} className="shrink-0 text-neutral-400" />}
-              </button>
-            </MenuItem>
-            {isScreenCaptureAvailable && (
-              <MenuItem>
-                {({ close }) => (
-                  <Tooltip
-                    content={
-                      isContinuousCaptureActive
-                        ? "Stop sharing — removes the live screen feed from the conversation"
-                        : "Share your screen continuously as context for the conversation"
-                    }
-                    side="right"
-                    className="w-full"
+        <AddMenu>
+          {/* Add File — a direct attach when no drives are configured, otherwise a submenu */}
+          {config.drives.length === 0 ? (
+            <MenuRow label="Add File" onSelect={onAttachmentClick}>
+              <Paperclip size={16} className="shrink-0" />
+              <span className="font-medium text-sm flex-1 text-left">Add File</span>
+            </MenuRow>
+          ) : (
+            <Submenu label="Add File" icon={<Paperclip size={16} className="shrink-0" />} panelClassName="min-w-40">
+              {(close) => (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAttachmentClick();
+                      close();
+                    }}
+                    className={ROW_CLASS}
                   >
+                    <Paperclip size={16} className="shrink-0" />
+                    <span className="font-medium text-sm">Upload</span>
+                  </button>
+                  {config.drives.map((fp) => (
+                    <button
+                      key={fp.id}
+                      type="button"
+                      onClick={() => {
+                        onDriveSelect(fp);
+                        close();
+                      }}
+                      className={ROW_CLASS}
+                    >
+                      {fp.icon ? (
+                        <span
+                          className="shrink-0 bg-current inline-block"
+                          style={{
+                            width: 16,
+                            height: 16,
+                            maskImage: `url(${fp.icon})`,
+                            WebkitMaskImage: `url(${fp.icon})`,
+                            maskSize: "contain",
+                            maskRepeat: "no-repeat",
+                            maskPosition: "center",
+                          }}
+                        />
+                      ) : (
+                        <HardDrive size={16} />
+                      )}
+                      <span className="font-medium text-sm">{fp.name}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+            </Submenu>
+          )}
+          {isScreenCaptureAvailable && (
+            <Tooltip
+              content={
+                isContinuousCaptureActive
+                  ? "Stop sharing — removes the live screen feed from the conversation"
+                  : "Share your screen continuously as context for the conversation"
+              }
+              side="right"
+              className="w-full"
+            >
+              <MenuRow
+                label={isContinuousCaptureActive ? "Stop Screen Capture" : "Share Screen"}
+                onSelect={onContinuousCaptureToggle}
+                className={isContinuousCaptureActive ? "text-green-600 dark:text-green-400" : undefined}
+              >
+                <ScreenShare size={16} className="shrink-0" />
+                <span className="font-medium text-sm">
+                  {isContinuousCaptureActive ? "Stop Screen Capture" : "Share Screen"}
+                </span>
+              </MenuRow>
+            </Tooltip>
+          )}
+          {showSkillsMenu && (
+            <Submenu
+              label="Skills"
+              icon={<Sparkles size={16} className="shrink-0" />}
+              panelClassName="min-w-48 flex flex-col overflow-hidden"
+            >
+              {(close) => (
+                <>
+                  <Tooltip content="Skills you've created — editable in Manage Skills" side="right" className="w-full">
+                    <button type="button" onClick={() => toggleSkillSource("personal")} className={ROW_CLASS}>
+                      <User size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left">
+                        My Skills <span className="text-neutral-400 dark:text-neutral-500">({skills.length})</span>
+                      </span>
+                      <span className="shrink-0 w-4 flex justify-center">
+                        {skillSources.personal && (
+                          <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
+                        )}
+                      </span>
+                    </button>
+                  </Tooltip>
+                  <Tooltip content="Ready-made skills shipped with the app" side="right" className="w-full">
+                    <button type="button" onClick={() => toggleSkillSource("catalog")} className={ROW_CLASS}>
+                      <Library size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left">
+                        Catalog <span className="text-neutral-400 dark:text-neutral-500">({catalogTemplateCount})</span>
+                      </span>
+                      <span className="shrink-0 w-4 flex justify-center">
+                        {skillSources.catalog && <Check size={13} className="text-neutral-600 dark:text-neutral-400" />}
+                      </span>
+                    </button>
+                  </Tooltip>
+                  {skillBuilder && (
                     <button
                       type="button"
                       onClick={async () => {
-                        close();
-                        await onContinuousCaptureToggle();
-                      }}
-                      className={cn(
-                        "group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 transition-colors",
-                        isContinuousCaptureActive
-                          ? "text-green-600 dark:text-green-400"
-                          : "text-neutral-800 dark:text-neutral-200",
-                      )}
-                    >
-                      <ScreenShare size={16} className="shrink-0" />
-                      <span className="font-medium text-sm">
-                        {isContinuousCaptureActive ? "Stop Screen Capture" : "Share Screen"}
-                      </span>
-                    </button>
-                  </Tooltip>
-                )}
-              </MenuItem>
-            )}
-            {activeSubmenu === "file" && (
-              <Portal>
-                <div
-                  ref={fileRefs.setFloating}
-                  data-file-submenu
-                  role="none"
-                  style={fileFloatingStyles}
-                  className="z-9999"
-                  onMouseEnter={() => openSubmenu("file")}
-                  onMouseLeave={scheduleCloseSubmenu}
-                >
-                  <div className="rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1 min-w-40">
-                    <button
-                      type="button"
-                      onClick={onAttachmentClick}
-                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                    >
-                      <Paperclip size={16} className="shrink-0" />
-                      <span className="font-medium text-sm">Upload</span>
-                    </button>
-                    {config.drives.map((fp) => (
-                      <button
-                        key={fp.id}
-                        type="button"
-                        onClick={() => {
-                          setActiveSubmenu(null);
-                          onDriveSelect(fp);
-                        }}
-                        className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                      >
-                        {fp.icon ? (
-                          <span
-                            className="shrink-0 bg-current inline-block"
-                            style={{
-                              width: 16,
-                              height: 16,
-                              maskImage: `url(${fp.icon})`,
-                              WebkitMaskImage: `url(${fp.icon})`,
-                              maskSize: "contain",
-                              maskRepeat: "no-repeat",
-                              maskPosition: "center",
-                            }}
-                          />
-                        ) : (
-                          <HardDrive size={16} />
-                        )}
-                        <span className="font-medium text-sm">{fp.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Portal>
-            )}
-            {showSkillsMenu && (
-              <MenuItem>
-                <button
-                  ref={skillsRefs.setReference}
-                  type="button"
-                  onMouseEnter={() => openSubmenu("skills")}
-                  onMouseLeave={scheduleCloseSubmenu}
-                  className="group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                >
-                  <Sparkles size={16} className="shrink-0" />
-                  <span className="font-medium text-sm flex-1 text-left">Skills</span>
-                  <ChevronRight size={14} className="shrink-0 text-neutral-400" />
-                </button>
-              </MenuItem>
-            )}
-            <MenuItem>
-              <button
-                ref={agentRefs.setReference}
-                type="button"
-                onMouseEnter={() => openSubmenu("agent")}
-                onMouseLeave={scheduleCloseSubmenu}
-                className="group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-              >
-                <Bot size={16} className="shrink-0" />
-                <span className="font-medium text-sm flex-1 text-left">Agents</span>
-                <ChevronRight size={14} className="shrink-0 text-neutral-400" />
-              </button>
-            </MenuItem>
-            {activeSubmenu === "agent" && (
-              <Portal>
-                <div
-                  ref={agentRefs.setFloating}
-                  data-agent-submenu
-                  role="none"
-                  style={agentFloatingStyles}
-                  className="z-9999"
-                  onMouseEnter={() => openSubmenu("agent")}
-                  onMouseLeave={scheduleCloseSubmenu}
-                >
-                  <div className="rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1 min-w-48 flex flex-col overflow-hidden max-h-[min(60vh,400px)]">
-                    {agents.length === 0 && (
-                      <p className="px-4 py-2 text-sm text-neutral-500 dark:text-neutral-400">No agents configured</p>
-                    )}
-                    <div className="overflow-y-auto">
-                      {agents.map((agent) => (
-                        <div
-                          key={agent.id}
-                          className="group/agent flex w-full items-center rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                        >
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCurrentAgent(agent);
-                              setActiveSubmenu(null);
-                              setAgentDrawerView("details");
-                              setShowAgentDrawer(true);
-                            }}
-                            className="flex flex-1 min-w-0 items-center gap-3 px-3 py-2"
-                          >
-                            <Bot size={16} className="shrink-0" />
-                            <span className="font-medium text-sm flex-1 text-left truncate">{agent.name}</span>
-                            {currentAgent?.id === agent.id && (
-                              <Check size={13} className="shrink-0 ml-1 text-neutral-600 dark:text-neutral-400" />
-                            )}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="border-t border-neutral-200 dark:border-neutral-700 mt-1" />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSubmenu(null);
-                        setWizardOpen(true);
-                      }}
-                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                    >
-                      <Plus size={16} className="shrink-0" />
-                      <span className="font-medium text-sm">Add Agent</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSubmenu(null);
-                        setAgentDrawerView("list");
-                        setShowAgentDrawer(true);
-                      }}
-                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                    >
-                      <FolderCog size={16} className="shrink-0" />
-                      <span className="font-medium text-sm">Manage Agents</span>
-                    </button>
-                  </div>
-                </div>
-              </Portal>
-            )}
-            {activeSubmenu === "skills" && (
-              <Portal>
-                <div
-                  ref={skillsRefs.setFloating}
-                  data-skills-submenu
-                  role="none"
-                  style={skillsFloatingStyles}
-                  className="z-9999"
-                  onMouseEnter={() => openSubmenu("skills")}
-                  onMouseLeave={scheduleCloseSubmenu}
-                >
-                  <div className="rounded-xl border border-white/40 dark:border-neutral-700/60 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg shadow-black/20 dark:shadow-black/50 p-1 min-w-48 flex flex-col overflow-hidden">
-                    <Tooltip
-                      content="Skills you've created — editable in Manage Skills"
-                      side="right"
-                      className="w-full"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSkillSource("personal")}
-                        className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                      >
-                        <User size={16} className="shrink-0" />
-                        <span className="font-medium text-sm flex-1 text-left">
-                          My Skills <span className="text-neutral-400 dark:text-neutral-500">({skills.length})</span>
-                        </span>
-                        <span className="shrink-0 w-4 flex justify-center">
-                          {skillSources.personal && (
-                            <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
-                          )}
-                        </span>
-                      </button>
-                    </Tooltip>
-                    <Tooltip content="Ready-made skills shipped with the app" side="right" className="w-full">
-                      <button
-                        type="button"
-                        onClick={() => toggleSkillSource("catalog")}
-                        className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                      >
-                        <Library size={16} className="shrink-0" />
-                        <span className="font-medium text-sm flex-1 text-left">
-                          Catalog{" "}
-                          <span className="text-neutral-400 dark:text-neutral-500">({catalogTemplateCount})</span>
-                        </span>
-                        <span className="shrink-0 w-4 flex justify-center">
-                          {skillSources.catalog && (
-                            <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
-                          )}
-                        </span>
-                      </button>
-                    </Tooltip>
-                    {skillBuilder && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await setProviderEnabled(
-                              SKILL_BUILDER_ID,
-                              getProviderState(SKILL_BUILDER_ID) !== ProviderState.Connected,
-                            );
-                          } catch (error) {
-                            console.error("Failed to toggle Skill Builder:", error);
-                          }
-                        }}
-                        className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                      >
-                        <PenTool size={16} className="shrink-0" />
-                        <span className="font-medium text-sm flex-1 text-left">Skill Builder</span>
-                        <span className="shrink-0 w-4 flex justify-center">
-                          {getProviderState(SKILL_BUILDER_ID) === ProviderState.Connected && (
-                            <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
-                          )}
-                        </span>
-                      </button>
-                    )}
-                    <div className="border-t border-neutral-200 dark:border-neutral-700 mt-1" />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveSubmenu(null);
-                        openSkillCatalog();
-                      }}
-                      className="flex w-full items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors"
-                    >
-                      <FolderCog size={16} className="shrink-0" />
-                      <span className="font-medium text-sm">Manage Skills</span>
-                    </button>
-                  </div>
-                </div>
-              </Portal>
-            )}
-            {otherProviders.length > 0 && <div className="border-t border-neutral-200 dark:border-neutral-700 my-1" />}
-            {otherProviders.map((provider: ToolProvider) => {
-              const state = getProviderState(provider.id);
-              const providerEnabled = state === ProviderState.Connected;
-              const providerInitializing = state === ProviderState.Initializing;
-              const providerFailed = state === ProviderState.Failed;
-              const providerRequired = getProviderPolicy(provider.id) === "required";
-
-              return (
-                <MenuItem key={provider.id}>
-                  <Tooltip
-                    content={
-                      providerRequired
-                        ? `${provider.name} is required by this agent`
-                        : providerFailed
-                          ? `${provider.name} failed to connect`
-                          : providerInitializing
-                            ? `${provider.name} is connecting…`
-                            : (provider.description ??
-                              (providerEnabled
-                                ? `Disable ${provider.name} tools for this conversation`
-                                : `Enable ${provider.name} tools for this conversation`))
-                    }
-                    side="right"
-                    className="w-full"
-                  >
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.preventDefault();
-                        if (providerInitializing || providerRequired) return;
                         try {
-                          await setProviderEnabled(provider.id, !providerEnabled);
+                          await setProviderEnabled(
+                            SKILL_BUILDER_ID,
+                            getProviderState(SKILL_BUILDER_ID) !== ProviderState.Connected,
+                          );
                         } catch (error) {
-                          console.error(`Failed to toggle provider ${provider.name}:`, error);
+                          console.error("Failed to toggle Skill Builder:", error);
                         }
                       }}
-                      disabled={providerInitializing || providerRequired}
-                      className={cn(
-                        "group flex w-full items-center gap-3 px-3 py-2 rounded-lg data-focus:bg-neutral-100/60 dark:data-focus:bg-white/5 hover:bg-neutral-100/60 dark:hover:bg-white/5 text-neutral-800 dark:text-neutral-200 transition-colors",
-                        providerInitializing && !providerRequired && "opacity-50",
-                      )}
+                      className={ROW_CLASS}
                     >
-                      {renderProviderIcon(provider, state)}
-                      <span className="font-medium text-sm flex-1 text-left truncate">{provider.name}</span>
+                      <PenTool size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left">Skill Builder</span>
                       <span className="shrink-0 w-4 flex justify-center">
-                        {providerRequired ? (
-                          <Lock size={12} className="text-neutral-400 dark:text-neutral-500" />
-                        ) : (
-                          providerEnabled &&
-                          !providerInitializing &&
-                          !providerFailed && <Check size={13} className="ml-1 text-neutral-600 dark:text-neutral-400" />
+                        {getProviderState(SKILL_BUILDER_ID) === ProviderState.Connected && (
+                          <Check size={13} className="text-neutral-600 dark:text-neutral-400" />
                         )}
                       </span>
                     </button>
-                  </Tooltip>
-                </MenuItem>
-              );
-            })}
-          </MenuItems>
-        </Menu>
+                  )}
+                  <div className="border-t border-neutral-200 dark:border-neutral-700 mt-1" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openSkillCatalog();
+                      close();
+                    }}
+                    className={ROW_CLASS}
+                  >
+                    <FolderCog size={16} className="shrink-0" />
+                    <span className="font-medium text-sm">Manage Skills</span>
+                  </button>
+                </>
+              )}
+            </Submenu>
+          )}
+          <Submenu
+            label="Agents"
+            icon={<Bot size={16} className="shrink-0" />}
+            panelClassName="min-w-48 flex flex-col overflow-hidden max-h-[min(60vh,400px)]"
+          >
+            {(close) => (
+              <>
+                {agents.length === 0 && (
+                  <p className="px-4 py-2 text-sm text-neutral-500 dark:text-neutral-400">No agents configured</p>
+                )}
+                <div className="overflow-y-auto">
+                  {agents.map((agent) => (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      onClick={() => {
+                        setCurrentAgent(agent);
+                        setAgentDrawerView("details");
+                        setShowAgentDrawer(true);
+                        close();
+                      }}
+                      className={ROW_CLASS}
+                    >
+                      <Bot size={16} className="shrink-0" />
+                      <span className="font-medium text-sm flex-1 text-left truncate">{agent.name}</span>
+                      {currentAgent?.id === agent.id && (
+                        <Check size={13} className="shrink-0 ml-1 text-neutral-600 dark:text-neutral-400" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-neutral-200 dark:border-neutral-700 mt-1" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWizardOpen(true);
+                    close();
+                  }}
+                  className={ROW_CLASS}
+                >
+                  <Plus size={16} className="shrink-0" />
+                  <span className="font-medium text-sm">Add Agent</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAgentDrawerView("list");
+                    setShowAgentDrawer(true);
+                    close();
+                  }}
+                  className={ROW_CLASS}
+                >
+                  <FolderCog size={16} className="shrink-0" />
+                  <span className="font-medium text-sm">Manage Agents</span>
+                </button>
+              </>
+            )}
+          </Submenu>
+          {otherProviders.length > 0 && <div className="border-t border-neutral-200 dark:border-neutral-700 my-1" />}
+          {otherProviders.map((provider: ToolProvider) => {
+            const state = getProviderState(provider.id);
+            const providerEnabled = state === ProviderState.Connected;
+            const providerInitializing = state === ProviderState.Initializing;
+            const providerFailed = state === ProviderState.Failed;
+            const providerRequired = getProviderPolicy(provider.id) === "required";
+
+            return (
+              <Tooltip
+                key={provider.id}
+                content={
+                  providerRequired
+                    ? `${provider.name} is required by this agent`
+                    : providerFailed
+                      ? `${provider.name} failed to connect`
+                      : providerInitializing
+                        ? `${provider.name} is connecting…`
+                        : (provider.description ??
+                          (providerEnabled
+                            ? `Disable ${provider.name} tools for this conversation`
+                            : `Enable ${provider.name} tools for this conversation`))
+                }
+                side="right"
+                className="w-full"
+              >
+                <MenuRow
+                  label={provider.name}
+                  closeOnClick={false}
+                  disabled={providerInitializing || providerRequired}
+                  onSelect={async () => {
+                    try {
+                      await setProviderEnabled(provider.id, !providerEnabled);
+                    } catch (error) {
+                      console.error(`Failed to toggle provider ${provider.name}:`, error);
+                    }
+                  }}
+                  className={cn(providerInitializing && !providerRequired && "opacity-50")}
+                >
+                  {renderProviderIcon(provider, state)}
+                  <span className="font-medium text-sm flex-1 text-left truncate">{provider.name}</span>
+                  <span className="shrink-0 w-4 flex justify-center">
+                    {providerRequired ? (
+                      <Lock size={12} className="text-neutral-400 dark:text-neutral-500" />
+                    ) : (
+                      providerEnabled &&
+                      !providerInitializing &&
+                      !providerFailed && <Check size={13} className="ml-1 text-neutral-600 dark:text-neutral-400" />
+                    )}
+                  </span>
+                </MenuRow>
+              </Tooltip>
+            );
+          })}
+        </AddMenu>
       </div>
 
       <AgentWizard isOpen={wizardOpen} onClose={() => setWizardOpen(false)} onCreated={handleWizardCreated} />

@@ -1,5 +1,5 @@
 import { ArrowRight, HardDrive, ImagePlus, Loader2, Paintbrush, Sparkles, Upload, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import type { Model } from "@/shared/types/chat";
 import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 
@@ -50,7 +50,6 @@ export function CanvasInput({
   autoFocus,
   className = "",
 }: CanvasInputProps) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const referenceImageEntries = useMemo(() => {
     const counts = new Map<string, number>();
 
@@ -63,19 +62,6 @@ export function CanvasInput({
   }, [referenceImages]);
 
   const canSubmit = (prompt.trim() || referenceImages.length > 0) && !disabled;
-
-  useEffect(() => {
-    if (!inputRef.current) {
-      return;
-    }
-
-    inputRef.current.style.height = "auto";
-    inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
-
-    if (prompt.length === 0) {
-      inputRef.current.style.height = "auto";
-    }
-  }, [prompt]);
 
   const handleContentChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -95,12 +81,6 @@ export function CanvasInput({
     },
     [canSubmit, onSubmit],
   );
-
-  useEffect(() => {
-    if (autoFocus && inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, [autoFocus]);
 
   return (
     <div
@@ -139,9 +119,9 @@ export function CanvasInput({
       {/* Input area */}
       <div className="relative flex-1">
         <textarea
-          ref={inputRef}
-          className="block w-full px-4 pt-4 pb-2 max-h-[40vh] overflow-y-auto min-h-12 resize-none bg-transparent text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none whitespace-pre-wrap wrap-break-word"
-          style={{ scrollbarWidth: "thin", minHeight: "2.5rem", height: "auto" }}
+          // biome-ignore lint/a11y/noAutofocus: the canvas composer opts in via the autoFocus prop
+          autoFocus={autoFocus}
+          className="block w-full px-4 pt-4 pb-2 max-h-[40vh] overflow-y-auto scrollbar-thin min-h-10 field-sizing-content resize-none bg-transparent text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none whitespace-pre-wrap wrap-break-word"
           value={prompt}
           placeholder={placeholder}
           disabled={disabled}

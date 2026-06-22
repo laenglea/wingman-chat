@@ -1,5 +1,5 @@
 import { Pencil } from "lucide-react";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useState } from "react";
 import { ArtifactChip } from "@/features/artifacts/components/ArtifactChip";
 import { useChat } from "@/features/chat/hooks/useChat";
 import { cn } from "@/shared/lib/cn";
@@ -45,7 +45,6 @@ export const ChatUserMessage = memo(function ChatUserMessage({ message, index, i
       p.type === "image" || p.type === "audio" || p.type === "file",
   );
   const [editMediaContent, setEditMediaContent] = useState<(ImageContent | AudioContent | FileContent)[]>(mediaContent);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { sendMessage, chat } = useChat();
 
   // Check for images and files in content
@@ -54,32 +53,8 @@ export const ChatUserMessage = memo(function ChatUserMessage({ message, index, i
   ) as Content[];
   const hasMedia = mediaParts.length > 0;
 
-  // Auto-resize textarea and focus when entering edit mode
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [isEditing]);
-
-  // Auto-resize textarea on content change
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, []);
-
   const handleEditContentChange = (value: string) => {
     setEditContent(value);
-
-    requestAnimationFrame(() => {
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-      }
-    });
   };
 
   const handleStartEdit = () => {
@@ -147,7 +122,6 @@ export const ChatUserMessage = memo(function ChatUserMessage({ message, index, i
             editContent={editContent}
             onEditContentChange={handleEditContentChange}
             onKeyDown={handleKeyDown}
-            textareaRef={textareaRef}
             editAdditionalTextContent={editAdditionalTextContent}
             onRemoveAdditionalText={handleRemoveAdditionalText}
             editMediaContent={editMediaContent}

@@ -38,7 +38,7 @@ const NonMemoizedSvgRenderer = ({ svg, language, name }: SvgRendererProps) => {
           </pre>
         </div>
       ) : isComplete ? (
-        <div className="flex items-center justify-center p-4 overflow-auto" style={{ maxHeight: "75vw" }}>
+        <div className="flex items-center justify-center p-4 overflow-auto max-h-[75vw]">
           <img src={svgPreviewUrl} alt={title || language} className="max-w-full object-contain" />
         </div>
       ) : (

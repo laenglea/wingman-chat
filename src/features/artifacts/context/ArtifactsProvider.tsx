@@ -104,5 +104,5 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     setFileSystem,
   };
 
-  return <ArtifactsContext.Provider value={value}>{children}</ArtifactsContext.Provider>;
+  return <ArtifactsContext value={value}>{children}</ArtifactsContext>;
 }

@@ -652,5 +652,5 @@ export function AgentProvider({ children }: { children: ReactNode }) {
     toggleServer,
   };
 
-  return <AgentContext.Provider value={value}>{children}</AgentContext.Provider>;
+  return <AgentContext value={value}>{children}</AgentContext>;
 }

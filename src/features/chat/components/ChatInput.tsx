@@ -44,7 +44,16 @@ import { formatArtifactReference } from "./chatMessageUtils";
 export function ChatInput() {
   const config = getConfig();
 
-  const { sendMessage, models, model, setModel: onModelChange, messages, isResponding, stopStreaming } = useChat();
+  const {
+    sendMessage,
+    models,
+    model,
+    setModel: onModelChange,
+    messages,
+    isResponding,
+    stopStreaming,
+    chat,
+  } = useChat();
   const { currentAgent, setCurrentAgent, setShowAgentDrawer } = useAgents();
   const { isAvailable: artifactsAvailable } = useArtifacts();
   const { profile } = useSettings();
@@ -130,7 +139,6 @@ export function ChatInput() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const contentInputRef = useRef<HTMLTextAreaElement>(null);
-  const voiceInputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const profileName = profile?.name;
 
@@ -233,22 +241,15 @@ export function ChatInput() {
     }
   }, []);
 
-  // Auto-focus on desktop devices only (not on touch devices like iPad)
+  // Focus the composer when the active chat changes — starting a new chat or opening an
+  // existing one — so you can type right away. Skipped on touch devices to avoid popping
+  // the on-screen keyboard. rAF defers focus until the newly selected chat has rendered
+  // (Safari ignores focus() called too early in the same tick).
   useEffect(() => {
-    if (messages.length === 0) {
-      // Check if this is a touch device
-      const isTouchDevice = window.matchMedia("(pointer: coarse)").matches;
-
-      if (!isTouchDevice && contentInputRef.current) {
-        // Small delay to ensure DOM is ready
-        const timer = setTimeout(() => {
-          contentInputRef.current?.focus();
-        }, 100);
-
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [messages.length]);
+    if (window.matchMedia("(pointer: coarse)").matches) return;
+    const raf = requestAnimationFrame(() => contentInputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, [chat?.id]);
 
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
@@ -446,32 +447,6 @@ export function ChatInput() {
     }
   }, [isTranscribing, stopTranscription, startTranscription]);
 
-  useEffect(() => {
-    if (!contentInputRef.current) {
-      return;
-    }
-
-    contentInputRef.current.style.height = "auto";
-    contentInputRef.current.style.height = `${contentInputRef.current.scrollHeight}px`;
-
-    if (content.length === 0) {
-      contentInputRef.current.style.height = "auto";
-    }
-  }, [content]);
-
-  useEffect(() => {
-    if (!voiceInputRef.current) {
-      return;
-    }
-
-    voiceInputRef.current.style.height = "auto";
-    voiceInputRef.current.style.height = `${voiceInputRef.current.scrollHeight}px`;
-
-    if (voiceTextInput.length === 0) {
-      voiceInputRef.current.style.height = "auto";
-    }
-  }, [voiceTextInput]);
-
   return (
     <>
       <form onSubmit={handleSubmit}>
@@ -521,9 +496,7 @@ export function ChatInput() {
           <div className={cn("relative flex-1 transition-all duration-200", isDragging && "blur-sm")}>
             {isRealtimeSelected ? (
               <textarea
-                className="block w-full resize-none border-0 bg-transparent p-3 md:p-4 max-h-[40vh] overflow-y-auto min-h-10 whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200 focus:outline-none"
-                style={{ scrollbarWidth: "thin", minHeight: "2.5rem", height: "auto" }}
-                ref={voiceInputRef}
+                className="block w-full resize-none border-0 bg-transparent p-3 md:p-4 max-h-[40vh] overflow-y-auto scrollbar-thin min-h-10 field-sizing-content whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200 focus:outline-none"
                 value={voiceTextInput}
                 rows={1}
                 aria-label="Voice text input"
@@ -543,12 +516,7 @@ export function ChatInput() {
               <>
                 <textarea
                   ref={contentInputRef}
-                  className="block w-full resize-none border-0 bg-transparent p-3 md:p-4 max-h-[40vh] overflow-y-auto min-h-10 whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200 focus:outline-none"
-                  style={{
-                    scrollbarWidth: "thin",
-                    minHeight: "2.5rem",
-                    height: "auto",
-                  }}
+                  className="block w-full resize-none border-0 bg-transparent p-3 md:p-4 max-h-[40vh] overflow-y-auto scrollbar-thin min-h-10 field-sizing-content whitespace-pre-wrap wrap-break-word text-neutral-800 dark:text-neutral-200 focus:outline-none"
                   value={content}
                   rows={1}
                   inputMode="text"

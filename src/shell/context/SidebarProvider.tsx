@@ -30,5 +30,5 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     resetSidebarWidth,
   };
 
-  return <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>;
+  return <SidebarContext value={value}>{children}</SidebarContext>;
 }

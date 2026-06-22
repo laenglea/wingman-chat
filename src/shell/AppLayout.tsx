@@ -18,6 +18,7 @@ import { SettingsButton } from "@/features/settings/components/SettingsButton";
 import { SettingsDrawer } from "@/features/settings/components/SettingsDrawer";
 import { useToolsContext } from "@/features/tools";
 import { getConfig } from "@/shared/config";
+import { useMediaQuery } from "@/shared/hooks/useMediaQuery";
 import { cn } from "@/shared/lib/cn";
 import { useApp } from "@/shell/hooks/useApp";
 import { useNavigation } from "@/shell/hooks/useNavigation";
@@ -75,7 +76,7 @@ export function AppLayout() {
 
   // Track desktop breakpoint so the sidebar width is only applied on md+
   // (mobile keeps its full-width overlay).
-  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   // Mobile menu state
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -124,7 +125,6 @@ export function AppLayout() {
   // Auto-close sidebar on mobile screens and update sliders on resize
   useEffect(() => {
     const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 768);
       if (window.innerWidth < 768) {
         setShowSidebar(false);
       }
@@ -238,8 +238,7 @@ export function AppLayout() {
           <button
             type="button"
             aria-label="Resize sidebar"
-            className="hidden md:flex absolute top-0 bottom-0 right-0 w-3 z-10 group items-center justify-center"
-            style={{ cursor: "ew-resize" }}
+            className="hidden md:flex absolute top-0 bottom-0 right-0 w-3 z-10 group items-center justify-center cursor-ew-resize"
             onMouseDown={handleSidebarResizeMouseDown}
             onDoubleClick={resetSidebarWidth}
           >

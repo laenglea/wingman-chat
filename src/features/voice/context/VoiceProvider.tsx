@@ -314,5 +314,5 @@ export function VoiceProvider({ children }: VoiceProviderProps) {
     sendText: sendVoiceText,
   };
 
-  return <VoiceContext.Provider value={value}>{children}</VoiceContext.Provider>;
+  return <VoiceContext value={value}>{children}</VoiceContext>;
 }

@@ -304,13 +304,7 @@ export function NotebookChat({
             placeholder={hasSources ? "Ask about your sources..." : "Add sources first to start chatting"}
             disabled={!hasSources}
             rows={1}
-            className="flex-1 bg-transparent text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none resize-none py-2 max-h-30 disabled:opacity-50"
-            style={{ height: "auto" }}
-            onInput={(e) => {
-              const target = e.target as HTMLTextAreaElement;
-              target.style.height = "auto";
-              target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-            }}
+            className="flex-1 bg-transparent text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none resize-none py-2 max-h-30 overflow-y-auto field-sizing-content disabled:opacity-50"
           />
           <button
             type="button"

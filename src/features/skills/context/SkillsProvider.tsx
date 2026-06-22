@@ -176,7 +176,7 @@ export function SkillsProvider({ children }: SkillsProviderProps) {
   }, []);
 
   return (
-    <SkillsContext.Provider
+    <SkillsContext
       value={{
         skills,
         addSkill,
@@ -191,6 +191,6 @@ export function SkillsProvider({ children }: SkillsProviderProps) {
       }}
     >
       {children}
-    </SkillsContext.Provider>
+    </SkillsContext>
   );
 }

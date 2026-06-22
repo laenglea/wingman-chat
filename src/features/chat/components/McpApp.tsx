@@ -1,6 +1,6 @@
 import { Loader2, Maximize2 } from "lucide-react";
 import type { CSSProperties } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
 import { parseToolArguments } from "@/shared/lib/toolArguments";
 import { useOverlayRect } from "@/shared/lib/useOverlayRect";
@@ -71,8 +71,10 @@ export function McpApp({ toolResult, isLastFullscreenApp }: McpAppProps) {
   const isFullscreenRef = useRef(isFullscreen);
   isFullscreenRef.current = isFullscreen;
 
-  // Create the bridge once on the persistent iframe.
-  const renderApp = useCallback(async () => {
+  // Render the bridge once on mount. An Effect Event so it always reads the latest
+  // props/state without forcing the mount Effect below to re-run — the bridge is
+  // persistent across mode changes.
+  const renderApp = useEffectEvent(async () => {
     const iframe = iframeRef.current;
     if (!iframe) return;
     setIsLoading(true);
@@ -109,13 +111,10 @@ export function McpApp({ toolResult, isLastFullscreenApp }: McpAppProps) {
       console.error("Failed to render MCP app:", error);
       setIsLoading(false);
     }
-  }, [toolResult, providerId, resourceUri, content, setProviderEnabled, renderAppInto, restoreToolUI]);
+  });
 
-  // Mount once — the bridge persists across mode changes.
-  const renderAppRef = useRef(renderApp);
-  renderAppRef.current = renderApp;
   useEffect(() => {
-    renderAppRef.current();
+    renderApp();
     return () => {
       if (cleanupRef.current) {
         const cleanup = cleanupRef.current;

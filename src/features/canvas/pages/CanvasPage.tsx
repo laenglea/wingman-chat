@@ -524,7 +524,7 @@ export function CanvasPage() {
 
         {/* Thumbnail grid overlay — bottom horizontal on mobile, right vertical on desktop */}
         {images.length > 0 && (
-          <div className="absolute bottom-0 inset-x-0 md:bottom-0 md:inset-auto md:top-16 md:right-0 z-10 flex md:flex-col items-center gap-2 p-2 overflow-x-auto md:overflow-x-hidden md:overflow-y-auto scrollbar-hide bg-white/50 dark:bg-neutral-950/50 md:bg-transparent dark:md:bg-transparent backdrop-blur-sm md:backdrop-blur-none">
+          <div className="absolute bottom-0 inset-x-0 md:bottom-0 md:inset-auto md:top-16 md:right-0 z-10 flex md:flex-col items-center gap-2 p-2 overflow-x-auto md:overflow-x-hidden md:overflow-y-auto scrollbar-none bg-white/50 dark:bg-neutral-950/50 md:bg-transparent dark:md:bg-transparent backdrop-blur-sm md:backdrop-blur-none">
             {/* New generation tile */}
             <button
               type="button"

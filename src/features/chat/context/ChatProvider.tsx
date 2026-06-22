@@ -817,7 +817,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     resolveConsent,
   };
 
-  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+  return <ChatContext value={value}>{children}</ChatContext>;
 }
 
 function appendTextContent(message: Message, text: string | null): Message {
