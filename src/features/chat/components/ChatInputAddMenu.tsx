@@ -8,6 +8,7 @@ import {
   MenuButton,
   MenuItem,
   MenuItems,
+  Portal,
 } from "@headlessui/react";
 import {
   Bot,
@@ -30,7 +31,6 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { AgentWizard } from "@/features/agent/components/wizard/AgentWizard";
 import { useAgentFiles } from "@/features/agent/hooks/useAgentFiles";
 import { useAgents } from "@/features/agent/hooks/useAgents";
@@ -130,6 +130,24 @@ export function ChatInputAddMenu({
       if (submenuTimer.current) clearTimeout(submenuTimer.current);
     };
   }, []);
+
+  // Keep the Add menu open when toggling Skills sources. The portaled Skills submenu
+  // would otherwise trip HeadlessUI's outside-click close; a window capture-phase
+  // listener (runs before document) stops those pointer events from reaching it.
+  useEffect(() => {
+    if (activeSubmenu !== "skills") return;
+    const isInsideSkillsSubmenu = (target: EventTarget | null) =>
+      target instanceof Element && !!target.closest("[data-skills-submenu]");
+    const guard = (event: PointerEvent) => {
+      if (isInsideSkillsSubmenu(event.target)) event.stopPropagation();
+    };
+    window.addEventListener("pointerdown", guard, true);
+    window.addEventListener("pointerup", guard, true);
+    return () => {
+      window.removeEventListener("pointerdown", guard, true);
+      window.removeEventListener("pointerup", guard, true);
+    };
+  }, [activeSubmenu]);
 
   const { refs: fileRefs, floatingStyles: fileFloatingStyles } = useFloating({
     placement: "right-start",
@@ -269,8 +287,8 @@ export function ChatInputAddMenu({
                 )}
               </MenuItem>
             )}
-            {activeSubmenu === "file" &&
-              createPortal(
+            {activeSubmenu === "file" && (
+              <Portal>
                 <div
                   ref={fileRefs.setFloating}
                   data-file-submenu
@@ -319,9 +337,9 @@ export function ChatInputAddMenu({
                       </button>
                     ))}
                   </div>
-                </div>,
-                document.body,
-              )}
+                </div>
+              </Portal>
+            )}
             {showSkillsMenu && (
               <MenuItem>
                 <button
@@ -350,8 +368,8 @@ export function ChatInputAddMenu({
                 <ChevronRight size={14} className="shrink-0 text-neutral-400" />
               </button>
             </MenuItem>
-            {activeSubmenu === "agent" &&
-              createPortal(
+            {activeSubmenu === "agent" && (
+              <Portal>
                 <div
                   ref={agentRefs.setFloating}
                   data-agent-submenu
@@ -415,11 +433,11 @@ export function ChatInputAddMenu({
                       <span className="font-medium text-sm">Manage Agents</span>
                     </button>
                   </div>
-                </div>,
-                document.body,
-              )}
-            {activeSubmenu === "skills" &&
-              createPortal(
+                </div>
+              </Portal>
+            )}
+            {activeSubmenu === "skills" && (
+              <Portal>
                 <div
                   ref={skillsRefs.setFloating}
                   data-skills-submenu
@@ -506,9 +524,9 @@ export function ChatInputAddMenu({
                       <span className="font-medium text-sm">Manage Skills</span>
                     </button>
                   </div>
-                </div>,
-                document.body,
-              )}
+                </div>
+              </Portal>
+            )}
             {otherProviders.length > 0 && <div className="border-t border-neutral-200 dark:border-neutral-700 my-1" />}
             {otherProviders.map((provider: ToolProvider) => {
               const state = getProviderState(provider.id);
