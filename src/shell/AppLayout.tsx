@@ -3,8 +3,8 @@ import { Link, Outlet, useRouterState } from "@tanstack/react-router";
 import {
   ChevronDown,
   Coffee,
-  Globe,
   GraduationCap,
+  NotebookPen,
   Image,
   Languages,
   MessageCircle,
@@ -159,7 +159,7 @@ export function AppLayout() {
   // Navigation pages
   const pages = [
     { key: "chat" as const, label: "Chat", icon: <MessageCircle size={20} />, to: "/chat" },
-    { key: "notebook" as const, label: "Notebook", icon: <Globe size={20} />, to: "/notebook" },
+    { key: "notebook" as const, label: "Notebook", icon: <NotebookPen size={20} />, to: "/notebook" },
     { key: "translate" as const, label: "Translate", icon: <Languages size={20} />, to: "/translate" },
     { key: "canvas" as const, label: "Canvas", icon: <Image size={20} />, to: "/canvas" },
   ].filter((page) => {
