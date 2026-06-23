@@ -153,10 +153,10 @@ body {
   outline: none;
 }
 
-button,
-[role="button"],
-button[data-headlessui-state],
-[data-headlessui-state=""] {
+button:not(.cursor-ew-resize),
+[role="button"]:not(.cursor-ew-resize),
+button[data-headlessui-state]:not(.cursor-ew-resize),
+[data-headlessui-state=""]:not(.cursor-ew-resize) {
   cursor: pointer;
 }
 

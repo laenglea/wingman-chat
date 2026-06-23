@@ -204,11 +204,12 @@ export function ChatPage() {
     closeThresholdPx: 200,
     minPanelPx: 280,
     maxPanelPx: 500,
+    anchoredAtRight: true,
     getSiblingOffsetPx: () =>
       showArtifactsDrawer
-        ? (artifactsWidthVw / 100) * window.innerWidth + 12
+        ? (artifactsWidthVw / 100) * window.innerWidth
         : showAppDrawer
-          ? (appWidthVw / 100) * window.innerWidth + 12
+          ? (appWidthVw / 100) * window.innerWidth
           : 0,
     setShow: setShowAgentDrawer,
   });
@@ -221,7 +222,7 @@ export function ChatPage() {
   } = useDrawerResize({
     defaultWidthVw: 50,
     closeThresholdPx: 120,
-    getSiblingOffsetPx: () => (showAgentDrawer ? (agentWidthVw / 100) * window.innerWidth + 12 : 0),
+    getSiblingOffsetPx: () => (showAgentDrawer ? (agentWidthVw / 100) * window.innerWidth : 0),
     setShow: setShowAppDrawer,
   });
 
@@ -234,7 +235,7 @@ export function ChatPage() {
     defaultWidthVw: 50,
     closeThresholdPx: 220,
     minPanelPx: 360,
-    getSiblingOffsetPx: () => (showAgentDrawer ? (agentWidthVw / 100) * window.innerWidth + 12 : 0),
+    getSiblingOffsetPx: () => (showAgentDrawer ? (agentWidthVw / 100) * window.innerWidth : 0),
     setShow: setShowArtifactsDrawer,
   });
 
@@ -618,7 +619,7 @@ export function ChatPage() {
           )}
           style={{
             width: isMobile ? undefined : `${artifactsWidthVw}vw`,
-            right: !isMobile && showAgentDrawer ? `calc(${agentWidthVw}vw + 0.5rem)` : undefined,
+            right: !isMobile && showAgentDrawer ? `${agentWidthVw}vw` : undefined,
             top: isMobile ? "48px" : undefined,
             bottom: isMobile ? 0 : undefined,
           }}
@@ -653,14 +654,13 @@ export function ChatPage() {
       {shouldRenderAgentDrawer && (
         <div
           className={cn(
-            "w-full transform fixed right-0 md:top-14 md:bottom-0 max-w-none z-25",
+            "transform fixed right-0 md:top-14 md:bottom-0 max-w-none z-25",
             !isAgentResizing && "transition-all duration-300 ease-out",
             isMobile ? "w-full" : "",
             isAgentDrawerAnimating ? "translate-x-0 opacity-100" : "translate-x-full opacity-0",
           )}
           style={{
             width: isMobile ? undefined : `${agentWidthVw}vw`,
-            maxWidth: isMobile ? undefined : "500px",
             top: isMobile ? "48px" : undefined,
             bottom: isMobile ? 0 : undefined,
           }}
@@ -703,7 +703,7 @@ export function ChatPage() {
         )}
         style={{
           width: isMobile ? undefined : `${appWidthVw}vw`,
-          right: !isMobile && showAgentDrawer ? `calc(${agentWidthVw}vw + 1.5rem)` : undefined,
+          right: !isMobile && showAgentDrawer && showAppDrawer ? `${agentWidthVw}vw` : undefined,
           top: isMobile ? "48px" : undefined,
           bottom: isMobile ? 0 : undefined,
         }}
@@ -728,7 +728,7 @@ export function ChatPage() {
             </div>
           </button>
         )}
-        <div className="h-full border-l border-black/10 dark:border-white/10 overflow-hidden flex flex-col">
+        <div className="h-full overflow-hidden flex flex-col">
           {/* Mobile close bar */}
           <div className="flex md:hidden items-center h-10 px-2 mt-4 border-b border-neutral-200/60 dark:border-neutral-700/60 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm">
             <button

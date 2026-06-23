@@ -176,7 +176,7 @@ export function McpApp({ toolResult, isLastFullscreenApp }: McpAppProps) {
           left: overlay.left,
           width: overlay.width,
           height: overlay.height,
-          zIndex: 30,
+          zIndex: 21,
           border: "none",
         }
       : { position: "fixed", width: 0, height: 0, opacity: 0, pointerEvents: "none", border: "none" }

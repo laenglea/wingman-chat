@@ -14,6 +14,13 @@ export interface DrawerResizeConfig {
    */
   getSiblingOffsetPx: () => number;
   setShow: (show: boolean) => void;
+  /**
+   * When true, the panel is anchored at right:0 (e.g. the agent drawer).
+   * Width = vw - cursor, capped so chat + siblings stay above minChatPx.
+   * When false (default), the panel is offset from the right by sibling panels,
+   * and width = (panelRightEdge - cursor).
+   */
+  anchoredAtRight?: boolean;
 }
 
 export interface DrawerResizeReturn {
@@ -30,6 +37,7 @@ export function useDrawerResize({
   maxPanelPx,
   getSiblingOffsetPx,
   setShow,
+  anchoredAtRight = false,
 }: DrawerResizeConfig): DrawerResizeReturn {
   const [widthVw, setWidthVw] = useState(defaultWidthVw);
   const [isResizing, setIsResizing] = useState(false);
@@ -52,8 +60,16 @@ export function useDrawerResize({
       const onMouseMove = (ev: MouseEvent) => {
         if (!resizingRef.current) return;
         const vw = window.innerWidth;
-        const panelRightEdge = vw - siblingOffset;
-        let targetWidthPx = Math.min(panelRightEdge - minChatPx, panelRightEdge - ev.clientX);
+        let targetWidthPx: number;
+        if (anchoredAtRight) {
+          // Panel sits at right:0 — width is simply distance from cursor to right edge.
+          // Cap so chat area + any sibling panels stay above minChatPx.
+          const maxWidth = vw - siblingOffset - minChatPx;
+          targetWidthPx = Math.min(vw - ev.clientX, maxWidth);
+        } else {
+          const panelRightEdge = vw - siblingOffset;
+          targetWidthPx = Math.min(panelRightEdge - minChatPx, panelRightEdge - ev.clientX);
+        }
         if (maxPanelPx !== undefined) targetWidthPx = Math.min(targetWidthPx, maxPanelPx);
         intendedWidthPx = Math.max(0, targetWidthPx);
         const visibleWidthPx = minPanelPx !== undefined ? Math.max(minPanelPx, intendedWidthPx) : intendedWidthPx;
@@ -77,7 +93,7 @@ export function useDrawerResize({
     },
     // widthVw is needed only for the initial intendedWidthPx snapshot;
     // getSiblingOffsetPx is called fresh each drag so it stays current.
-    [widthVw, getSiblingOffsetPx, maxPanelPx, minPanelPx, closeThresholdPx, defaultWidthVw, setShow],
+    [widthVw, getSiblingOffsetPx, maxPanelPx, minPanelPx, closeThresholdPx, defaultWidthVw, setShow, anchoredAtRight],
   );
 
   return { widthVw, setWidthVw, isResizing, handleMouseDown };
