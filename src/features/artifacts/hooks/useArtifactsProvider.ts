@@ -270,32 +270,34 @@ export function useArtifactsProvider(): ToolProvider | null {
         },
         description:
           "Execute Python code with optional package dependencies. Pass the full script body in `code` (use `path` instead to run an existing .py artifact). For long scripts heavy with quotes or backslashes (regex, nested strings), prefer writing the script to a .py artifact first and running it via `path` — this avoids JSON-escaping mistakes in the `code` string. All artifact files are available under /home/user/, and files created, modified, or deleted there are synced back. To run a skill's bundled scripts, pass its name(s) in `skills`: its resources mount read-only under /home/user/skills/<name>/ for that run (e.g. `import runpy; runpy.run_path('skills/<name>/scripts/extract.py')`).",
+        strict: true,
         parameters: {
           type: "object",
           properties: {
             code: {
-              type: "string",
+              type: ["string", "null"],
               description: "Inline Python code to execute. This is the standard way to run code.",
             },
             path: {
-              type: "string",
+              type: ["string", "null"],
               description:
                 "Optional: path to an existing Python script in the artifacts filesystem to execute (e.g., `/analysis.py`). Ignored when `code` is also provided.",
             },
             packages: {
-              type: "array",
+              type: ["array", "null"],
               items: { type: "string" },
               description:
                 "Optional list of Python packages required (e.g., ['numpy', 'pandas']). These will be available for import.",
             },
             skills: {
-              type: "array",
+              type: ["array", "null"],
               items: { type: "string" },
               description:
                 "Optional skill names whose bundled resources to mount under /home/user/skills/<name>/ for this run (use the resource paths from read_skill). Mounted read-only; not saved as artifacts.",
             },
           },
-          required: [],
+          required: ["code", "path", "packages", "skills"],
+          additionalProperties: false,
         },
         // The whole snapshot → execute → sync-back section runs under the
         // sandbox lock: parallel tool calls would otherwise commit stale
@@ -402,6 +404,7 @@ export function useArtifactsProvider(): ToolProvider | null {
         },
         description:
           "Execute bash commands or scripts in a sandboxed shell. All artifact files are preloaded and any files created, modified, or deleted are synced back. Prefer explicit paths rather than relying on prior shell state. Supports pipes, redirections, loops, variables, jq, yq, xan, sqlite3, grep, sed, awk, and more. To use a skill's bundled resources (data files, references, shell scripts), pass its name(s) in `skills`: they mount read-only under /home/user/skills/<name>/ for that run.",
+        strict: true,
         parameters: {
           type: "object",
           properties: {
@@ -411,13 +414,14 @@ export function useArtifactsProvider(): ToolProvider | null {
                 "The bash command or script to execute. Supports full shell syntax: pipes (|), redirections (>, >>), chaining (&&, ||, ;), variables, loops, functions, and glob patterns.",
             },
             skills: {
-              type: "array",
+              type: ["array", "null"],
               items: { type: "string" },
               description:
                 "Optional skill names whose bundled resources to mount under /home/user/skills/<name>/ for this run (use the resource paths from read_skill). Mounted read-only; not saved as artifacts.",
             },
           },
-          required: ["command"],
+          required: ["command", "skills"],
+          additionalProperties: false,
         },
         // Runs under the sandbox lock for the same reason as the Python tool —
         // and because the bash runtime itself is a singleton working tree.

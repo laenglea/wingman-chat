@@ -727,7 +727,7 @@ export class Client {
       name: tool.name,
       description: tool.description,
 
-      strict: false,
+      strict: tool.strict ?? false,
       parameters: tool.parameters,
     }));
   }

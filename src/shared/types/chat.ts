@@ -68,6 +68,8 @@ export type Tool = {
 
   parameters: Record<string, unknown>;
 
+  strict?: boolean;
+
   function: (
     args: Record<string, unknown>,
     context?: ToolContext,

@@ -20,6 +20,7 @@ import type {
   CodeExecutionRequest,
   CodeExecutionResult,
   ExecuteMessage,
+  ExecuteReply,
   LlmCallOptions,
   PlotlyManifest,
   PlotlyResult,
@@ -314,7 +315,10 @@ function loadPyodide(): Promise<PyodideInterface> {
   return pyodideReady;
 }
 
-async function executeCode(request: CodeExecutionRequest): Promise<CodeExecutionResult> {
+async function executeCode(
+  request: CodeExecutionRequest,
+  onStarted?: () => void,
+): Promise<CodeExecutionResult> {
   const { packages = [], files = {} } = request;
 
   try {
@@ -338,6 +342,8 @@ async function executeCode(request: CodeExecutionRequest): Promise<CodeExecution
       await pyodide.runPythonAsync(PLOTLY_IMAGE_SHIM);
       plotlyShimApplied = true;
     }
+
+    onStarted?.();
 
     clearRenderQueue(pyodide);
     const runStart = Date.now();
@@ -632,18 +638,28 @@ let executionChain: Promise<void> = Promise.resolve();
 ctx.addEventListener("message", (event) => {
   const { request, port } = event.data;
   executionChain = executionChain.then(async () => {
+    const signalStarted = () => {
+      try {
+        port.postMessage({ type: "started" } satisfies ExecuteReply);
+      } catch {
+        // best-effort
+      }
+    };
     // executeCode never throws — errors come back as { success: false }.
-    const result = await executeCode(request);
+    const result = await executeCode(request, signalStarted);
     try {
-      port.postMessage(result);
+      port.postMessage({ type: "result", result } satisfies ExecuteReply);
     } catch (error) {
       // A non-cloneable result must not break the chain (every subsequent run
       // would hang) — report the failure on the same port instead.
       port.postMessage({
-        success: false,
-        output: "",
-        error: `Failed to serialize execution result: ${error instanceof Error ? error.message : String(error)}`,
-      } satisfies CodeExecutionResult);
+        type: "result",
+        result: {
+          success: false,
+          output: "",
+          error: `Failed to serialize execution result: ${error instanceof Error ? error.message : String(error)}`,
+        },
+      } satisfies ExecuteReply);
     }
     port.close();
   });

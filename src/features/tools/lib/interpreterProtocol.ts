@@ -34,6 +34,8 @@ export interface CodeExecutionResult {
   files?: ArtifactFiles;
 }
 
+export type ExecuteReply = { type: "started" } | { type: "result"; result: CodeExecutionResult };
+
 /** Render request written by plotlyShim.py into the in-FS render queue. */
 export interface PlotlyManifest {
   fig: { data: unknown[]; layout?: Record<string, unknown>; config?: Record<string, unknown> };
@@ -67,9 +69,8 @@ export interface LlmCallOptions {
 }
 
 // Every request carries a dedicated MessagePort for its reply, so no id
-// bookkeeping is needed on either side. Execute replies are a bare
-// `CodeExecutionResult` (it has its own success/error shape and never
-// rejects); worker→main RPC replies use the `RpcReply` envelope below.
+// bookkeeping is needed on either side; worker→main RPC replies use the
+// `RpcReply` envelope below.
 export interface ExecuteMessage {
   type: "execute";
   request: CodeExecutionRequest;

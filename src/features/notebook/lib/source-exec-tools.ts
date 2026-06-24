@@ -108,6 +108,7 @@ export function createSourceExecTools(getSources: () => readonly File[], options
       name: "execute_python_code",
       description:
         "Execute Python code in a sandboxed Pyodide environment. All notebook sources are available under `/home/user/`, and files created or modified there are saved back as notebook sources. Packages numpy, pandas, matplotlib, plotly, pillow, openpyxl, pypdf, pdfminer.six, pdfplumber, python-docx, beautifulsoup4, markdownify, tabulate are preloaded. For async code use top-level `await` directly; never call asyncio.run() or loop.run_until_complete() — they cannot block in the browser.",
+      strict: true,
       parameters: {
         type: "object",
         properties: {
@@ -116,12 +117,13 @@ export function createSourceExecTools(getSources: () => readonly File[], options
             description: "Python code to execute. Use standard I/O under `/home/user/` to read and write files.",
           },
           packages: {
-            type: "array",
+            type: ["array", "null"],
             items: { type: "string" },
             description: "Optional extra Python packages to load (e.g., ['scikit-learn']).",
           },
         },
-        required: ["code"],
+        required: ["code", "packages"],
+        additionalProperties: false,
       },
       function: async (args: Record<string, unknown>) => {
         const code = typeof args.code === "string" ? args.code : "";
@@ -170,6 +172,7 @@ export function createSourceExecTools(getSources: () => readonly File[], options
       name: "execute_bash_code",
       description:
         "Execute bash commands in a sandboxed shell. All notebook sources are preloaded under `/home/user/`, and files created or modified there are saved back as notebook sources. Supports pipes, redirections, loops, jq, yq, grep, sed, awk, and sqlite3.",
+      strict: true,
       parameters: {
         type: "object",
         properties: {
@@ -179,6 +182,7 @@ export function createSourceExecTools(getSources: () => readonly File[], options
           },
         },
         required: ["command"],
+        additionalProperties: false,
       },
       function: async (args: Record<string, unknown>) => {
         const command = typeof args.command === "string" ? args.command : "";

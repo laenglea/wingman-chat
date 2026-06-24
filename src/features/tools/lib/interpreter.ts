@@ -15,6 +15,7 @@ import type {
   CodeExecutionRequest,
   CodeExecutionResult,
   ExecuteMessage,
+  ExecuteReply,
   RpcReply,
   WorkerToMainMessage,
 } from "./interpreterProtocol";
@@ -105,6 +106,13 @@ function getWorker(): Worker {
  * killed, while an infinite loop recovers in ~this long instead of minutes. */
 const COMPUTE_STALL_MS = 120_000;
 
+/** Budget for the bootstrap phase (worker module load + Pyodide runtime + wheel
+ * downloads) before the worker reports user code has started. Kept separate from
+ * — and more generous than — the compute-stall budget so a slow first run on a
+ * cold cache isn't mistaken for a wedged infinite loop and killed mid-download.
+ * It's only a backstop to release the sandbox lock if the load truly hangs. */
+const STARTUP_STALL_MS = 180_000;
+
 export interface ExecuteCodeOptions {
   /** Aborts the run (e.g. the user's Stop): terminates the worker and settles. */
   signal?: AbortSignal;
@@ -133,6 +141,7 @@ export async function executeCode(
     let timer: ReturnType<typeof setTimeout> | null = null;
     let inFlight = 0;
     let settled = false;
+    let started = false;
 
     // A wedged run can't be interrupted in single-threaded Pyodide, so tear the
     // worker down: the next call spawns a fresh one, and settling here releases
@@ -145,11 +154,18 @@ export async function executeCode(
     // (Re)arm the stall timer; runs only while no bridge call is in flight, so it
     // measures uninterrupted pure-compute time, not total wall-clock.
     const arm = () => {
-      if (settled || stallMs <= 0) return;
+      if (settled) return;
+      const ms = started ? stallMs : STARTUP_STALL_MS;
+      if (ms <= 0) return;
       if (timer) clearTimeout(timer);
       timer = setTimeout(
-        () => fail(`Code execution stalled — no progress for ${Math.round(stallMs / 1000)}s (worker terminated)`),
-        stallMs,
+        () =>
+          fail(
+            started
+              ? `Code execution stalled — no progress for ${Math.round(stallMs / 1000)}s (worker terminated)`
+              : `Interpreter startup timed out after ${Math.round(STARTUP_STALL_MS / 1000)}s (worker terminated)`,
+          ),
+        ms,
       );
     };
     const bridge = {
@@ -178,7 +194,15 @@ export async function executeCode(
       resolve(result);
     }
 
-    port1.onmessage = (event: MessageEvent<CodeExecutionResult>) => settle(event.data);
+    port1.onmessage = (event: MessageEvent<ExecuteReply>) => {
+      const reply = event.data;
+      if (reply.type === "started") {
+        started = true;
+        arm();
+        return;
+      }
+      settle(reply.result);
+    };
     pendingFailures.add(onCrash);
     if (signal) {
       if (signal.aborted) {
