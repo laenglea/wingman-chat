@@ -4,7 +4,6 @@ import { lookupContentType } from "./utils";
 // 1. Text/code files where `mime` maps to a wrong binary type
 // 2. Binary files where `mime` returns null (→ undefined → wrongly treated as text)
 const MIME_OVERRIDES: Record<string, string> = {
-  // Text files with wrong binary MIME types
   ".ts": "text/typescript", // mime: video/mp2t
   ".rs": "text/x-rustsrc", // mime: application/rls-services+xml
   ".cjs": "text/javascript", // mime: application/node
@@ -18,13 +17,25 @@ const MIME_OVERRIDES: Record<string, string> = {
   ".json5": "application/json", // mime: application/json5 (not in isTextContentType)
   ".mmd": "text/vnd.mermaid", // mime: null → would be stored as binary; it's Mermaid diagram source
   ".mermaid": "text/vnd.mermaid",
-  // Binary files with no MIME entry (null → undefined → wrongly treated as text)
   ".tgz": "application/gzip",
   ".pyc": "application/octet-stream",
   ".pkl": "application/octet-stream",
   ".pickle": "application/octet-stream",
   ".sqlite": "application/octet-stream",
   ".db": "application/octet-stream",
+  // Scientific / data binaries from the Python stack (numpy, pandas, scipy,
+  // sklearn) that `mime` doesn't know — without an override they default to text
+  // and get corrupted by the UTF-8 round trip through the sandbox FS.
+  ".npy": "application/octet-stream",
+  ".npz": "application/octet-stream",
+  ".parquet": "application/octet-stream",
+  ".feather": "application/octet-stream",
+  ".arrow": "application/octet-stream",
+  ".h5": "application/octet-stream",
+  ".hdf5": "application/octet-stream",
+  ".mat": "application/octet-stream",
+  ".joblib": "application/octet-stream",
+  ".bin": "application/octet-stream",
 };
 
 export function inferContentTypeFromPath(path: string): string | undefined {
@@ -77,8 +88,7 @@ export function fileMatchesTypeList(name: string, type: string, list: string[]):
 /**
  * Syntax-highlight language id for a file path. Returns the raw extension (shiki
  * accepts extension aliases like `py` / `ts`), with special-cases for the common
- * extensionless build files. Used by the artifact code editors and tool-call
- * rendering.
+ * extensionless build files.
  */
 export function artifactLanguage(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() || "";

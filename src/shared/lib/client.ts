@@ -67,6 +67,55 @@ const TRANSCRIBE_EXTENSIONS: Record<string, string> = {
   "audio/flac": "flac",
 };
 
+/**
+ * Optional geometry/quality knobs for image generation, forwarded to the
+ * backend's `/v1/render`. All are provider-neutral: the backend maps each to the
+ * target model's supported values (aspect ratios snap to the nearest available)
+ * and silently drops what a model can't honor, so the same options work across
+ * providers.
+ */
+export interface ImageRenderOptions {
+  /** Aspect ratio like "1:1" or "16:9"; snapped to the nearest the model supports. */
+  aspectRatio?: string;
+  /** Quality tier; higher is slower and may cost more. */
+  quality?: "low" | "medium" | "high";
+  /** Output resolution. */
+  resolution?: "512" | "1K" | "2K" | "4K";
+  /** Background handling (only honored by models that support it). */
+  background?: "transparent" | "opaque";
+  /** Desired output format; negotiated via the `Accept` header, not a form field. */
+  format?: "png" | "jpeg" | "webp";
+}
+
+/**
+ * Best-effort human-readable detail from a failed response body, so tool errors
+ * surface the backend's reason instead of a bare status code. Handles both
+ * plain-text errors (e.g. /api/v1/render) and `{ error: { message } }` /
+ * `{ error }` JSON envelopes, truncated so a stray HTML error page can't flood
+ * the message.
+ */
+async function readErrorBody(resp: Response): Promise<string> {
+  let text: string;
+  try {
+    text = (await resp.text()).trim();
+  } catch {
+    return "";
+  }
+  if (!text) return "";
+
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const body = JSON.parse(text);
+      const message = body?.error?.message ?? body?.error ?? body?.message;
+      if (typeof message === "string" && message.trim()) text = message.trim();
+    } catch {
+      // Not JSON after all — fall back to the raw text.
+    }
+  }
+
+  return text.length > 300 ? `${text.slice(0, 300)}…` : text;
+}
+
 export class Client {
   private oai: OpenAI;
 
@@ -706,14 +755,22 @@ export class Client {
     return result.content || "";
   }
 
-  async generateImage(model: string, prompt: string, images?: Blob[]): Promise<Blob> {
+  async generateImage(model: string, prompt: string, images?: Blob[], options?: ImageRenderOptions): Promise<Blob> {
     const data = new FormData();
     data.append("input", prompt);
     if (model) data.append("model", model);
     images?.forEach((blob, i) => {
       data.append("file", blob, `image_${i}.${mime.getExtension(blob.type) || "image"}`);
     });
-    return (await this.postRaw("/api/v1/render", data)).blob();
+    if (options?.aspectRatio) data.append("aspect_ratio", options.aspectRatio);
+    if (options?.quality) data.append("quality", options.quality);
+    if (options?.resolution) data.append("resolution", options.resolution);
+    if (options?.background) data.append("background", options.background);
+    // Output format is negotiated via Accept, not a form field (see /v1/render).
+    const headers = options?.format ? { Accept: `image/${options.format}` } : undefined;
+    // Rendering — especially high quality or large sizes — can take minutes, so
+    // allow well beyond the default render/translate/search budget.
+    return (await this.postRaw("/api/v1/render", data, headers, 300_000)).blob();
   }
 
   private toTools(tools: Tool[]): OpenAI.Responses.Tool[] | undefined {
@@ -794,12 +851,23 @@ export class Client {
     return this.postRaw(path, data);
   }
 
-  private async postRaw(path: string, data: FormData, headers?: HeadersInit): Promise<Response> {
+  private async postRaw(
+    path: string,
+    data: FormData,
+    headers?: HeadersInit,
+    timeoutMs = 90_000,
+  ): Promise<Response> {
     // Raw fetch has no built-in timeout; without this a stalled backend (render,
     // translate, search) hangs forever — and when called from a Python bridge it
-    // wedges the single interpreter worker and every queued sandbox call.
+    // wedges the single interpreter worker and every queued sandbox call. Image
+    // generation can legitimately run for minutes, so its caller passes a larger
+    // budget (see generateImage).
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 90_000);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     let resp: Response;
     try {
       resp = await fetch(new URL(path, window.location.origin), {
@@ -808,11 +876,19 @@ export class Client {
         body: data,
         signal: controller.signal,
       });
+    } catch (error) {
+      // Surface a readable timeout instead of the runtime's opaque abort message
+      // (WebKit reports a timed-out fetch as the cryptic "Fetch is aborted").
+      if (timedOut) throw new Error(`${path} timed out after ${Math.round(timeoutMs / 1000)}s`);
+      throw error;
     } finally {
       clearTimeout(timer);
     }
 
-    if (!resp.ok) throw new Error(`${path} failed with status ${resp.status}`);
+    if (!resp.ok) {
+      const detail = await readErrorBody(resp);
+      throw new Error(`${path} failed with status ${resp.status}${detail ? `: ${detail}` : ""}`);
+    }
     return resp;
   }
 }

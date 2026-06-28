@@ -10,56 +10,19 @@ import { compactAgentMessage } from "../lib/chat-history";
 import * as store from "../lib/opfs-notebook";
 import {
   type GenerateContext,
-  generateArchitecture,
-  generateDataCatalog,
   generateHtmlSlides,
   generateImageSlides,
   generateInfographic,
   generateMindMap,
   generatePodcast,
-  generateProcess,
   generateQuiz,
   generateText,
 } from "../lib/output-generators";
 import { createSourceExecTools } from "../lib/source-exec-tools";
 import { createSourceTools } from "../lib/source-tools";
-import {
-  architectureStyles,
-  type BuildInstructionsOptions,
-  buildInstructions,
-  chatInstructions,
-  infographicStyles,
-  OUTPUT_META,
-  podcastStyles,
-  processStyles,
-  reportStyles,
-  slideStyles,
-} from "../lib/styles";
+import { type BuildInstructionsOptions, buildInstructions, chatInstructions, OUTPUT_META } from "../lib/styles";
 import type { Notebook, NotebookMessage, NotebookOutput, OutputType } from "../types/notebook";
-
-export function getSlideStyles() {
-  return slideStyles.getAll();
-}
-
-export function getPodcastStyles() {
-  return podcastStyles.getAll();
-}
-
-export function getReportStyles() {
-  return reportStyles.getAll();
-}
-
-export function getInfographicStyles() {
-  return infographicStyles.getAll();
-}
-
-export function getProcessStyles() {
-  return processStyles.getAll();
-}
-
-export function getArchitectureStyles() {
-  return architectureStyles.getAll();
-}
+import { useNotebookSkills } from "./useNotebookSkills";
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -134,6 +97,11 @@ function uniquePath(path: string, existing: Set<string>): string {
 export function useNotebook(notebookId?: string) {
   const config = getConfig();
   const client = config.client;
+
+  // Domain-capability skills the source-chat can `read_skill` while analyzing
+  // sources (null when no skill library is served). Folded into the chat run
+  // below — the Studio generators don't use it.
+  const skills = useNotebookSkills();
 
   const [notebook, setNotebook] = useState<Notebook | null>(null);
   const [sources, setSources] = useState<File[]>([]);
@@ -458,53 +426,52 @@ export function useNotebook(notebookId?: string) {
     [ensureNotebook, reservePath],
   );
 
-  const deleteSource = useCallback(
-    async (path: string) => {
-      if (!notebook) return;
-      await store.removeSource(notebook.id, path);
-      store.touchNotebook(notebook.id);
-      setSources((prev) => prev.filter((s) => s.path !== path));
-    },
-    [notebook],
-  );
+  const deleteSource = useCallback(async (path: string) => {
+    // Read the live ref, not the `notebook` state — the notebook may have been
+    // lazily created this turn (chat from an empty notebook), so the closed-over
+    // state is still null while the ref is already set.
+    const nb = notebookRef.current;
+    if (!nb) return;
+    await store.removeSource(nb.id, path);
+    store.touchNotebook(nb.id);
+    setSources((prev) => prev.filter((s) => s.path !== path));
+  }, []);
 
-  const renameSource = useCallback(
-    async (oldPath: string, rawNewPath: string) => {
-      if (!notebook) return;
-      const trimmed = rawNewPath.trim();
-      if (!trimmed) throw new Error("Name cannot be empty");
+  const renameSource = useCallback(async (oldPath: string, rawNewPath: string) => {
+    const nb = notebookRef.current;
+    if (!nb) return;
+    const trimmed = rawNewPath.trim();
+    if (!trimmed) throw new Error("Name cannot be empty");
 
-      let newPath: string;
-      try {
-        newPath = store.normalizeSourcePath(trimmed);
-      } catch (err) {
-        throw new Error(err instanceof Error ? err.message : "Invalid name");
-      }
-      if (!newPath) throw new Error("Name cannot be empty");
+    let newPath: string;
+    try {
+      newPath = store.normalizeSourcePath(trimmed);
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Invalid name");
+    }
+    if (!newPath) throw new Error("Name cannot be empty");
 
-      // Preserve the original extension if the user didn't supply one.
-      const oldExt = splitPath(oldPath).ext;
-      if (oldExt) newPath = store.withDefaultExtension(newPath, oldExt.slice(1));
-      if (newPath === oldPath) return;
+    // Preserve the original extension if the user didn't supply one.
+    const oldExt = splitPath(oldPath).ext;
+    if (oldExt) newPath = store.withDefaultExtension(newPath, oldExt.slice(1));
+    if (newPath === oldPath) return;
 
-      const current = sourcesRef.current.find((s) => s.path === oldPath);
-      if (!current) throw new Error("Source not found");
+    const current = sourcesRef.current.find((s) => s.path === oldPath);
+    if (!current) throw new Error("Source not found");
 
-      if (sourcesRef.current.some((s) => s.path === newPath)) {
-        throw new Error(`A source named "${newPath}" already exists`);
-      }
+    if (sourcesRef.current.some((s) => s.path === newPath)) {
+      throw new Error(`A source named "${newPath}" already exists`);
+    }
 
-      const renamed: File = current.contentType
-        ? { path: newPath, content: current.content, contentType: current.contentType }
-        : { path: newPath, content: current.content };
+    const renamed: File = current.contentType
+      ? { path: newPath, content: current.content, contentType: current.contentType }
+      : { path: newPath, content: current.content };
 
-      await store.addSource(notebook.id, renamed);
-      await store.removeSource(notebook.id, oldPath);
-      store.touchNotebook(notebook.id);
-      setSources((prev) => prev.map((s) => (s.path === oldPath ? renamed : s)));
-    },
-    [notebook],
-  );
+    await store.addSource(nb.id, renamed);
+    await store.removeSource(nb.id, oldPath);
+    store.touchNotebook(nb.id);
+    setSources((prev) => prev.map((s) => (s.path === oldPath ? renamed : s)));
+  }, []);
 
   /**
    * Write (or overwrite) a source at the given path. Used by the python/bash
@@ -512,24 +479,27 @@ export function useNotebook(notebookId?: string) {
    * notebook. Paths are taken verbatim; content may be utf-8 text or a
    * `data:` URL for binary payloads.
    */
-  const writeSource = useCallback(
-    async (path: string, content: string, contentType?: string) => {
-      if (!notebook) return;
-      const source: File = contentType ? { path, content, contentType } : { path, content };
-      await store.addSource(notebook.id, source);
-      store.touchNotebook(notebook.id);
-      setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
-    },
-    [notebook],
-  );
+  const writeSource = useCallback(async (path: string, content: string, contentType?: string) => {
+    const nb = notebookRef.current;
+    if (!nb) return;
+    const source: File = contentType ? { path, content, contentType } : { path, content };
+    await store.addSource(nb.id, source);
+    store.touchNotebook(nb.id);
+    setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
+  }, []);
 
   // ── Chat ───────────────────────────────────────────────────────────
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!notebook || isChatting) return;
+      if (isChatting) return;
       setIsChatting(true);
       setStreamingContent(null);
+
+      // Lazily create the notebook on the first message, so the chat works from
+      // an empty state — the assistant can draft notes and create sources from
+      // scratch, not only analyze existing ones.
+      const nb = notebook ?? (await ensureNotebook());
 
       const userMsg: NotebookMessage = {
         role: "user",
@@ -543,7 +513,6 @@ export function useNotebook(notebookId?: string) {
       try {
         const tools = [
           ...createSourceTools(() => sourcesRef.current, {
-            onCreate: (path, content) => addTextSource(path, content),
             onWrite: writeSource,
             onRename: renameSource,
             onDelete: deleteSource,
@@ -551,12 +520,17 @@ export function useNotebook(notebookId?: string) {
           ...createSourceExecTools(() => sourcesRef.current, {
             onWrite: writeSource,
           }),
+          ...(skills?.tools ?? []),
         ];
+
+        // Fold the skills provider's guidance into the system prompt the same
+        // way the main chat composes tool-provider instructions.
+        const instructions = [chatInstructions, skills?.instructions].filter(Boolean).join("\n\n");
 
         // Build Message[] for the LLM (strip timestamps)
         const conversation = newMessages.map(({ timestamp, ...msg }) => msg);
 
-        const result = await run(client, getModel(), chatInstructions, conversation, tools, {
+        const result = await run(client, getModel(), instructions, conversation, tools, {
           agentName: "notebook",
           onStream: (content) => setStreamingContent(content),
         });
@@ -574,8 +548,8 @@ export function useNotebook(notebookId?: string) {
 
         const finalMessages = [...newMessages, ...agentMessages];
         setMessages(finalMessages);
-        await store.saveMessages(notebook.id, finalMessages);
-        store.touchNotebook(notebook.id);
+        await store.saveMessages(nb.id, finalMessages);
+        store.touchNotebook(nb.id);
       } catch (err) {
         setStreamingContent(null);
 
@@ -593,15 +567,15 @@ export function useNotebook(notebookId?: string) {
         setMessages(finalMessages);
         // Persist the failed turn too — otherwise the user's question and the
         // error reply silently vanish on reload.
-        await store.saveMessages(notebook.id, finalMessages).catch((saveErr) => {
+        await store.saveMessages(nb.id, finalMessages).catch((saveErr) => {
           console.error("Failed to persist messages after chat error:", saveErr);
         });
-        store.touchNotebook(notebook.id);
+        store.touchNotebook(nb.id);
       } finally {
         setIsChatting(false);
       }
     },
-    [notebook, messages, client, getModel, isChatting, addTextSource, writeSource, renameSource, deleteSource],
+    [notebook, ensureNotebook, messages, client, getModel, isChatting, skills, writeSource, renameSource, deleteSource],
   );
 
   // ── Outputs ────────────────────────────────────────────────────────
@@ -665,12 +639,6 @@ export function useNotebook(notebookId?: string) {
               return generateQuiz(ctx);
             case "mindmap":
               return generateMindMap(ctx);
-            case "process":
-              return generateProcess(ctx, styleId ?? OUTPUT_META.process.defaultStyleId);
-            case "architecture":
-              return generateArchitecture(ctx);
-            case "data-catalog":
-              return generateDataCatalog(ctx);
             default:
               return generateText(ctx, OUTPUT_META[type].title);
           }

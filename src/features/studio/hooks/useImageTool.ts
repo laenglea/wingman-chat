@@ -4,7 +4,9 @@ import { useCallback, useMemo, useRef } from "react";
 import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
 import type { FileSystemManager } from "@/features/artifacts/lib/fs";
 import { getConfig } from "@/shared/config";
+import type { ImageRenderOptions } from "@/shared/lib/client";
 import { isDataUrl } from "@/shared/lib/fileContent";
+import { rendererCapabilities } from "@/shared/lib/models";
 import { readAsDataURL } from "@/shared/lib/utils";
 import type { TextContent, Tool, ToolContext } from "@/shared/types/chat";
 
@@ -73,6 +75,54 @@ export function useImageTool(): Tool | null {
   const buildTool = useCallback((): Tool => {
     const elicitation = config.renderer?.elicitation;
     const model = config.renderer?.model || "";
+    const caps = rendererCapabilities(model);
+
+    // Advertise only the controls this renderer honors — the same capability
+    // mapping the Canvas pickers use — so the model isn't offered aspect ratios,
+    // quality tiers, or a transparent background the configured model can't make.
+    const properties: Record<string, unknown> = {
+      prompt: {
+        type: "string",
+        description:
+          "The image request in the user's own words. Pass it through faithfully — preserve their intent and do not invent style, lighting, or details they did not ask for. Resolve only contextual references (e.g. what 'it' refers to). When reference images are provided, describe just the changes to make.",
+      },
+      images: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          'Optional paths to image artifacts to use as references, e.g. ["/a-red-fox.png"]. Images attached to the current message are used automatically.',
+      },
+      aspect_ratio: {
+        type: "string",
+        enum: caps.aspectRatios,
+        description:
+          'Optional aspect ratio, e.g. "16:9" for widescreen or "9:16" for portrait. Snapped to the nearest the model supports. Omit for the model default (usually square).',
+      },
+    };
+    if (caps.qualities?.length) {
+      properties.quality = {
+        type: "string",
+        enum: caps.qualities,
+        description:
+          'Quality tier. Start with "low" (the default) — fast, cheap, and genuinely capable, ideal for casual requests, drafts, and iteration. Step up to "medium" for polished production assets: social/marketing graphics, logos and brand work, UI mockups, product compositing, and normal-size embedded text. Use "high" only when precision is non-negotiable — small or dense text and detailed infographics, close-up faces or identity-sensitive edits, transparent backgrounds, or large-format/print output. Higher tiers are slower and cost more.',
+      };
+    }
+    if (caps.resolutions?.length) {
+      properties.resolution = {
+        type: "string",
+        enum: caps.resolutions,
+        description:
+          'Output resolution. Leave at the default (1K) for most work; step up to "2K" or "4K" only when the deliverable is large-format or print, since higher resolutions are slower.',
+      };
+    }
+    if (caps.backgrounds?.length) {
+      properties.background = {
+        type: "string",
+        enum: caps.backgrounds,
+        description:
+          'Set "transparent" for a cut-out subject with no background; "opaque" forces a solid fill. Omit for the model default.',
+      };
+    }
 
     return {
       name: "create_image",
@@ -86,19 +136,7 @@ export function useImageTool(): Tool | null {
         "Generate an image from a text description. Optionally provide reference images to edit or build on: pass `images` (paths to image artifacts) and/or attach images to the chat. The result is saved as an artifact and returned inline.",
       parameters: {
         type: "object",
-        properties: {
-          prompt: {
-            type: "string",
-            description:
-              "The image request in the user's own words. Pass it through faithfully — preserve their intent and do not invent style, lighting, or details they did not ask for. Resolve only contextual references (e.g. what 'it' refers to). When reference images are provided, describe just the changes to make.",
-          },
-          images: {
-            type: "array",
-            items: { type: "string" },
-            description:
-              'Optional paths to image artifacts to use as references, e.g. ["/a-red-fox.png"]. Images attached to the current message are used automatically.',
-          },
-        },
+        properties,
         required: ["prompt"],
       },
       function: async (args: Record<string, unknown>, context?: ToolContext) => {
@@ -125,7 +163,28 @@ export function useImageTool(): Tool | null {
             if (part.type === "image") references.push(await blobFromDataUrl(part.data));
           }
 
-          const imageBlob = await client.generateImage(model, prompt, references);
+          const options: ImageRenderOptions = {};
+          if (typeof args.aspect_ratio === "string") options.aspectRatio = args.aspect_ratio;
+          // Start low on models with quality tiers: low is fast, cheap, and capable,
+          // and the API's "auto" generation otherwise trends toward the slow, pricey
+          // "high" tier. The model steps up to medium/high explicitly (see the param
+          // doc) when the request warrants it.
+          if (caps.qualities?.length) {
+            options.quality = args.quality === "medium" || args.quality === "high" ? args.quality : "low";
+          }
+          if (
+            args.resolution === "512" ||
+            args.resolution === "1K" ||
+            args.resolution === "2K" ||
+            args.resolution === "4K"
+          ) {
+            options.resolution = args.resolution;
+          }
+          if (args.background === "transparent" || args.background === "opaque") {
+            options.background = args.background;
+          }
+
+          const imageBlob = await client.generateImage(model, prompt, references, options);
           const dataUrl = await readAsDataURL(imageBlob);
 
           // Save to the artifacts workspace so the image is downloadable, editable

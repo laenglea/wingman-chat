@@ -1,18 +1,15 @@
 import { Outlet, useMatch, useNavigate } from "@tanstack/react-router";
-import { Download, PlusIcon, X } from "lucide-react";
+import { Download, Loader2, PlusIcon, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { notify } from "@/shared/lib/notify";
 import { Markdown } from "@/shared/ui/Markdown";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/shared/ui/Resizable";
 import { useNavigation } from "@/shell/hooks/useNavigation";
 import { useSidebar } from "@/shell/hooks/useSidebar";
-import { ArchitectureViewer } from "../components/ArchitectureViewer";
 import { AudioViewer } from "../components/AudioViewer";
-import { DataCatalogViewer } from "../components/DataCatalogViewer";
 import { MindMapViewer } from "../components/MindMapViewer";
 import { NotebookChat } from "../components/NotebookChat";
 import { NotebookSidebar } from "../components/NotebookSidebar";
-import { ProcessViewer } from "../components/ProcessViewer";
 import { QuizViewer } from "../components/QuizViewer";
 import { ReportViewer } from "../components/ReportViewer";
 import { SlideViewer } from "../components/SlideViewer";
@@ -437,11 +434,20 @@ interface OutputViewProps {
 
 /** Output preview with download/close actions — shared by desktop and mobile. */
 function OutputView({ output, download, onClose, onRefine }: OutputViewProps) {
+  const isGenerating = output.status === "generating";
   return (
     <div className="h-full flex flex-col relative">
+      {/* Live generation indicator — the viewer below (e.g. SlideViewer) updates
+          as partial results stream in. */}
+      {isGenerating && (
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/70 dark:bg-neutral-900/70 backdrop-blur-sm border border-neutral-200/70 dark:border-neutral-700/70 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+          <Loader2 size={12} className="animate-spin" />
+          <span>Generating…</span>
+        </div>
+      )}
       {/* Output buttons */}
       <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
-        {download.canDownload(output) && (
+        {!isGenerating && download.canDownload(output) && (
           <button
             type="button"
             onClick={() => download.trigger(output)}
@@ -467,12 +473,6 @@ function OutputView({ output, download, onClose, onRefine }: OutputViewProps) {
           <QuizViewer questions={output.quiz} />
         ) : output.mindMap ? (
           <MindMapViewer root={output.mindMap} />
-        ) : output.process ? (
-          <ProcessViewer output={output} onRefine={onRefine} />
-        ) : output.architecture ? (
-          <ArchitectureViewer output={output} onRefine={onRefine} />
-        ) : output.dataCatalog ? (
-          <DataCatalogViewer output={output} onRefine={onRefine} />
         ) : output.audioUrl ? (
           <AudioViewer content={output.content} audioUrl={output.audioUrl} />
         ) : output.type === "slides" ? (

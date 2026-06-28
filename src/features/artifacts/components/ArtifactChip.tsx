@@ -4,18 +4,15 @@ import { cn } from "@/shared/lib/cn";
 import { useArtifacts } from "../hooks/useArtifacts";
 
 /**
- * Inline, clickable reference to an artifact file shown in the conversation
- * (e.g. when the assistant creates a file, or a user attaches one). Clicking
- * opens the file in the artifacts panel — created files are surfaced here
- * rather than by auto-opening the drawer. When the target file no longer
- * exists, the chip greys out and is no longer clickable.
+ * Inline, clickable reference to an artifact file in the conversation; clicking
+ * opens it in the artifacts panel. Greys out (non-clickable) when the file no
+ * longer exists.
  */
 export const ArtifactChip = memo(function ArtifactChip({ path, className }: { path: string; className?: string }) {
   const { fs, openFile, setShowArtifactsDrawer } = useArtifacts();
 
   // Optimistically assume the file exists to avoid a greyed-out flash; flip to
-  // false only once a check confirms it's gone. Re-checks on filesystem changes
-  // so deleting (or recreating) the file updates the chip live.
+  // false only once a check confirms it's gone.
   const [exists, setExists] = useState(true);
 
   useEffect(() => {
@@ -75,7 +72,7 @@ export const ArtifactChip = memo(function ArtifactChip({ path, className }: { pa
         {ext && (
           <span
             className={cn(
-              "absolute -bottom-0.5 left-1/2 -translate-x-1/2 rounded bg-neutral-500 px-1 text-[8px] font-bold leading-snug text-white transition-opacity dark:bg-neutral-600",
+              "absolute -bottom-0.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-neutral-500 px-1 text-[8px] font-bold leading-snug text-white transition-opacity dark:bg-neutral-600",
               exists && "group-hover/artifact:opacity-0",
             )}
           >

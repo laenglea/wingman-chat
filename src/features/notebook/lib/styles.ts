@@ -16,12 +16,9 @@
 import { getConfig } from "@/shared/config";
 import chatInstructions from "../prompts/chat.txt?raw";
 import slideCommonRules from "../prompts/slide-style-common.txt?raw";
-import studioArchitectureInstructions from "../prompts/studio-architecture.txt?raw";
 import studioAudioInstructions from "../prompts/studio-audio-overview.txt?raw";
-import studioDataCatalogInstructions from "../prompts/studio-data-catalog.txt?raw";
 import studioInfographicInstructions from "../prompts/studio-infographic.txt?raw";
 import studioMindMapInstructions from "../prompts/studio-mind-map.txt?raw";
-import studioProcessInstructions from "../prompts/studio-process.txt?raw";
 import studioQuizInstructions from "../prompts/studio-quiz.txt?raw";
 import studioReportInstructions from "../prompts/studio-report.txt?raw";
 import studioSlideInstructions from "../prompts/studio-slide-deck.txt?raw";
@@ -84,7 +81,7 @@ export interface StyleRegistry {
   get(id?: string): Style | undefined;
 }
 
-type NotebookStyleType = "slides" | "podcasts" | "reports" | "processes" | "architectures" | "infographics";
+type NotebookStyleType = "slides" | "podcasts" | "reports" | "infographics";
 
 /**
  * Registry for one output type. Built-in styles come from the server notebook
@@ -117,8 +114,6 @@ const toId = (name: string) => name.toLowerCase().replace(/\s+/g, "-");
 export const slideStyles = styleRegistry("slides");
 export const podcastStyles = styleRegistry("podcasts");
 export const reportStyles = styleRegistry("reports");
-export const processStyles = styleRegistry("processes");
-export const architectureStyles = styleRegistry("architectures");
 export const infographicStyles = styleRegistry("infographics");
 
 // ── Output metadata ────────────────────────────────────────────────────
@@ -159,24 +154,6 @@ export const OUTPUT_META: Record<OutputType, OutputMeta> = {
   },
   quiz: { title: "Quiz", template: studioQuizInstructions },
   mindmap: { title: "Mind Map", template: studioMindMapInstructions },
-  process: {
-    title: "Process",
-    template: studioProcessInstructions,
-    styles: processStyles,
-    defaultStyleId: "bpmn",
-  },
-  architecture: {
-    title: "Architecture",
-    template: studioArchitectureInstructions,
-    styles: architectureStyles,
-    defaultStyleId: "c4",
-  },
-  "data-catalog": {
-    title: "Data Catalog",
-    template: studioDataCatalogInstructions,
-    // No style picker — the catalog generation populates all four sections
-    // (inventory / glossary / lineage / contracts) in a single pass.
-  },
 };
 
 // ── Instruction assembly ───────────────────────────────────────────────
@@ -190,6 +167,12 @@ export interface BuildInstructionsOptions {
   instructions?: string;
   /** Slide generation mode: "html" for editable/structured, "images" for AI-generated visuals. */
   slideMode?: "html" | "images";
+  /** Quiz: exact number of questions to produce. */
+  questionCount?: number;
+  /** Quiz: target difficulty level. */
+  difficulty?: "easy" | "medium" | "hard" | "mixed";
+  /** Mind map: number of hierarchy levels deep (root counts as level 1). */
+  depth?: number;
 }
 
 /**
@@ -257,6 +240,25 @@ function buildOverridesBlock(
     const n = Math.round(options.slideCount);
     overrides.push(
       `- Produce **exactly ${n} ${n === 1 ? "slide" : "slides"}**. This overrides any slide count mentioned elsewhere in the instructions (e.g. "8–12 slides"). Plan the deck arc to fit this exact length.`,
+    );
+  }
+  if (options?.questionCount && options.questionCount > 0) {
+    const n = Math.round(options.questionCount);
+    overrides.push(
+      `- Produce **exactly ${n} question${n === 1 ? "" : "s"}**. This overrides any count mentioned elsewhere in the instructions.`,
+    );
+  }
+  if (options?.difficulty) {
+    overrides.push(
+      options.difficulty === "mixed"
+        ? "- Use a **deliberate mix of difficulty levels** (easy, medium, and hard) across the questions."
+        : `- Target an overall **${options.difficulty}** difficulty for the questions.`,
+    );
+  }
+  if (options?.depth && options.depth > 0) {
+    const d = Math.round(options.depth);
+    overrides.push(
+      `- Build the mind map **${d} level${d === 1 ? "" : "s"} deep** (the root is level 1). Keep branches reasonably balanced and don't nest deeper than ${d}.`,
     );
   }
   if (options?.instructions) {

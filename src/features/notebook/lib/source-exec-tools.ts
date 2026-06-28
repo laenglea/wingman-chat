@@ -1,26 +1,21 @@
 /**
- * Execution tools (Python + Bash) for notebooks.
+ * Execution tools (Python + Bash) for notebooks. Mirrors the artifact chat's
+ * execute tools, but with notebook sources as the filesystem root.
  *
- * Mirrors the artifact chat's execute_python_code / execute_bash_code tools,
- * but with notebook sources as the filesystem root.
+ * Symmetric mapping: notebook source `data.csv` ↔ sandbox `/home/user/data.csv`.
  *
- * Symmetric mapping:
- *   notebook source path `data.csv` ↔ sandbox path `/home/user/data.csv`
- *
- * Before each run: all sources are loaded into the Pyodide VFS and the
- * bash InMemoryFs at `/home/user/`.
- * After each run: files present at `/home/user/` are diffed against the
- * pre-run sources; additions and modifications are saved back as sources
- * via `onWrite`. Deletions are NOT propagated — sources are treated as
- * append-only from code execution (the model should use `source_create`
- * to explicitly replace, and users remove sources through the UI).
+ * Deletions are NOT propagated — sources are treated as append-only from code
+ * execution (the model should use `source_create_file` to explicitly replace, and
+ * users remove sources through the UI).
  */
 
 import { executeBash, getSingleton, loadArtifactsIntoFs, readFilesFromFs } from "@/features/tools/lib/bash";
 import { executeCode } from "@/features/tools/lib/interpreter";
+import { executeJavaScript } from "@/features/tools/lib/javascript";
 import { withSandboxLock } from "@/features/tools/lib/sandboxLock";
 import type { Tool } from "@/shared/types/chat";
 import type { File } from "@/shared/types/file";
+import { normalizeSourceKey } from "./opfs-notebook";
 
 interface FileRecord {
   content: string;
@@ -28,20 +23,6 @@ interface FileRecord {
 }
 
 type FileMap = Record<string, FileRecord>;
-
-/**
- * Normalize a path to the notebook-source canonical form (no leading slash).
- *
- * Sandbox runtimes (Pyodide, Bash) return paths like `/foo.csv`, but
- * notebook sources are stored without a leading slash. Without this,
- * diffing/persisting would create duplicate entries (`foo.csv` and
- * `/foo.csv`) every time the sandbox writes a file.
- */
-function normalizeSourceKey(path: string): string {
-  let p = path.trim();
-  while (p.startsWith("/")) p = p.slice(1);
-  return p;
-}
 
 function normalizeMapKeys(map: FileMap): FileMap {
   const out: FileMap = {};
@@ -52,7 +33,6 @@ function normalizeMapKeys(map: FileMap): FileMap {
   return out;
 }
 
-/** Convert the sources array to the Record<path, {content, contentType}> shape. */
 function sourcesToFileMap(sources: readonly File[]): FileMap {
   const map: FileMap = {};
   for (const s of sources) {
@@ -82,9 +62,8 @@ export interface SourceExecToolsOptions {
 }
 
 /**
- * Create execution tools (python + bash) that expose notebook sources as
- * the working filesystem. Sources are mounted at `/home/user/` before
- * execution and changes are persisted back via `onWrite`.
+ * Create execution tools (python + bash) that expose notebook sources as the
+ * working filesystem, mounted at `/home/user/` and persisted back via `onWrite`.
  */
 export function createSourceExecTools(getSources: () => readonly File[], options: SourceExecToolsOptions): Tool[] {
   const { onWrite } = options;
@@ -107,7 +86,7 @@ export function createSourceExecTools(getSources: () => readonly File[], options
     {
       name: "execute_python_code",
       description:
-        "Execute Python code in a sandboxed Pyodide environment. All notebook sources are available under `/home/user/`, and files created or modified there are saved back as notebook sources. Packages numpy, pandas, matplotlib, plotly, pillow, openpyxl, pypdf, pdfminer.six, pdfplumber, python-docx, beautifulsoup4, markdownify, tabulate are preloaded. For async code use top-level `await` directly; never call asyncio.run() or loop.run_until_complete() — they cannot block in the browser.",
+        "Execute Python code in a sandboxed Pyodide environment. All notebook sources are available under `/home/user/`, and files created or modified there are saved back as notebook sources. Packages numpy, pandas, matplotlib, seaborn, pillow, openpyxl, pypdf, pdfminer.six, pdfplumber, python-docx, beautifulsoup4, markdownify, tabulate are preloaded. For async code use top-level `await` directly; never call asyncio.run() or loop.run_until_complete() — they cannot block in the browser.",
       strict: true,
       parameters: {
         type: "object",
@@ -169,6 +148,59 @@ export function createSourceExecTools(getSources: () => readonly File[], options
       },
     },
     {
+      name: "execute_javascript_code",
+      description:
+        "Execute JavaScript in a sandboxed Web Worker (off the UI thread, no network). Read and write notebook sources through the injected `vfs` helper: `vfs.read(path)` / `vfs.readBytes` / `vfs.readJSON` and `vfs.write(path, data, contentType?)` / `vfs.writeBytes` / `vfs.writeJSON`, plus `vfs.list()`, `vfs.exists(path)`, `vfs.remove(path)`. Files you write are saved back as sources. Browser-native APIs (WebCodecs, OffscreenCanvas, crypto.subtle, WebAssembly) and the bundled `mediabunny` global are available. Use top-level `await` directly; `return` a value or `console.log(...)` for output.",
+      strict: true,
+      parameters: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "JavaScript to execute. Use the `vfs` helper to read and write sources.",
+          },
+        },
+        required: ["code"],
+        additionalProperties: false,
+      },
+      function: async (args: Record<string, unknown>) => {
+        const code = typeof args.code === "string" ? args.code : "";
+        if (!code.trim()) {
+          return [{ type: "text" as const, text: "Error: `code` is required." }];
+        }
+
+        // Same locking rationale as the python tool — the sandbox runtimes are
+        // shared singletons and must not interleave on the source snapshot.
+        return withSandboxLock(async () => {
+          const before = sourcesToFileMap(getSources());
+
+          try {
+            const result = await executeJavaScript({ code, files: before });
+
+            if (!result.success) {
+              return [{ type: "text" as const, text: `Error executing code: ${result.error || "Unknown error"}` }];
+            }
+
+            const after = normalizeMapKeys(result.files ?? {});
+            const written = await persistWrites(before, after);
+
+            const parts: string[] = [result.output || "(no output)"];
+            if (written.length > 0) {
+              parts.push(`\nSaved sources: ${written.join(", ")}`);
+            }
+            return [{ type: "text" as const, text: parts.join("") }];
+          } catch (err) {
+            return [
+              {
+                type: "text" as const,
+                text: `JavaScript execution failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+              },
+            ];
+          }
+        });
+      },
+    },
+    {
       name: "execute_bash_code",
       description:
         "Execute bash commands in a sandboxed shell. All notebook sources are preloaded under `/home/user/`, and files created or modified there are saved back as notebook sources. Supports pipes, redirections, loops, jq, yq, grep, sed, awk, and sqlite3.",
@@ -197,7 +229,6 @@ export function createSourceExecTools(getSources: () => readonly File[], options
           const { memFs } = getSingleton();
 
           try {
-            // Mount all sources into /home/user/...
             const inputFiles = Object.entries(before).map(([path, rec]) => ({
               path,
               content: rec.content,

@@ -10,6 +10,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { tryParseToolArguments } from "@/shared/lib/toolArguments";
 import type { Content } from "@/shared/types/chat";
 import { getTextFromContent } from "@/shared/types/chat";
 import type { File } from "@/shared/types/file";
@@ -22,11 +23,14 @@ const TOOL_VERBS: Record<string, string> = {
   source_read_file: "read",
   source_grep: "grep",
   source_glob: "glob",
-  source_create: "create",
-  source_edit: "edit",
-  source_rename: "rename",
-  source_delete: "delete",
+  source_create_file: "create",
+  source_edit_file: "edit",
+  source_move_file: "move",
+  source_delete_file: "delete",
+  read_skill: "skill",
+  read_skill_resource: "skill file",
   execute_python_code: "python",
+  execute_javascript_code: "javascript",
   execute_bash_code: "bash",
 };
 
@@ -40,13 +44,8 @@ function toolActivityLabels(msg: NotebookMessage): string[] | null {
   return msg.content.map((part) => {
     if (part.type !== "tool_result") return "";
     const verb = TOOL_VERBS[part.name] ?? part.name;
-    let detail = "";
-    try {
-      const args = JSON.parse(part.arguments || "{}") as Record<string, unknown>;
-      detail = String(args.path ?? args.pattern ?? args.new_path ?? "");
-    } catch {
-      /* unparseable args — verb only */
-    }
+    const args = tryParseToolArguments(part.arguments) ?? {};
+    const detail = String(args.path ?? args.to ?? args.pattern ?? args.name ?? "");
     return detail ? `${verb} · ${detail}` : verb;
   });
 }
@@ -142,8 +141,8 @@ export function NotebookChat({
                     Start building your notebook
                   </p>
                   <p className="text-sm text-neutral-400 dark:text-neutral-500 mb-6 leading-relaxed">
-                    Add sources from the web or upload files, then chat with your sources or generate outputs in the
-                    studio.
+                    Add sources from the web or upload files — or just start chatting to draft notes and build sources
+                    as you go.
                   </p>
                   <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-neutral-400 dark:text-neutral-500">
                     <div className="flex items-center gap-1.5">
@@ -301,15 +300,14 @@ export function NotebookChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasSources ? "Ask about your sources..." : "Add sources first to start chatting"}
-            disabled={!hasSources}
+            placeholder={hasSources ? "Ask about your sources..." : "Ask anything, or start drafting content..."}
             rows={1}
             className="flex-1 bg-transparent text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 outline-none resize-none py-2 max-h-30 overflow-y-auto field-sizing-content disabled:opacity-50"
           />
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={!input.trim() || isChatting || !hasSources}
+            disabled={!input.trim() || isChatting}
             className="rounded-xl p-2 text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors hover:bg-neutral-100/70 dark:hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed shrink-0"
           >
             <ArrowRight size={18} />

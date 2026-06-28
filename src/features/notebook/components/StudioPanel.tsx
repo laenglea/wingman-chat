@@ -2,8 +2,6 @@ import {
   AlertCircle,
   AudioLines,
   BarChart3,
-  BookMarked,
-  Boxes,
   CircleHelp,
   Download,
   Loader2,
@@ -13,7 +11,6 @@ import {
   StickyNote,
   Table2,
   Trash2,
-  Workflow,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { cn } from "@/shared/lib/cn";
@@ -48,10 +45,19 @@ const OUTPUT_TYPES: {
   { type: "infographic", label: "Infographic", icon: BarChart3 },
   { type: "quiz", label: "Quiz", icon: CircleHelp },
   { type: "mindmap", label: "Mind Map", icon: Network },
-  { type: "process", label: "Process", icon: Workflow },
-  { type: "architecture", label: "Architecture", icon: Boxes },
-  { type: "data-catalog", label: "Data Catalog", icon: BookMarked },
 ];
+
+/**
+ * An output is previewable once it's done — or, while still generating, as soon
+ * as it has streamed partial content: slides appear one at a time, and a podcast
+ * script lands before its audio. This lets the user open an in-progress output
+ * and watch it build (the SlideViewer follows new slides live).
+ */
+function canPreviewOutput(output: NotebookOutput): boolean {
+  if (output.status === "completed") return true;
+  if (output.status !== "generating") return false;
+  return (output.slides?.length ?? 0) > 0 || Boolean(output.content);
+}
 
 export function StudioPanel({
   sources,
@@ -68,15 +74,7 @@ export function StudioPanel({
   const stableDialogType = useRef<OutputType>("slides");
   if (dialogType) stableDialogType.current = dialogType;
 
-  const DIALOG_TYPES = new Set<OutputType>([
-    "slides",
-    "podcast",
-    "report",
-    "infographic",
-    "process",
-    "architecture",
-    "data-catalog",
-  ]);
+  const DIALOG_TYPES = new Set<OutputType>(["slides", "podcast", "report", "infographic", "quiz", "mindmap"]);
 
   const handleDialogGenerate = (_type: OutputType, { styleId, ...rest }: GeneratorOptions) => {
     onGenerate(_type, styleId, rest);
@@ -129,6 +127,7 @@ export function StudioPanel({
               const Icon = typeInfo?.icon || StickyNote;
               const isGenerating = output.status === "generating";
               const isError = output.status === "error";
+              const previewable = canPreviewOutput(output);
 
               return (
                 <div
@@ -141,13 +140,13 @@ export function StudioPanel({
                   <button
                     type="button"
                     onClick={() => {
-                      if (output.status === "completed") {
+                      if (previewable) {
                         onSelectOutput(output);
                       }
                     }}
                     className={cn(
                       "flex flex-1 min-w-0 items-center gap-2 text-left",
-                      output.status === "completed" ? "cursor-pointer" : "cursor-default",
+                      previewable ? "cursor-pointer" : "cursor-default",
                     )}
                   >
                     <div className="w-6 h-6 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">

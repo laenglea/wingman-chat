@@ -1,15 +1,11 @@
 /**
- * Pyodide interpreter worker.
- *
- * Runs all Python execution off the main thread so CPU-bound code (PDF
- * parsing, dataframe crunching, ...) cannot freeze the UI. The main-thread
- * counterpart is `interpreter.ts`; the message protocol lives in
- * `interpreterProtocol.ts`. Capabilities that need the main thread (the `llm`,
- * `ocr`, `vision`, `render`, `synthesize`, and `transcribe` Python globals,
- * Plotly DOM rendering) are proxied back over RPC.
+ * Pyodide interpreter worker — runs all Python off the main thread so CPU-bound
+ * code can't freeze the UI. Main-thread counterpart is `interpreter.ts`; the
+ * llm/ocr/vision/render/synthesize/transcribe globals proxy back over RPC.
  */
 
 import { loadPyodide as loadPyodideRuntime, type PyodideInterface } from "pyodide";
+import type { ImageRenderOptions } from "@/shared/lib/client";
 import { bytesToDataUrl, dataUrlToBytes, isDataUrl } from "@/shared/lib/fileContent";
 import { inferContentTypeFromPath, isTextContentType } from "@/shared/lib/fileTypes";
 import { SANDBOX_HOME } from "@/shared/lib/sandbox";
@@ -22,33 +18,27 @@ import type {
   ExecuteMessage,
   ExecuteReply,
   LlmCallOptions,
-  PlotlyManifest,
-  PlotlyResult,
   RenderInput,
   RpcReply,
   WorkerToMainMessage,
 } from "./interpreterProtocol";
 import LLM_SHIM from "./llmShim.py?raw";
 import OCR_SHIM from "./ocrShim.py?raw";
-import PLOTLY_IMAGE_SHIM from "./plotlyShim.py?raw";
 import RENDER_SHIM from "./renderShim.py?raw";
 import SYNTHESIZE_SHIM from "./synthesizeShim.py?raw";
 import TRANSCRIBE_SHIM from "./transcribeShim.py?raw";
 import TRANSLATE_SHIM from "./translateShim.py?raw";
 import VISION_SHIM from "./visionShim.py?raw";
 
-// Typed view of the dedicated-worker global scope (the project compiles
-// against the DOM lib, so we avoid referencing the webworker lib globally).
+// Typed view of the worker global scope (project compiles against the DOM lib, not webworker).
 const ctx = self as unknown as {
   postMessage(message: WorkerToMainMessage, transfer: Transferable[]): void;
   addEventListener(type: "message", listener: (event: MessageEvent<ExecuteMessage>) => void): void;
 };
 
-// Maps Python import names to the package (lock) name to load. Only consulted
-// for the explicit `packages` arg: code imports resolve via Pyodide's lock index
-// automatically (so `import cv2`/`import docx` need no alias). The model is told
-// to pass pip names, but if it passes an *import* name it goes to loadPackage,
-// which only knows lock/package names — these map the common slips back.
+// Maps import names to lock/package names, only for the explicit `packages` arg
+// (code imports auto-resolve via Pyodide's lock index). The model is told to pass
+// pip names but sometimes passes an import name; these map the common slips back.
 const PACKAGE_ALIASES: Record<string, string> = {
   docx: "python-docx",
   pptx: "python-pptx",
@@ -65,40 +55,33 @@ const PACKAGE_ALIASES: Record<string, string> = {
 const NO_OUTPUT_MESSAGE = "Code executed successfully (no output)";
 
 function normalizePackageName(name: string): string {
-  // Callers pass top-level module / pip names; strip a "." defensively in case
-  // of "docx.shared", then PEP 503-normalize (e.g. `scikit_learn` → lock key
-  // `scikit-learn`). Aliases run on the un-normalized root for `PIL`/`bs4` renames.
+  // Strip a "." (e.g. "docx.shared"), then PEP 503-normalize (`scikit_learn` →
+  // `scikit-learn`); aliases run on the un-normalized root for `PIL`/`bs4` renames.
   const root = name.trim().toLowerCase().split(".")[0];
   if (!root) return root;
   return PACKAGE_ALIASES[root] ?? root.replace(/[_.]+/g, "-");
 }
 
-// stdlib `zoneinfo` and pandas read the IANA tz database from the `tzdata`
-// package in WASM (no system zoneinfo dir), but never import it by name — so
-// find_imports can't see it. Detect the usual timezone entry points and request
-// tzdata explicitly. Matches: `zoneinfo`/`ZoneInfo`, pandas `.tz_localize(`/
-// `.tz_convert(`, and a `tz="…"` kwarg. pytz ships its own data and is skipped.
+// zoneinfo/pandas read the IANA tz db from `tzdata` but never import it by name,
+// so find_imports misses it; detect timezone usage and load tzdata explicitly.
+// (pytz ships its own data and is skipped.)
 const TZDATA_USAGE = /\bzoneinfo\b|\bZoneInfo\(|\.tz_localize\(|\.tz_convert\(|\btz\s*=\s*['"]/;
 function needsTzdata(code: string): boolean {
   return TZDATA_USAGE.test(code);
 }
 
 let pyodideReady: Promise<PyodideInterface> | null = null;
-let plotlyShimApplied = false;
 
-// `_wingman_rewrite_async` from asyncioShim.py — rewrites blocking asyncio
-// entrypoints (asyncio.run, run_until_complete) into top-level await, which
-// runPythonAsync supports while synchronous blocking needs JSPI (unavailable
-// in Safari). Cached as a callable proxy at load time.
+// `_wingman_rewrite_async` from asyncioShim.py rewrites blocking asyncio
+// entrypoints (asyncio.run, ...) into top-level await; sync blocking would need
+// JSPI, which Safari lacks. Cached as a callable proxy at load time.
 let rewriteAsyncEntrypoints: ((code: string) => string) | null = null;
 
-// The Pyodide FS is a session-long singleton, so we reconcile its /home/user
-// tree incrementally instead of wiping and rewriting every file on each call.
-// `lastSyncedFiles` mirrors what is currently materialized in the FS (the full
-// set collected after the previous run); diffing the next input against it lets
-// us skip rewriting unchanged files and only delete ones that went away. A null
-// value (first run, a new Pyodide instance, or after an error) forces a full
-// clean rebuild so stale files never leak across chats.
+// The Pyodide FS is a session-long singleton, so we sync /home/user incrementally
+// rather than wiping it each call. `lastSyncedFiles` mirrors what's materialized;
+// diffing the next input skips unchanged files and deletes vanished ones. null
+// (first run, new instance, or after an error) forces a clean rebuild so stale
+// files never leak across chats.
 let lastSyncedFiles: ArtifactFiles | null = null;
 let lastSyncedPyodide: PyodideInterface | null = null;
 
@@ -120,9 +103,8 @@ function writeFileToPyodide(pyodide: PyodideInterface, path: string, file: Artif
 }
 
 function syncFilesToPyodide(pyodide: PyodideInterface, files: ArtifactFiles): void {
-  // `prev` is what we last materialized in the FS. A different instance or a
-  // missing record means we can't trust the tree, so wipe it and treat every
-  // input as new (the delete loop below is then a no-op over an empty `prev`).
+  // `prev` is what we last materialized. A different instance or missing record
+  // means we can't trust the tree, so wipe it and treat every input as new.
   let prev = lastSyncedPyodide === pyodide ? lastSyncedFiles : null;
   lastSyncedPyodide = pyodide;
   if (prev === null) {
@@ -131,7 +113,6 @@ function syncFilesToPyodide(pyodide: PyodideInterface, files: ArtifactFiles): vo
   }
   ensureDir(pyodide, SANDBOX_HOME);
 
-  // Remove files that were present last time but are gone now.
   for (const path of Object.keys(prev)) {
     if (!(path in files)) {
       try {
@@ -142,7 +123,6 @@ function syncFilesToPyodide(pyodide: PyodideInterface, files: ArtifactFiles): vo
     }
   }
 
-  // Write only files whose content or type changed since the last sync.
   for (const [path, file] of Object.entries(files)) {
     const before = prev[path];
     if (before && before.content === file.content && before.contentType === file.contentType) continue;
@@ -150,9 +130,8 @@ function syncFilesToPyodide(pyodide: PyodideInterface, files: ArtifactFiles): vo
   }
 }
 
-// Only a genuine Date older than the run start proves the file was untouched by
-// user code. Anything else (unexpected type, equal/newer timestamp) falls
-// through to a fresh read — we never risk returning stale content.
+// Only a genuine Date older than the run start proves the file was untouched;
+// anything else falls through to a fresh read so we never return stale content.
 function isUnmodifiedSince(mtime: unknown, runStart: number): boolean {
   return mtime instanceof Date && mtime.getTime() < runStart;
 }
@@ -211,13 +190,10 @@ function collectPyodideFiles(pyodide: PyodideInterface, sourceFiles: ArtifactFil
 }
 
 /**
- * Load everything the code needs from the offline lock in /pyodide/.
- *
- * The bundler injects the bundled PyPI wheels (seaborn, pdfplumber, python-docx,
- * …) into pyodide-lock.json alongside the Pyodide built-ins, so a single
- * mechanism — Pyodide's own lock-driven loader — resolves them all by import
- * name. No manifest, micropip, or dep bookkeeping. (sqlite3, ssl, and lzma need
- * no loading at all since Pyodide 314 — they ship in the base interpreter.)
+ * Load everything the code needs from the offline lock in /pyodide/. The bundler
+ * injects the bundled PyPI wheels into pyodide-lock.json alongside the built-ins,
+ * so Pyodide's own lock-driven loader resolves them all by import name — no
+ * micropip or dep bookkeeping. (sqlite3/ssl/lzma ship in the base interpreter.)
  */
 async function ensurePackagesLoaded(
   pyodide: PyodideInterface,
@@ -226,14 +202,11 @@ async function ensurePackagesLoaded(
 ): Promise<void> {
   const warn = (msg: string) => console.warn(`package load: ${msg}`);
 
-  // Everything imported in the code — built-ins, stdlib companions, and bundled
-  // PyPI wheels — resolves from the lock index by import name, with transitive
-  // deps pulled via each package's `depends`.
+  // All imports resolve from the lock index by name; transitive deps via `depends`.
   await pyodide.loadPackagesFromImports(code, { errorCallback: warn });
 
-  // Extras the import scan can't see: tzdata (data-only, read by zoneinfo/pandas
-  // but never imported by name) and packages the model lists explicitly (mainly
-  // for lazily-imported deps like a pandas Excel engine).
+  // Extras the import scan can't see: tzdata (data-only) and packages the model
+  // lists explicitly (mainly lazily-imported deps like a pandas Excel engine).
   const extra = new Set<string>();
   if (needsTzdata(code)) extra.add("tzdata");
   for (const raw of explicitPackages) {
@@ -241,10 +214,9 @@ async function ensurePackagesLoaded(
     if (pkg) extra.add(pkg);
   }
 
-  // Load each independently and tolerantly: `loadPackage` *throws* on an unknown
-  // name (a model-guessed package, or a stdlib module like `json`), even with an
-  // errorCallback — that must not abort the others or the run. A genuinely
-  // missing module still raises ModuleNotFoundError when the code imports it.
+  // Load each independently: `loadPackage` *throws* on an unknown name (model-guessed
+  // or a stdlib module) even with an errorCallback, and that must not abort the run.
+  // A genuinely missing module still raises ModuleNotFoundError at import.
   for (const pkg of extra) {
     try {
       await pyodide.loadPackage(pkg, { errorCallback: warn });
@@ -280,11 +252,17 @@ function loadPyodide(): Promise<PyodideInterface> {
         // relative-path writes (open("out.csv", "w")) would be silently lost.
         p.FS.mkdirTree(SANDBOX_HOME);
         p.FS.chdir(SANDBOX_HOME);
+        // Matplotlib's default backend wants a DOM canvas the worker lacks, so figure
+        // creation would fail. Force the headless Agg backend (savefig still works);
+        // an explicit matplotlib.use(...) in user code still wins.
+        p.runPython("import os; os.environ.setdefault('MPLBACKEND', 'Agg')");
         p.globals.set("_wingman_llm", requestLlm);
         p.globals.set("_wingman_ocr", (path: string) => requestOcr(p, path));
         p.globals.set("_wingman_vision", (path: string, prompt: string | null) => requestVision(p, path, prompt));
-        p.globals.set("_wingman_render", (prompt: string, output: string, inputsJson: string) =>
-          requestRenderImage(p, prompt, output, inputsJson),
+        p.globals.set(
+          "_wingman_render",
+          (prompt: string, output: string, inputsJson: string, optionsJson: string | null) =>
+            requestRenderImage(p, prompt, output, inputsJson, optionsJson),
         );
         p.globals.set("_wingman_synthesize", (text: string, output: string, voice: string | null) =>
           requestSynthesize(p, text, output, voice),
@@ -315,10 +293,7 @@ function loadPyodide(): Promise<PyodideInterface> {
   return pyodideReady;
 }
 
-async function executeCode(
-  request: CodeExecutionRequest,
-  onStarted?: () => void,
-): Promise<CodeExecutionResult> {
+async function executeCode(request: CodeExecutionRequest, onStarted?: () => void): Promise<CodeExecutionResult> {
   const { packages = [], files = {} } = request;
 
   try {
@@ -337,18 +312,10 @@ async function executeCode(
     syncFilesToPyodide(pyodide, files);
     await ensurePackagesLoaded(pyodide, code, packages);
 
-    // Apply plotly shim after packages are loaded (once per session)
-    if (!plotlyShimApplied && "plotly" in pyodide.loadedPackages) {
-      await pyodide.runPythonAsync(PLOTLY_IMAGE_SHIM);
-      plotlyShimApplied = true;
-    }
-
     onStarted?.();
 
-    clearRenderQueue(pyodide);
     const runStart = Date.now();
     const output = await runPythonCode(pyodide, code);
-    await processRenderQueue(pyodide);
 
     const resultFiles = collectPyodideFiles(pyodide, files, runStart);
     // Remember the materialized tree so the next call can sync incrementally.
@@ -370,8 +337,6 @@ async function executeCode(
     };
   }
 }
-
-// FS helpers
 
 function ensureDir(pyodide: PyodideInterface, dir: string): void {
   try {
@@ -422,9 +387,8 @@ function callMain<T>(build: (port: MessagePort) => WorkerToMainMessage): Promise
 }
 
 /**
- * Bridge behind the Python `llm` helper (see llmShim.py); resolved by the
- * main thread. Options arrive as a JSON string because Pyodide doesn't
- * forward Python kwargs to JS functions.
+ * Bridge behind the Python `llm` helper (llmShim.py), resolved by the main thread.
+ * Options arrive as a JSON string because Pyodide doesn't forward Python kwargs.
  */
 function requestLlm(prompt: string, optionsJson?: string | null): Promise<string> {
   let options: LlmCallOptions | undefined;
@@ -452,52 +416,46 @@ function writeWorkerFile(pyodide: PyodideInterface, path: string, data: Uint8Arr
   pyodide.FS.writeFile(path, data);
 }
 
-/**
- * Bridge behind the Python `ocr` helper (see ocrShim.py). The file bytes are
- * read from the worker's FS here; the main thread ships them to the backend
- * extractor service (which needs the chat client/config).
- */
+/** Bridge behind the Python `ocr` helper (ocrShim.py); reads file bytes from the FS, runs the backend extractor on the main thread. */
 async function requestOcr(pyodide: PyodideInterface, path: string): Promise<string> {
   const data = readWorkerFile(pyodide, path, "ocr");
   return callMain<string>((port) => ({ type: "ocr-request", data, path, port }));
 }
 
-/**
- * Bridge behind the Python `vision` helper (see visionShim.py). The image
- * bytes are read from the worker's FS here; the main thread sends them to a
- * vision-capable chat model.
- */
+/** Bridge behind the Python `vision` helper (visionShim.py); reads image bytes from the FS, runs a vision model on the main thread. */
 async function requestVision(pyodide: PyodideInterface, path: string, prompt: string | null): Promise<string> {
   const data = readWorkerFile(pyodide, path, "vision");
   return callMain<string>((port) => ({ type: "vision-request", data, path, prompt: prompt ?? undefined, port }));
 }
 
-/**
- * Bridge behind the Python `render` helper (see renderShim.py). Input images
- * are read from the worker's FS; the main thread calls the backend renderer
- * service and the resulting image is written back to `output` here.
- */
+/** Bridge behind the Python `render` helper (renderShim.py); reads inputs from the FS, writes the rendered image back to `output`. */
 async function requestRenderImage(
   pyodide: PyodideInterface,
   prompt: string,
   output: string,
   inputsJson: string,
+  optionsJson?: string | null,
 ): Promise<string> {
   const inputs: RenderInput[] = (JSON.parse(inputsJson) as string[]).map((path) => ({
     data: readWorkerFile(pyodide, path, "render"),
     path,
   }));
 
-  const data = await callMain<Uint8Array>((port) => ({ type: "render-request", prompt, inputs, port }));
+  let options: ImageRenderOptions | undefined;
+  if (optionsJson) {
+    try {
+      options = JSON.parse(optionsJson) as ImageRenderOptions;
+    } catch {
+      // Malformed options — proceed with defaults rather than failing the call.
+    }
+  }
+
+  const data = await callMain<Uint8Array>((port) => ({ type: "render-request", prompt, inputs, options, port }));
   writeWorkerFile(pyodide, output, data);
   return output;
 }
 
-/**
- * Bridge behind the Python `synthesize` helper (see synthesizeShim.py). The
- * main thread calls the backend TTS service; the resulting WAV audio is
- * written back to `output` here.
- */
+/** Bridge behind the Python `synthesize` helper (synthesizeShim.py); writes the backend's WAV audio back to `output`. */
 async function requestSynthesize(
   pyodide: PyodideInterface,
   text: string,
@@ -514,29 +472,18 @@ async function requestSynthesize(
   return output;
 }
 
-/**
- * Bridge behind the Python `transcribe` helper (see transcribeShim.py). The
- * audio bytes are read from the worker's FS here; the main thread ships them
- * to the backend speech-to-text service.
- */
+/** Bridge behind the Python `transcribe` helper (transcribeShim.py); reads audio bytes from the FS, runs backend speech-to-text. */
 async function requestTranscribe(pyodide: PyodideInterface, path: string): Promise<string> {
   const data = readWorkerFile(pyodide, path, "transcribe");
   return callMain<string>((port) => ({ type: "transcribe-request", data, path, port }));
 }
 
-/**
- * Bridge behind the Python `translate` helper (see translateShim.py); resolved
- * by the main thread, which calls the backend translation service.
- */
+/** Bridge behind the Python `translate` helper (translateShim.py), resolved by the main thread. */
 function requestTranslateText(lang: string, text: string): Promise<string> {
   return callMain<string>((port) => ({ type: "translate-text-request", lang, text, port }));
 }
 
-/**
- * Bridge behind the Python `translate_file` helper (see translateShim.py). The
- * file bytes are read from the worker's FS here; the main thread translates
- * them via the backend and the resulting file is written back to `output`.
- */
+/** Bridge behind the Python `translate_file` helper (translateShim.py); reads input from the FS, writes the translated file back to `output`. */
 async function requestTranslateFile(
   pyodide: PyodideInterface,
   lang: string,
@@ -555,84 +502,9 @@ async function requestTranslateFile(
   return output;
 }
 
-// Plotly render queue — manifests are written by plotlyShim.py; the actual
-// rendering needs a DOM, so it happens on the main thread.
-
-const RENDER_QUEUE_DIR = "/tmp/__plotly_render_queue__";
-let plotlyJsSent = false;
-
-function clearRenderQueue(pyodide: PyodideInterface): void {
-  try {
-    const entries = (pyodide.FS.readdir(RENDER_QUEUE_DIR) as string[]).filter((e: string) => e !== "." && e !== "..");
-    for (const entry of entries) {
-      pyodide.FS.unlink(`${RENDER_QUEUE_DIR}/${entry}`);
-    }
-  } catch {
-    // Queue directory may not exist yet.
-  }
-}
-
-function readRenderManifests(pyodide: PyodideInterface): PlotlyManifest[] {
-  let entries: string[];
-  try {
-    entries = (pyodide.FS.readdir(RENDER_QUEUE_DIR) as string[])
-      .filter((e: string) => e !== "." && e !== ".." && e.endsWith(".json"))
-      .sort();
-  } catch {
-    return [];
-  }
-
-  const manifests: PlotlyManifest[] = [];
-  for (const entry of entries) {
-    try {
-      const json = pyodide.FS.readFile(`${RENDER_QUEUE_DIR}/${entry}`, { encoding: "utf8" }) as string;
-      manifests.push(JSON.parse(json) as PlotlyManifest);
-    } catch (error) {
-      console.error(`Failed to read plotly manifest ${entry}:`, error);
-    }
-  }
-  return manifests;
-}
-
-function readPlotlyJsSource(pyodide: PyodideInterface): string {
-  const plotlyJsPath = String(
-    pyodide.runPython(
-      "import plotly, os; os.path.join(os.path.dirname(plotly.__file__), 'package_data', 'plotly.min.js')",
-    ),
-  ).trim();
-  return pyodide.FS.readFile(plotlyJsPath, { encoding: "utf8" }) as string;
-}
-
-async function processRenderQueue(pyodide: PyodideInterface): Promise<void> {
-  const manifests = readRenderManifests(pyodide);
-  if (manifests.length === 0) return;
-
-  try {
-    const plotlyJs = plotlyJsSent ? undefined : readPlotlyJsSource(pyodide);
-    const results = await callMain<PlotlyResult[]>((port) => ({
-      type: "plotly-request",
-      manifests,
-      plotlyJs,
-      port,
-    }));
-    plotlyJsSent = true;
-
-    for (const result of results) {
-      const dir = result.path.substring(0, result.path.lastIndexOf("/"));
-      if (dir) ensureDir(pyodide, dir);
-      pyodide.FS.writeFile(result.path, result.data);
-    }
-  } catch (error) {
-    console.error("Failed to render plotly figures:", error);
-  }
-
-  clearRenderQueue(pyodide);
-}
-
-// Message loop — executions are serialized: the Pyodide FS and the
-// package/sync bookkeeping are shared state, so concurrent runs would
-// interleave at await points. RPC replies arrive on their own ports and
-// bypass the chain, unblocking the run currently executing.
+// Executions are serialized: the Pyodide FS and sync bookkeeping are shared
+// state, so concurrent runs would interleave at await points. RPC replies arrive
+// on their own ports and bypass the chain, unblocking the running execution.
 let executionChain: Promise<void> = Promise.resolve();
 
 ctx.addEventListener("message", (event) => {
