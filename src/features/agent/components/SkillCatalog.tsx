@@ -189,7 +189,7 @@ export function SkillCatalog({
       setSelectedTemplate(null);
       setTemplateContent(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // setters are stable and intentionally omitted from the deps
   }, [isOpen, initialView, initialSkillName, openEditor, allSkills]);
 
   useEffect(() => {

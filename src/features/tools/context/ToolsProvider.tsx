@@ -355,24 +355,20 @@ export function ToolsProvider({ children }: { children: React.ReactNode }) {
   // Also wire up auth lifecycle callbacks so the UI reflects Authenticating state
   useEffect(() => {
     for (const client of allMcpClients) {
-      // eslint-disable-next-line react-hooks/immutability -- setting callbacks on external MCP client objects is the purpose of this effect
+      // Mutating these external MCP client objects is the purpose of this effect.
       client.onDisconnected = () => {
         setMcpStates((prev) => new Map(prev).set(client.id, ProviderState.Failed));
       };
-      // eslint-disable-next-line react-hooks/immutability
       client.onAuthenticating = () => {
         setMcpStates((prev) => new Map(prev).set(client.id, ProviderState.Authenticating));
       };
-      // eslint-disable-next-line react-hooks/immutability
       client.onAuthComplete = () => {
         // Transition back to Initializing while the reconnection is in flight
         setMcpStates((prev) => new Map(prev).set(client.id, ProviderState.Initializing));
       };
-      // eslint-disable-next-line react-hooks/immutability
       client.onToolsChanged = () => {
         setToolsVersion((v) => v + 1);
       };
-      // eslint-disable-next-line react-hooks/immutability
       client.onElicitationComplete = null; // handled via activeToolContext; clear any stale reference
     }
   }, [allMcpClients]);

@@ -381,6 +381,7 @@ export const loadConfig = async (): Promise<Config | undefined> => {
     return config;
   } catch (error) {
     console.error("unable to load config", error);
+    return undefined;
   }
 };
 
