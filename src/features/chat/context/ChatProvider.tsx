@@ -70,6 +70,30 @@ function pruneAtSummary(messages: Message[]): Message[] {
   return pruned;
 }
 
+// Wire-only: append a current time/locale `<context>` to the user's real message —
+// the last human turn, not a tool result. `now` is captured once per run so the loop
+// keeps a stable, cacheable prefix.
+function injectContext(messages: Message[], now: Date): Message[] {
+  const idx = messages.findLastIndex((m) => m.role === Role.User && m.content.some((p) => p.type !== "tool_result"));
+  if (idx < 0) return messages;
+
+  const platform = window.innerWidth < 768 ? "mobile" : "desktop";
+  const pointer = window.matchMedia("(pointer: coarse)").matches ? "touch" : "mouse";
+  const theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
+
+  const block = [
+    "<context>",
+    `Current date and time: ${now.toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" })}`,
+    `ISO 8601 (UTC): ${now.toISOString()}`,
+    `Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`,
+    `Language: ${navigator.language}`,
+    `Client: ${platform}, ${pointer}, ${theme} theme`,
+    "</context>",
+  ].join("\n");
+
+  return messages.map((m, i) => (i === idx ? { ...m, content: [...m.content, { type: "text", text: block }] } : m));
+}
+
 /** Replace inline images before the latest user message with a placeholder.
  *  They're persisted as artifacts (see useFileAttachments) so the model can
  *  re-read them; dropping the base64 from earlier turns keeps requests small.
@@ -541,6 +565,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         // Get tools and instructions when needed
         const tools = await chatTools();
         const instructions = chatInstructions();
+        const now = new Date();
 
         // Proactive compaction: condense older messages into a summary marker
         // before the LLM call when the estimated token count exceeds the
@@ -563,7 +588,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
             verbosity: model?.verbosity,
             signal: abortController.signal,
           },
-          prepareMessages: (msgs) => stripHistoryImages(pruneAtSummary(msgs)),
+          prepareMessages: (msgs) => injectContext(stripHistoryImages(pruneAtSummary(msgs)), now),
           onTurnStart: () => {
             updateStreamingMessage({ chatId: id, message: { role: Role.Assistant, content: [] } });
           },
@@ -597,11 +622,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
             updateChat(id, () => ({ messages: conversation }));
           },
           onToolMeta: (toolCallId, meta) => {
-            setToolMeta((prev) => {
-              const existing = prev[toolCallId];
-              const merged = existing ? { ...existing, ...meta } : { ...meta };
-              return { ...prev, [toolCallId]: merged };
-            });
+            updateToolMeta(toolCallId, meta);
             // Late update after commit: also patch the persisted tool_result in place.
             updateChat(id, (prev) => ({
               messages: prev.messages.map((msg) => ({
@@ -674,6 +695,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
       requestElicitation,
       updateModelContext,
       updateStreamingMessage,
+      updateToolMeta,
     ],
   );
 

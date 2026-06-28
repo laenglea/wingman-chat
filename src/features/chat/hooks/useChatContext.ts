@@ -10,7 +10,6 @@ import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
 import { setModel as setInterpreterModel } from "@/features/tools/lib/llmCommand";
 import { createSubagentTool } from "@/features/tools/lib/subagent";
 import { getConfig } from "@/shared/config";
-import { renderTemplate } from "@/shared/lib/template";
 import type { Model, Tool, ToolProvider } from "@/shared/types/chat";
 import { ProviderState } from "@/shared/types/chat";
 
@@ -107,11 +106,11 @@ export function useChatContext(mode: "voice" | "chat" = "chat", model?: Model | 
 
         const globalInstructions = getConfig().chat?.instructions;
         if (globalInstructions?.trim()) {
-          instructionsList.push(renderTemplate(globalInstructions));
+          instructionsList.push(globalInstructions);
         }
 
         if (model?.instructions?.trim()) {
-          instructionsList.push(renderTemplate(model.instructions));
+          instructionsList.push(model.instructions);
         }
 
         if (defaultInstructions.trim()) {
