@@ -138,24 +138,13 @@ Limitations:
 - The script runs in a sandbox rooted at `/home/user/`.
 - Execution limits apply.
 
-### Choose the right tool
+### Choosing and combining tools
 
-Use Python when libraries or computation are the main value.
-Use JavaScript when the task needs a browser-native API (WebCodecs, OffscreenCanvas, Web Crypto) or a clean vector chart/PDF deliverable.
-Use Bash when the task is naturally a shell pipeline or file operation.
+Pick whatever is most efficient — one runtime or several. The tools share one artifact filesystem, so handing work from one to another is cheap: write a file in one, read it in the next. There's no need to force everything into a single runtime, and no need to split work that one runtime already handles cleanly — use your judgment.
 
-Quick guide:
-- Math, statistics, algorithms: Python
-- Tabular data work — clean, reconcile, merge, dedupe, or pivot a spreadsheet or export: Python (pandas)
-- Extract tables or text from a PDF, or read/write Excel, Word, or PowerPoint: Python
-- Convert between formats (CSV ↔ XLSX ↔ JSON) or fill a template: Python (or Bash for plain CSV/JSON)
-- Complex document parsing or library-driven output: Python
-- Charts:
-  - Analytical or statistical charts, especially when the data is already in a DataFrame: Python (matplotlib / seaborn).
-  - A polished, scalable vector chart as a deliverable (report, slide, dashboard): JavaScript (echarts SSR → SVG).
-  - Don't move a DataFrame into JavaScript just to chart it — chart where the data already lives.
-- Browser media (WebCodecs/OffscreenCanvas), audio/video transcoding, Web Crypto: JavaScript
-- JSON, YAML, CSV, SQLite: Bash first
-- File discovery, renames, and path-heavy tasks: Bash
+Rough strengths, as orientation rather than rules:
+- **Python** — computation, statistics, data and tabular work (pandas), and document libraries (PDF, Excel, Word, PowerPoint). The broadest toolbox.
+- **JavaScript** — browser-native APIs (WebCodecs, OffscreenCanvas, Web Crypto, WebAssembly) and clean vector deliverables (echarts → SVG, jsPDF).
+- **Bash** — shell pipelines and file/path work (grep/sed/awk, `jq`/`yq`/`xan`/`sqlite3`, find, renames).
 
-Combining runtimes: the tools share one artifact filesystem, so hand work off by writing an intermediate artifact. A common pattern is to crunch data in Python and write `/chart_data.json`, then read it in JavaScript and render an echarts SVG.
+When a later step wants a different runtime's strength, hand off through an artifact file — for example, compute series in Python, write `/chart_data.json`, then render an echarts SVG in JavaScript; or slice a large file with `xan`/`jq` in Bash, then analyze it in Python. When one runtime already does the job, stay in it — e.g. chart a DataFrame in place with matplotlib instead of shipping it to JavaScript.

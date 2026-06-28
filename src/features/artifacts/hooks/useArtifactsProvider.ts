@@ -409,7 +409,8 @@ export function useArtifactsProvider(): ToolProvider | null {
           "Paths are artifact paths like `/data.csv`. `fetch('/data.csv')` also reads the VFS (remote URLs are blocked). " +
           "Anything you write or delete via `vfs` is synced back as artifacts. Use top-level `await` directly, and " +
           "`return` a value or `console.log(...)` to produce output. Pass the full script in `code`, or `path` to run an " +
-          "existing .js artifact. Prefer Python (`execute_python_code`) for data/number crunching and document libraries.",
+          "existing .js artifact. For heavy data/number crunching or document libraries, Python (`execute_python_code`) " +
+          "is usually the stronger fit — they share the filesystem, so you can do that step there and read the result back here.",
         strict: true,
         parameters: {
           type: "object",
