@@ -1,10 +1,11 @@
-import { Download, Edit2, Folder, FolderOpen, HardDrive, MoreVertical, Trash, Upload } from "lucide-react";
+import { Download, Edit2, Folder, FolderOpen, MoreVertical, PanelRightClose, Trash, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { FileSystemManager } from "@/features/artifacts/lib/fs";
 import type { DriveConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
 import { notify } from "@/shared/lib/notify";
 import type { FileEntry } from "@/shared/types/file";
+import { DriveIcon } from "@/shared/ui/DriveIcon";
 import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 import { FileIcon } from "@/shared/ui/FileIcon";
 
@@ -17,64 +18,45 @@ interface FileNode {
   file?: FileEntry;
 }
 
+// Folders before files, then alphabetical by name.
+function compareNodes(a: FileNode, b: FileNode): number {
+  if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+  return a.name.localeCompare(b.name);
+}
+
+function sortTree(nodes: FileNode[]): void {
+  nodes.sort(compareNodes);
+  for (const node of nodes) {
+    if (node.children) sortTree(node.children);
+  }
+}
+
 function buildFileTree(files: FileEntry[]): FileNode[] {
   const tree: FileNode[] = [];
   const folderMap = new Map<string, FileNode>();
 
-  // Sort files by path to ensure consistent ordering
-  const sortedFiles = [...files].sort((a, b) => a.path.localeCompare(b.path));
-
-  for (const file of sortedFiles) {
-    const pathParts = file.path.split("/").filter((part: string) => part.length > 0);
+  for (const file of files) {
+    const pathParts = file.path.split("/").filter((part) => part.length > 0);
     let currentPath = "";
     let currentLevel = tree;
 
-    // Create folder structure
+    // Build the folder chain leading to the file, reusing folders already created.
     for (let i = 0; i < pathParts.length - 1; i++) {
-      const folderName = pathParts[i];
-      currentPath += `/${folderName}`;
-
+      currentPath += `/${pathParts[i]}`;
       let folderNode = folderMap.get(currentPath);
       if (!folderNode) {
-        folderNode = {
-          name: folderName,
-          path: currentPath,
-          type: "folder",
-          children: [],
-        };
+        folderNode = { name: pathParts[i], path: currentPath, type: "folder", children: [] };
         folderMap.set(currentPath, folderNode);
         currentLevel.push(folderNode);
-
-        // Sort folders before files
-        currentLevel.sort((a, b) => {
-          if (a.type === "folder" && b.type === "file") return -1;
-          if (a.type === "file" && b.type === "folder") return 1;
-          return a.name.localeCompare(b.name);
-        });
       }
-
-      const folderChildren = folderNode.children ?? [];
-      folderNode.children = folderChildren;
-      currentLevel = folderChildren;
+      currentLevel = folderNode.children ??= [];
     }
 
-    // Add the file
-    const fileName = pathParts[pathParts.length - 1];
-    currentLevel.push({
-      name: fileName,
-      path: file.path,
-      type: "file",
-      file: file,
-    });
-
-    // Sort the current level again
-    currentLevel.sort((a, b) => {
-      if (a.type === "folder" && b.type === "file") return -1;
-      if (a.type === "file" && b.type === "folder") return 1;
-      return a.name.localeCompare(b.name);
-    });
+    currentLevel.push({ name: pathParts[pathParts.length - 1], path: file.path, type: "file", file });
   }
 
+  // Sort once at the end rather than on every insert.
+  sortTree(tree);
   return tree;
 }
 
@@ -204,6 +186,7 @@ interface ArtifactsBrowserProps {
   onUploadDrive?: (drive: DriveConfig) => void;
   onDownloadAll?: () => void;
   onDownloadFile?: (path: string) => void;
+  onClose?: () => void;
 }
 
 export function ArtifactsBrowser({
@@ -217,6 +200,7 @@ export function ArtifactsBrowser({
   onUploadDrive,
   onDownloadAll,
   onDownloadFile,
+  onClose,
 }: ArtifactsBrowserProps) {
   const hasDrives = drives.length > 0 && !!onUploadDrive;
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -322,16 +306,47 @@ export function ArtifactsBrowser({
     setRenameValue("");
   };
 
+  // Upload + drive entries, shared by the header overflow menu and the bottom button.
+  const uploadMenuItems = (disabled: boolean) => (
+    <>
+      {onUploadLocal && (
+        <DropdownMenuItem icon={<Upload size={16} />} onClick={onUploadLocal} disabled={disabled}>
+          Upload
+        </DropdownMenuItem>
+      )}
+      {hasDrives &&
+        drives.map((drive) => (
+          <DropdownMenuItem
+            key={drive.id}
+            disabled={disabled}
+            icon={<DriveIcon drive={drive} />}
+            onClick={() => onUploadDrive?.(drive)}
+          >
+            {drive.name}
+          </DropdownMenuItem>
+        ))}
+    </>
+  );
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* File list - grows to fill space */}
       <div className="flex-1 overflow-auto min-h-0">
-        <div className="pt-1 min-w-full">
-          {/* Root folder row */}
-          <div className="flex items-center gap-1 pl-3 pr-2 py-2 min-w-0 group">
-            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 truncate flex-1">
-              Files
-            </span>
+        <div className="min-w-full">
+          {/* Root folder row — height matches the editor top bar so the close
+              button lines up with the open button it replaces. */}
+          <div className="flex items-center gap-1 pl-1.5 pr-2 h-12 md:h-10 min-w-0 group">
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                title="Hide files"
+                className="shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                <PanelRightClose size={14} />
+              </button>
+            )}
+            <div className="flex-1" />
             {(onUploadLocal || hasDrives || onDownloadAll) && (
               <DropdownMenu
                 anchor="bottom start"
@@ -341,39 +356,7 @@ export function ArtifactsBrowser({
                   </MenuButton>
                 }
               >
-                {onUploadLocal && (
-                  <DropdownMenuItem icon={<Upload size={16} />} onClick={onUploadLocal} disabled={isProcessing}>
-                    Upload
-                  </DropdownMenuItem>
-                )}
-                {hasDrives &&
-                  drives.map((drive) => (
-                    <DropdownMenuItem
-                      key={drive.id}
-                      disabled={isProcessing}
-                      icon={
-                        drive.icon ? (
-                          <span
-                            className="shrink-0 bg-current inline-block"
-                            style={{
-                              width: 16,
-                              height: 16,
-                              maskImage: `url(${drive.icon})`,
-                              WebkitMaskImage: `url(${drive.icon})`,
-                              maskSize: "contain",
-                              maskRepeat: "no-repeat",
-                              maskPosition: "center",
-                            }}
-                          />
-                        ) : (
-                          <HardDrive size={16} />
-                        )
-                      }
-                      onClick={() => onUploadDrive?.(drive)}
-                    >
-                      {drive.name}
-                    </DropdownMenuItem>
-                  ))}
+                {uploadMenuItems(isProcessing)}
                 {onDownloadAll && files.length > 0 && (
                   <DropdownMenuItem icon={<Download size={16} />} onClick={onDownloadAll}>
                     Download all
@@ -421,37 +404,7 @@ export function ArtifactsBrowser({
                 </MenuButton>
               }
             >
-              {onUploadLocal && (
-                <DropdownMenuItem icon={<Upload size={16} />} onClick={onUploadLocal}>
-                  Upload
-                </DropdownMenuItem>
-              )}
-              {drives.map((drive) => (
-                <DropdownMenuItem
-                  key={drive.id}
-                  icon={
-                    drive.icon ? (
-                      <span
-                        className="shrink-0 bg-current inline-block"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          maskImage: `url(${drive.icon})`,
-                          WebkitMaskImage: `url(${drive.icon})`,
-                          maskSize: "contain",
-                          maskRepeat: "no-repeat",
-                          maskPosition: "center",
-                        }}
-                      />
-                    ) : (
-                      <HardDrive size={16} />
-                    )
-                  }
-                  onClick={() => onUploadDrive?.(drive)}
-                >
-                  {drive.name}
-                </DropdownMenuItem>
-              ))}
+              {uploadMenuItems(false)}
             </DropdownMenu>
           ) : (
             <button
@@ -485,7 +438,7 @@ export function ArtifactsBrowser({
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  handleRenameSubmit();
+                  void handleRenameSubmit();
                 } else if (e.key === "Escape") {
                   handleRenameCancel();
                 }

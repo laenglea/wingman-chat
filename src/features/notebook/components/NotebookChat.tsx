@@ -31,7 +31,6 @@ const TOOL_VERBS: Record<string, string> = {
   read_skill_resource: "skill file",
   execute_python_code: "python",
   execute_javascript_code: "javascript",
-  execute_bash_code: "bash",
 };
 
 /**
@@ -45,7 +44,7 @@ function toolActivityLabels(msg: NotebookMessage): string[] | null {
     if (part.type !== "tool_result") return "";
     const verb = TOOL_VERBS[part.name] ?? part.name;
     const args = tryParseToolArguments(part.arguments) ?? {};
-    const detail = String(args.path ?? args.to ?? args.pattern ?? args.name ?? "");
+    const detail = [args.path, args.to, args.pattern, args.name].find((v): v is string => typeof v === "string") ?? "";
     return detail ? `${verb} · ${detail}` : verb;
   });
 }
@@ -179,7 +178,6 @@ export function NotebookChat({
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-neutral-400 dark:text-neutral-500">
                       <Wrench size={11} className="shrink-0" />
                       {toolLabels.map((label, i) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: labels are display-only and order-stable
                         <span key={`${label}:${i}`} className="font-mono">
                           {label}
                         </span>

@@ -1,4 +1,9 @@
-FROM node:lts-alpine AS app
+FROM node:lts-slim AS app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 

@@ -781,7 +781,7 @@ export async function renderSlideToJpegDataUrl(html: string, options: { hideText
 // ── PDF export ───────────────────────────────────────────────────────────────
 
 export async function downloadHtmlSlidesAsPdf(htmlSlides: string[], slug: string) {
-  const { jsPDF } = await import("jspdf");
+  const jsPDF = (await import("jspdf")).jsPDF;
 
   const w = CANVAS_W * RASTER_SCALE;
   const h = CANVAS_H * RASTER_SCALE;

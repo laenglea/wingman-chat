@@ -8,6 +8,7 @@
 import type { ImageRenderOptions } from "@/shared/lib/client";
 import { bytesToDataUrl, dataUrlToBytes, isDataUrl } from "@/shared/lib/fileContent";
 import { inferContentTypeFromPath, isTextContentType } from "@/shared/lib/fileTypes";
+import type { RasterizedPage } from "@/shared/lib/pdf";
 import { normalizeArtifactPath } from "@/shared/lib/sandbox";
 import type {
   ArtifactFile,
@@ -17,9 +18,10 @@ import type {
   ExecuteMessage,
   ExecuteReply,
   LlmCallOptions,
-  RpcReply,
   WorkerToMainMessage,
 } from "./interpreterProtocol";
+import { NO_OUTPUT_MESSAGE } from "./interpreterProtocol";
+import { callMainThread } from "./interpreterRpc";
 
 // Typed view of the worker global scope (project compiles against the DOM lib,
 // not the webworker lib).
@@ -28,7 +30,6 @@ const ctx = self as unknown as {
   addEventListener(type: "message", listener: (event: MessageEvent<ExecuteMessage>) => void): void;
 };
 
-const NO_OUTPUT_MESSAGE = "Code executed successfully (no output)";
 const NETWORK_DISABLED = "Network access is disabled in the JavaScript sandbox";
 
 const encoder = new TextEncoder();
@@ -217,18 +218,8 @@ function patchNetwork(): void {
   }
 }
 
-function callMain<T>(build: (port: MessagePort) => WorkerToMainMessage): Promise<T> {
-  const { port1, port2 } = new MessageChannel();
-  return new Promise<T>((resolve, reject) => {
-    port1.onmessage = (event: MessageEvent<RpcReply>) => {
-      port1.close();
-      const reply = event.data;
-      if (reply.ok) resolve(reply.value as T);
-      else reject(new Error(reply.error));
-    };
-    ctx.postMessage(build(port2), [port2]);
-  });
-}
+const callMain = <T>(build: (port: MessagePort) => WorkerToMainMessage): Promise<T> =>
+  callMainThread<T>((message, transfer) => ctx.postMessage(message, transfer), build);
 
 /** Behind the `llm(prompt, options?)` helper; resolved by the main thread. */
 function llm(prompt: string, options?: LlmCallOptions): Promise<string> {
@@ -283,6 +274,20 @@ function buildBridges(vfs: Vfs) {
       }));
       return writeBytes(output, data);
     },
+    // Render PDF pages to PNG via pdf.js on the main thread; returns the written
+    // paths. The runtime has no in-process rasterizer, so this is the only path
+    // from a PDF page to pixels.
+    rasterizePdf: async (path: string, options?: { scale?: number; pages?: number[] }): Promise<string[]> => {
+      const rendered = await callMain<RasterizedPage[]>((port) => ({
+        type: "pdf-rasterize-request",
+        data: readBytes(path),
+        pages: options?.pages,
+        scale: options?.scale,
+        port,
+      }));
+      const stem = path.replace(/\.pdf$/i, "");
+      return rendered.map(({ page, data }) => writeBytes(`${stem}-${page}.png`, data));
+    },
   };
 }
 
@@ -311,13 +316,17 @@ function formatValue(value: unknown): string {
   if (value instanceof Error) return value.stack || `${value.name}: ${value.message}`;
   if (typeof value === "object") {
     try {
-      // JSON.stringify throws on circular references — fall back to String().
-      return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? `${v}n` : v), 2) ?? String(value);
+      // JSON.stringify only returns undefined here for the rare object whose
+      // toJSON() yields undefined; fall back to the object tag in that case.
+      return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? `${v}n` : v), 2) ?? "[object Object]";
     } catch {
-      return String(value);
+      // Circular references throw — use the explicit object tag as a last resort.
+      return Object.prototype.toString.call(value);
     }
   }
-  return String(value);
+  // Everything else (string/null/undefined/bigint/function/symbol/object) is
+  // handled above; only number and boolean reach here.
+  return String(value as number | boolean);
 }
 
 function makeConsole(append: (line: string) => void) {

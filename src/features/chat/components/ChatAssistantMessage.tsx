@@ -217,7 +217,7 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
   // sticky after trackpad taps, so the buttons wouldn't reliably hide.
   const [hovered, setHovered] = useState(false);
 
-  // Files written during this turn (create_file + python/bash), surfaced as
+  // Files written during this turn (create_file + python/javascript), surfaced as
   // clickable chips on the turn's completion message rather than auto-opening
   // the artifacts drawer.
   const turnArtifactPaths = useMemo(
@@ -260,7 +260,7 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
   // Handle loading states (no text content yet)
   if (!hasTextContent) {
     const reasoningParts = message.content.filter((p) => p.type === "reasoning");
-    const hasReasoning = reasoningParts.length > 0 && reasoningParts.some((p) => p.text || p.summary);
+    const hasReasoning = reasoningParts.some((p) => p.text || p.summary);
 
     // isReasoningActive is already false for non-last messages, so a single
     // helper covers the old / loading / streaming branches below.
@@ -335,7 +335,6 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
 
   // Render assistant message with content
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: hover only toggles the action bar; the buttons stay focusable on their own
     <div
       className="flex justify-start pb-2 text-neutral-900 dark:text-neutral-200"
       onMouseEnter={() => setHovered(true)}

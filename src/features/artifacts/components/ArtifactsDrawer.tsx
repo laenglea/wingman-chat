@@ -1,19 +1,17 @@
+import { lazyRouteComponent } from "@tanstack/react-router";
 import {
   ChevronDown,
   Code,
   Download,
   Eye,
   File as FileIcon2,
-  Files,
-  HardDrive,
   Loader2,
   PanelRightOpen,
   Play,
   Shapes,
-  Terminal,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
 import { artifactKind, artifactLanguage, processUploadedFile } from "@/features/artifacts/lib/artifacts";
 import type { FileSystemManager } from "@/features/artifacts/lib/fs";
@@ -21,46 +19,52 @@ import { useChat } from "@/features/chat/hooks/useChat";
 import { getConfig } from "@/shared/config";
 import { cn } from "@/shared/lib/cn";
 import { getDriveContentUrl } from "@/shared/lib/drives";
-import { markdownToDocx } from "@/shared/lib/markdownToDocx";
 import { notify } from "@/shared/lib/notify";
 import { downloadBlob, getFileName } from "@/shared/lib/utils";
 import type { File, FileEntry } from "@/shared/types/file";
+import { DriveIcon } from "@/shared/ui/DriveIcon";
 import { DrivePicker, type SelectedFile } from "@/shared/ui/DrivePicker";
 import { DropdownMenu, DropdownMenuItem, Menu, MenuButton, MenuItem, MenuItems } from "@/shared/ui/DropdownMenu";
-import { BashEditor } from "@/shared/ui/editors/BashEditor";
-import { CodeEditor } from "@/shared/ui/editors/CodeEditor";
-import { CsvEditor } from "@/shared/ui/editors/CsvEditor";
-import { DocxEditor } from "@/shared/ui/editors/DocxEditor";
-import { HtmlEditor } from "@/shared/ui/editors/HtmlEditor";
-import { JsEditor } from "@/shared/ui/editors/JsEditor";
-import { MarkdownEditor } from "@/shared/ui/editors/MarkdownEditor";
-import { MediaEditor } from "@/shared/ui/editors/MediaEditor";
-import { MermaidEditor } from "@/shared/ui/editors/MermaidEditor";
-import { OfficeMarkdownEditor } from "@/shared/ui/editors/OfficeMarkdownEditor";
-import { PdfEditor } from "@/shared/ui/editors/PdfEditor";
-import { PptxEditor } from "@/shared/ui/editors/PptxEditor";
-import { PythonEditor } from "@/shared/ui/editors/PythonEditor";
-import { SvgEditor } from "@/shared/ui/editors/SvgEditor";
-import { TextEditor } from "@/shared/ui/editors/TextEditor";
-import { XlsxEditor } from "@/shared/ui/editors/XlsxEditor";
 import { FileIcon } from "@/shared/ui/FileIcon";
 import { ResizablePanel, ResizablePanelGroup } from "@/shared/ui/Resizable";
 import { ArtifactsBrowser } from "./ArtifactsBrowser";
 
+// Editors are loaded on demand. Each pulls in heavy, format-specific
+// dependencies (pdfjs, the docx/xlsx/pptx converters, mediabunny, shiki, …)
+// that the chat view never needs until a user actually opens that file type.
+// `lazyRouteComponent` is the same primitive the router uses — it also reloads
+// gracefully when a chunk goes missing after a deploy.
+const CodeEditor = lazyRouteComponent(() => import("@/shared/ui/editors/CodeEditor"), "CodeEditor");
+const CsvEditor = lazyRouteComponent(() => import("@/shared/ui/editors/CsvEditor"), "CsvEditor");
+const DocxEditor = lazyRouteComponent(() => import("@/shared/ui/editors/DocxEditor"), "DocxEditor");
+const HtmlEditor = lazyRouteComponent(() => import("@/shared/ui/editors/HtmlEditor"), "HtmlEditor");
+const JsEditor = lazyRouteComponent(() => import("@/shared/ui/editors/JsEditor"), "JsEditor");
+const MarkdownEditor = lazyRouteComponent(() => import("@/shared/ui/editors/MarkdownEditor"), "MarkdownEditor");
+const MediaEditor = lazyRouteComponent(() => import("@/shared/ui/editors/MediaEditor"), "MediaEditor");
+const MermaidEditor = lazyRouteComponent(() => import("@/shared/ui/editors/MermaidEditor"), "MermaidEditor");
+const OfficeMarkdownEditor = lazyRouteComponent(
+  () => import("@/shared/ui/editors/OfficeMarkdownEditor"),
+  "OfficeMarkdownEditor",
+);
+const PdfEditor = lazyRouteComponent(() => import("@/shared/ui/editors/PdfEditor"), "PdfEditor");
+const PptxEditor = lazyRouteComponent(() => import("@/shared/ui/editors/PptxEditor"), "PptxEditor");
+const PythonEditor = lazyRouteComponent(() => import("@/shared/ui/editors/PythonEditor"), "PythonEditor");
+const SvgEditor = lazyRouteComponent(() => import("@/shared/ui/editors/SvgEditor"), "SvgEditor");
+const TextEditor = lazyRouteComponent(() => import("@/shared/ui/editors/TextEditor"), "TextEditor");
+const XlsxEditor = lazyRouteComponent(() => import("@/shared/ui/editors/XlsxEditor"), "XlsxEditor");
+
 export function ArtifactsDrawer() {
   const config = getConfig();
   const { fs, activeFile, openFile } = useArtifacts();
-  const { chat, ensureChat } = useChat();
+  const { ensureChat } = useChat();
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [activeDrive, setActiveDrive] = useState<(typeof config.drives)[number] | null>(null);
   const [viewMode, setViewMode] = useState<"preview" | "code">("preview");
   const [isRunning, setIsRunning] = useState(false);
   const [runHandler, setRunHandler] = useState<(() => Promise<void>) | null>(null);
-  const [showTerminal, setShowTerminal] = useState(false);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const filePickerRef = useRef<HTMLDivElement>(null);
-  const [terminalMounted, setTerminalMounted] = useState(false);
   const [showFilesBrowser, setShowFilesBrowser] = useState(false);
   const viewSliderRef = useRef<HTMLDivElement>(null);
   const [viewSliderStyle, setViewSliderStyle] = useState({ left: 0, width: 0 });
@@ -129,20 +133,23 @@ export function ArtifactsDrawer() {
     [uploadFiles],
   );
 
-  // Toggle terminal panel (auto-creates chat if needed)
-  const toggleTerminal = useCallback(async () => {
-    const opening = !showTerminal;
-    if (opening) {
-      await ensureFs();
-      setTerminalMounted(true);
-    }
-    setShowTerminal(opening);
-  }, [showTerminal, ensureFs]);
-
   // Callback for editors to register their run handler
   const onRunReady = useCallback((handler: (() => Promise<void>) | null) => {
     setRunHandler(() => handler);
   }, []);
+
+  // Download a single artifact by path, logging (not surfacing) failures.
+  const downloadFile = useCallback(
+    async (path: string) => {
+      if (!fs) return;
+      try {
+        await fs.downloadFile(path);
+      } catch (error) {
+        console.error("Failed to download file:", error);
+      }
+    },
+    [fs],
+  );
 
   // Subscribe to filesystem events and load data
   useEffect(() => {
@@ -192,8 +199,8 @@ export function ArtifactsDrawer() {
     };
 
     // Load initial data
-    loadFiles();
-    loadActiveFile();
+    void loadFiles();
+    void loadActiveFile();
 
     // Subscribe to events for subsequent updates.
     // Reload the sidebar list for every filesystem change, but only refresh
@@ -269,30 +276,8 @@ export function ArtifactsDrawer() {
     // IMPORTANT: Capture files immediately before any async work!
     // The browser clears e.dataTransfer after the sync part of the handler completes
     const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length === 0) {
-      return;
-    }
-
-    // Ensure a chat and FS exist before writing files
-    const activeFs = await ensureFs();
-
-    setIsProcessing(true);
-    try {
-      for (const file of droppedFiles) {
-        try {
-          // Process file (converts XLSX to CSV automatically)
-          const processedFiles = await processUploadedFile(file);
-
-          for (const processed of processedFiles) {
-            await activeFs.createFile(processed.path, processed.content, processed.contentType);
-            openFile(processed.path);
-          }
-        } catch (error) {
-          console.error(`Error processing file ${file.name}:`, error);
-        }
-      }
-    } finally {
-      setIsProcessing(false);
+    if (droppedFiles.length > 0) {
+      await uploadFiles(droppedFiles);
     }
   };
 
@@ -523,16 +508,6 @@ export function ArtifactsDrawer() {
             />
           );
         }
-        if (lang === "sh" || lang === "bash") {
-          return (
-            <BashEditor
-              key={editorKey}
-              initialScript={activeFileData.content}
-              onRunReady={onRunReady}
-              onRunningChange={setIsRunning}
-            />
-          );
-        }
         return <CodeEditor key={editorKey} content={activeFileData.content} language={lang} />;
       }
       default:
@@ -580,7 +555,6 @@ export function ArtifactsDrawer() {
   const isEmpty = !activeFile && files.length === 0;
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: File drag-and-drop requires drag events on the drawer surface.
     <div
       className="h-full flex flex-col overflow-hidden animate-in fade-in duration-200 relative pt-2 md:pt-0 bg-neutral-50 dark:bg-neutral-950"
       onDragEnter={handleDragEnter}
@@ -613,9 +587,9 @@ export function ArtifactsDrawer() {
         }}
       />
 
-      {/* Outer horizontal split: left = top bar + editor + terminal; right = files browser (full height) */}
+      {/* Outer horizontal split: left = top bar + editor; right = files browser (full height) */}
       <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0">
-        {/* Left column: top bar + vertical editor/terminal split */}
+        {/* Left column: top bar + editor */}
         <ResizablePanel defaultSize={75} minSize={200} className="h-full flex flex-col overflow-hidden">
           {/* Top bar — lives inside the left column so the files browser spans full drawer height */}
           <div className="@container shrink-0 h-12 md:h-10 flex items-center px-2 gap-1">
@@ -750,24 +724,7 @@ export function ArtifactsDrawer() {
                   {config.drives.map((drive) => (
                     <DropdownMenuItem
                       key={drive.id}
-                      icon={
-                        drive.icon ? (
-                          <span
-                            className="shrink-0 bg-current inline-block"
-                            style={{
-                              width: 16,
-                              height: 16,
-                              maskImage: `url(${drive.icon})`,
-                              WebkitMaskImage: `url(${drive.icon})`,
-                              maskSize: "contain",
-                              maskRepeat: "no-repeat",
-                              maskPosition: "center",
-                            }}
-                          />
-                        ) : (
-                          <HardDrive size={16} />
-                        )
-                      }
+                      icon={<DriveIcon drive={drive} />}
                       onClick={() => setActiveDrive(drive)}
                     >
                       {drive.name}
@@ -816,13 +773,7 @@ export function ArtifactsDrawer() {
                         return (
                           <button
                             type="button"
-                            onClick={async () => {
-                              try {
-                                await fs.downloadFile(activeFileData.path);
-                              } catch (error) {
-                                console.error("Failed to download file:", error);
-                              }
-                            }}
+                            onClick={() => downloadFile(activeFileData.path)}
                             className="flex items-center gap-1 px-2 py-1.5 md:px-1.5 md:py-1 rounded transition-all duration-150 ease-out text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 text-sm md:text-xs"
                             title={`Download ${getFileName(activeFileData.path)}`}
                           >
@@ -849,13 +800,7 @@ export function ArtifactsDrawer() {
                             <MenuItem>
                               <button
                                 type="button"
-                                onClick={async () => {
-                                  try {
-                                    await fs.downloadFile(activeFileData.path);
-                                  } catch (error) {
-                                    console.error("Failed to download file:", error);
-                                  }
-                                }}
+                                onClick={() => downloadFile(activeFileData.path)}
                                 className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 data-focus:bg-neutral-100 dark:data-focus:bg-neutral-800 transition-colors"
                               >
                                 <Download size={12} className="text-neutral-500" />
@@ -867,6 +812,7 @@ export function ArtifactsDrawer() {
                                 type="button"
                                 onClick={async () => {
                                   try {
+                                    const { markdownToDocx } = await import("@/shared/lib/markdownToDocx");
                                     const blob = await markdownToDocx(activeFileData.content);
                                     const baseName = getFileName(activeFileData.path).replace(/\.(md|markdown)$/i, "");
                                     downloadBlob(blob, `${baseName}.docx`);
@@ -892,64 +838,39 @@ export function ArtifactsDrawer() {
                     })()}
                 </div>
 
-                {chat?.id && <div className="w-px h-4 bg-black/10 dark:bg-white/10 mx-0.5" />}
+                {files.length > 0 && !showFilesBrowser && (
+                  <div className="w-px h-4 bg-black/10 dark:bg-white/10 mx-0.5" />
+                )}
               </>
             )}
 
-            {chat?.id && (
-              <DropdownMenu
-                anchor="bottom end"
-                trigger={
-                  <MenuButton
-                    className="flex items-center gap-0.5 p-2 md:p-1.5 rounded transition-all duration-150 ease-out text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5"
-                    title="Toggle panels"
-                  >
-                    <PanelRightOpen size={14} className="w-4 h-4 md:w-3.5 md:h-3.5" />
-                    <ChevronDown size={10} className="w-3 h-3 md:w-2.5 md:h-2.5 opacity-60" />
-                  </MenuButton>
-                }
+            {files.length > 0 && !showFilesBrowser && (
+              <button
+                type="button"
+                onClick={() => setShowFilesBrowser(true)}
+                className="flex items-center p-2 md:p-1.5 rounded transition-all duration-150 ease-out text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5"
+                title="Show files"
               >
-                {files.length > 0 && (
-                  <DropdownMenuItem
-                    icon={<Files size={12} />}
-                    selected={showFilesBrowser}
-                    onClick={() => setShowFilesBrowser((v) => !v)}
-                  >
-                    Files
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem icon={<Terminal size={12} />} selected={showTerminal} onClick={toggleTerminal}>
-                  Terminal
-                </DropdownMenuItem>
-              </DropdownMenu>
+                <PanelRightOpen size={14} className="w-4 h-4 md:w-3.5 md:h-3.5" />
+              </button>
             )}
           </div>
 
-          {/* Vertical split: editor on top, terminal on bottom */}
-          <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0">
-            <ResizablePanel defaultSize={70} minSize={20} className="h-full overflow-hidden relative z-0">
-              {renderFileEditor()}
-            </ResizablePanel>
-
-            {/* Terminal — spans only the left column, below the editor */}
-            {terminalMounted && showTerminal && (
-              <ResizablePanel defaultSize={30} minSize={80}>
-                <div className="h-full relative z-10 border-t border-black/10 dark:border-white/10 shadow-[0_-8px_20px_-2px_rgba(0,0,0,0.12)] dark:shadow-[0_-8px_20px_-2px_rgba(0,0,0,0.5)]">
-                  <BashEditor key="terminal" visible={showTerminal} />
+          {/* Editor fills the left column */}
+          <div className="flex-1 min-h-0 overflow-hidden relative z-0">
+            <Suspense
+              fallback={
+                <div className="h-full flex items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-neutral-400 dark:text-neutral-500" />
                 </div>
-              </ResizablePanel>
-            )}
-          </ResizablePanelGroup>
-
-          {/* Keep terminal mounted but hidden when closed */}
-          {terminalMounted && !showTerminal && (
-            <div className="hidden">
-              <BashEditor key="terminal" visible={false} />
-            </div>
-          )}
+              }
+            >
+              {renderFileEditor()}
+            </Suspense>
+          </div>
         </ResizablePanel>
 
-        {/* Files browser — right panel spanning full drawer height (including header and over terminal) */}
+        {/* Files browser — right panel shown alongside the editor */}
         {files.length > 0 && fs && showFilesBrowser && (
           <ResizablePanel defaultSize={25} minSize={120}>
             <div className="h-full overflow-hidden border-l border-black/10 dark:border-white/10">
@@ -960,6 +881,7 @@ export function ArtifactsDrawer() {
                 onFileClick={openFile}
                 drives={config.drives}
                 isProcessing={isProcessing}
+                onClose={() => setShowFilesBrowser(false)}
                 onUploadLocal={() => fileInputRef.current?.click()}
                 onUploadDrive={(drive) => setActiveDrive(drive)}
                 onDownloadAll={async () => {
@@ -970,13 +892,7 @@ export function ArtifactsDrawer() {
                     notify.error("Download failed", "The files couldn't be downloaded. Please try again.");
                   }
                 }}
-                onDownloadFile={async (path) => {
-                  try {
-                    await fs.downloadFile(path);
-                  } catch (error) {
-                    console.error("Failed to download file:", error);
-                  }
-                }}
+                onDownloadFile={downloadFile}
               />
             </div>
           </ResizablePanel>

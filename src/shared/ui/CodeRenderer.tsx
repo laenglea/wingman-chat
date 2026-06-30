@@ -4,12 +4,6 @@ import { useTheme } from "@/shell/hooks/useTheme";
 import { CopyButton } from "./CopyButton";
 import { RendererFrame } from "./renderers/RendererFrame";
 
-let shikiPromise: Promise<typeof import("shiki")> | null = null;
-function getShiki() {
-  if (!shikiPromise) shikiPromise = import("shiki");
-  return shikiPromise;
-}
-
 const HIGHLIGHT_DEBOUNCE_MS = 120;
 const MAX_HIGHLIGHT_CACHE_SIZE = 200;
 const MAX_BLOCK_HIGHLIGHT_CACHE_SIZE = 200;
@@ -112,7 +106,7 @@ const CodeRenderer = memo(
 
       const highlight = async () => {
         try {
-          const { codeToHtml } = await getShiki();
+          const { codeToHtml } = await import("shiki");
           const highlighted = await codeToHtml(code, {
             lang: normalizedLanguage,
             theme: isDark ? "one-dark-pro" : "one-light",

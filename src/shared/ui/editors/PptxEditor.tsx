@@ -75,7 +75,6 @@ export const PptxEditor = memo(function PptxEditor({ path, content, contentType 
         <div className="flex items-center gap-2">
           {result.slides.map((_, i) => (
             <button
-              // biome-ignore lint/suspicious/noArrayIndexKey: slides are static once converted
               key={i}
               ref={(el) => {
                 thumbRefs.current[i] = el;
@@ -216,7 +215,7 @@ function useSlideThumbnails(htmlSlides: string[] | undefined, slideW: number, sl
           await new Promise<void>((resolve) => setTimeout(resolve, 80));
 
           try {
-            const { default: html2canvas } = await import("html2canvas");
+            const html2canvas = (await import("html2canvas")).default;
             const body = iframe.contentDocument?.body;
             if (!body) continue;
 
@@ -249,7 +248,7 @@ function useSlideThumbnails(htmlSlides: string[] | undefined, slideW: number, sl
       }
     }
 
-    render();
+    void render();
     return () => {
       cancelled = true;
     };

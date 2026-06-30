@@ -5,9 +5,9 @@ import "./index.css";
 import App from "./App.tsx";
 
 import { loadNotebooks } from "./features/notebook/lib/notebooks.ts";
-import { initTelemetry } from "./features/repository/lib/telemetry";
 import { loadConfig } from "./shared/config.ts";
 import { prepareInitialEmojiRendering } from "./shared/lib/noto-emoji.ts";
+import { errorText } from "./shared/lib/errors.ts";
 
 /**
  * Display a fatal error message to the user when the app fails to start.
@@ -44,7 +44,7 @@ const showFatalError = (title: string, message: string, error?: unknown) => {
           max-width: 600px;
           overflow: auto;
           text-align: left;
-        ">${error instanceof Error ? error.message : String(error)}</pre>`
+        ">${errorText(error)}</pre>`
             : ""
         }
         <button onclick="location.reload()" style="
@@ -67,6 +67,8 @@ const bootstrap = async () => {
     const [config] = await Promise.all([loadConfig(), loadNotebooks(), prepareInitialEmojiRendering()]);
 
     if (config?.telemetry) {
+      // Loaded on demand so the OpenTelemetry SDK stays out of the initial bundle.
+      const { initTelemetry } = await import("./features/repository/lib/telemetry");
       initTelemetry();
     }
 
@@ -93,4 +95,4 @@ const bootstrap = async () => {
   }
 };
 
-bootstrap();
+void bootstrap();

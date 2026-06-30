@@ -1,5 +1,4 @@
 import { Dialog, Transition } from "@headlessui/react";
-import JSZip from "jszip";
 import {
   ArrowLeft,
   Check,
@@ -242,7 +241,7 @@ export function SkillCatalog({
 
   const openPreview = useCallback(
     (skill: Skill) => {
-      discardAndRun(() => {
+      void discardAndRun(() => {
         setSelectedSkill(skill);
         setEditMode(false);
       });
@@ -338,7 +337,7 @@ export function SkillCatalog({
 
   const switchTab = useCallback(
     (next: "mine" | "templates") => {
-      discardAndRun(() => {
+      void discardAndRun(() => {
         setTab(next);
         setSearch("");
         setTemplateCategory("");
@@ -356,7 +355,7 @@ export function SkillCatalog({
       setSelectedTemplate(template);
       setTemplateContent(null);
       setTemplateLoading(true);
-      loadTemplate(template.path)
+      void loadTemplate(template.path)
         .then((parsed) => setTemplateContent(parsed))
         .finally(() => setTemplateLoading(false));
     },
@@ -400,6 +399,7 @@ export function SkillCatalog({
     for (const file of files) {
       try {
         if (file.name.endsWith(".zip")) {
+          const JSZip = (await import("jszip")).default;
           const zip = await JSZip.loadAsync(file);
           for (const [filename, zipEntry] of Object.entries(zip.files)) {
             if (zipEntry.dir || !filename.endsWith(".md")) continue;

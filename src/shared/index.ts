@@ -11,9 +11,9 @@ export { Client } from "./lib/client";
 // Lib - Copy
 export type { CopyOptions } from "./lib/copy";
 export { copyToClipboard } from "./lib/copy";
-// Lib - Document conversion
-export { docxToMarkdown } from "./lib/docx";
-export { markdownToDocx } from "./lib/markdownToDocx";
+// Lib - Document conversion: import these directly from their modules. They pull
+// in heavy deps (docx, jszip), so re-exporting them here would anchor those into
+// any chunk that touches the barrel.
 // Lib - Media types
 export { isAudioUrl, isVideoUrl } from "./lib/mediaTypes";
 // Lib - Models
@@ -84,7 +84,6 @@ export {
   writeJson,
   writeText,
 } from "./lib/opfs";
-export { pptxToMarkdown } from "./lib/pptx";
 // Lib - Text utilities
 export { formatLineOutput, getLineRange, splitLines } from "./lib/text-utils";
 // Lib - Utils
@@ -97,15 +96,12 @@ export {
   formatBytes,
   getFileName,
   lookupContentType,
-  markdownToHtml,
-  markdownToText,
   parseDataUrl,
   readAsDataURL,
   resizeImageBlob,
   serializeToolResultForApi,
   simplifyMarkdown,
 } from "./lib/utils";
-export { downloadCsv, xlsxToCsv } from "./lib/xlsx";
 // Types - Chat
 export type {
   AudioContent,
