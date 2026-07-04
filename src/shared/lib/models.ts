@@ -259,3 +259,7 @@ export function modelName(id: string): string {
     })
     .join(" ");
 }
+
+export function shortModelName(id: string): string {
+  return modelName(id.replace(/-(\d{4}-\d{2}-\d{2}|\d{8})$/, ""));
+}
