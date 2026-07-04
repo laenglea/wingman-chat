@@ -12,6 +12,7 @@ import { run as agentRun } from "@/shared/lib/agent";
 import type { Client } from "@/shared/lib/client";
 import { getErrorInfo } from "@/shared/lib/errors";
 import { notify } from "@/shared/lib/notify";
+import { trimBulkyToolHistory } from "@/shared/lib/toolHistoryTrim";
 import type {
   Content,
   Message,
@@ -603,7 +604,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
             verbosity: model?.verbosity,
             signal: abortController.signal,
           },
-          prepareMessages: (msgs) => injectContext(stripHistoryImages(pruneAtSummary(msgs)), now),
+          prepareMessages: (msgs) =>
+            injectContext(stripHistoryImages(trimBulkyToolHistory(pruneAtSummary(msgs))), now),
           onTurnStart: () => {
             updateStreamingMessage({ chatId: id, message: { role: Role.Assistant, content: [] } });
           },
