@@ -45,7 +45,27 @@ Current AI design clusters on three looks: (1) warm cream (~#F4F1EA) + high-cont
 terracotta accent; (2) near-black + a single acid-green/vermilion accent; (3) broadsheet layout with
 hairline rules, zero radius, dense columns. All are legitimate _for some briefs_, but they appear
 regardless of subject. Where the brief pins a direction, follow it exactly. Where it leaves an axis
-free, **don't spend that freedom on a default** — make a choice for _this_ subject.
+free, **don't spend that freedom on a default** — make a choice for _this_ subject. Once built,
+`read_skill ai-slop-check` catches what slipped through.
+
+## Numbers to build on
+
+Vague taste produces generic output; concrete scales produce intentional output. Pick these once, up
+front, and reference them everywhere instead of inventing values inline:
+
+- **Spacing** — a 4px or 8px scale (`4/8/16/24/40/64`). Off-scale padding/margins read as chaotic.
+- **Type** — a defined scale (`12/14/16/18/20/24/30/36/48`), 1–2 font families max, real weight/width
+  pairing rather than two near-identical sans-serifs.
+- **Color** — subtly toned white/black (`#FAFAFA`/`#1A1A1A`, or toned to the palette's hue), never
+  pure `#FFFFFF`/`#000000`. Building a palette from scratch, use `oklch()` with matched lightness/
+  chroma and varied hue so colors feel related instead of arbitrary.
+- **Motion** — `0.2–0.3s ease` transitions on hover/active/focus; wrap in
+  `@media (prefers-reduced-motion: reduce)`.
+- **Focus** — never `outline: none` without a replacement:
+  `button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }`
+- **Contrast** — 4.5:1 body text, 3:1 large text and UI components (WCAG AA floor).
+- **One CTA per screen.** Everything else is visibly secondary — competing same-weight buttons cause
+  paralysis, not choice.
 
 ## Process: plan → critique → build
 
@@ -72,3 +92,8 @@ Words are design material, not decoration. Write from the user's side of the scr
 what people control, not how the system is built). Active voice; an action keeps its name through the
 flow ("Publish" → "Published"). Treat errors and empty states as direction, not mood. Sentence case,
 plain verbs, no filler; each element does exactly one job.
+
+## Before it ships
+
+Before handing off anything interactive, `read_skill polish-pass` — it runs the AI-slop, hierarchy/
+rhythm, interaction-state, and accessibility checks together and fixes what's found.
