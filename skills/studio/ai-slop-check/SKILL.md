@@ -1,6 +1,6 @@
 ---
 name: ai-slop-check
-description: Scan a Studio HTML/UI build for generic AI-template visual tropes — gradients, emoji decoration, rounded-corner-with-left-border cards, hand-drawn SVG, overused fonts, the cream+serif+terracotta house style — and fix them. Use when a build risks reading as generic, right after any greenfield hi-fi HTML build, or when asked "does this look AI-generated" / "remove the slop".
+description: Scan a Studio HTML/UI build for generic AI-template visual tropes — gradients, emoji decoration, rounded-corner-with-left-border cards, hand-drawn SVG, overused fonts, the cream+serif+terracotta house style — and fix them. Use when asked "does this look AI-generated" / "remove the slop", when a mid-iteration build risks reading as generic, or as part of polish-pass (which already includes this check — don't run both at ship time).
 ---
 
 # AI Slop Check

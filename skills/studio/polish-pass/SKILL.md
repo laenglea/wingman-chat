@@ -18,7 +18,7 @@ itself before checking. Tell each agent explicitly: report every issue including
 ones, with a severity estimate — filtering happens after aggregation, not by self-censoring in the
 agent.
 
-1. `read_skill accessibility-review` and audit contrast, semantic HTML, keyboard/focus, and
+1. `read_skill accessibility-pass` and audit contrast, semantic HTML, keyboard/focus, and
    motion/forms.
 2. `read_skill ai-slop-check` and scan for gradients, emoji, trope cards, weak illustration,
    overused fonts, the cream/serif/terracotta house style.
