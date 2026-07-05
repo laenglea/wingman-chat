@@ -57,7 +57,7 @@ export function ChatInput() {
     chat,
   } = useChat();
   const { currentAgent, setCurrentAgent, setShowAgentDrawer } = useAgents();
-  const { isAvailable: artifactsAvailable } = useArtifacts();
+  const { isAvailable: artifactsAvailable, fs: artifactsFs } = useArtifacts();
   const { profile } = useSettings();
   const {
     isAvailable: isScreenCaptureAvailable,
@@ -120,6 +120,15 @@ export function ChatInput() {
   const [transcribingContent, setTranscribingContent] = useState(false);
   const [voiceTextInput, setVoiceTextInput] = useState("");
 
+  // Attachments are written to the workspace root by name at send, so new
+  // uploads must not reuse a name a previous message already persisted.
+  const getTakenFileNames = useCallback(async () => {
+    if (!artifactsFs) return new Set<string>();
+    const entries = await artifactsFs.listEntries();
+    // Root-level entries only — uploads land at `/${name}`, so nested files can't collide.
+    return new Set(entries.filter((e) => !e.path.slice(1).includes("/")).map((e) => e.path.slice(1)));
+  }, [artifactsFs]);
+
   const {
     attachments,
     pendingFiles,
@@ -135,6 +144,7 @@ export function ChatInput() {
     artifactsAvailable,
     visionMaxFileSize: config.vision?.maxFileSize,
     artifactsMaxFileSize: config.artifacts?.maxFileSize,
+    getTakenFileNames,
   });
 
   const [activeDrive, setActiveDrive] = useState<(typeof config.drives)[number] | null>(null);
