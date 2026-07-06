@@ -270,7 +270,18 @@ export function useInternetProvider(): ToolProvider | null {
           }
         }
 
-        const guard = await client.guard(internet?.guard ?? "", instructions);
+        let guard;
+        try {
+          guard = await client.guard(internet?.guard ?? "", instructions);
+        } catch (err) {
+          return [
+            {
+              type: "text" as const,
+              text: "The Guardrail system is not available. Please try again later.",
+            },
+          ];
+        }
+
         if (guard.flagged) {
           const categories = guard.categories.map((c) => c.name).join(", ");
           return [
