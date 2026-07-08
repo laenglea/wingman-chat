@@ -289,7 +289,7 @@ function ModelDropdownRoot({
 
   const click = useClick(context);
   const role = useRole(context, { role: "menu" });
-  const dismiss = useDismiss(context, { bubbles: true });
+  const dismiss = useDismiss(context, { bubbles: { escapeKey: false, outsidePress: true } });
   const { getReferenceProps, getFloatingProps } = useInteractions([click, role, dismiss]);
 
   const { isMounted, styles: transitionStyles } = useTransitionStyles(context, {
@@ -368,7 +368,7 @@ function ModelDropdownRoot({
         {isMounted && (
           <FloatingPortal>
             <FloatingFocusManager context={context} modal={false} initialFocus={-1} returnFocus>
-              <div ref={refs.setFloating} style={floatingStyles} className="z-50" {...getFloatingProps()}>
+              <div ref={refs.setFloating} style={floatingStyles} className="z-9999" {...getFloatingProps()}>
                 <div
                   style={transitionStyles}
                   className={cn(PANEL_CLASS, "flex flex-col overflow-hidden", dropdownClassName)}

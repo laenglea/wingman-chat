@@ -273,7 +273,7 @@ export function useInternetProvider(): ToolProvider | null {
         let guard;
         try {
           guard = await client.guard(internet?.guard ?? "", instructions);
-        } catch (err) {
+        } catch {
           return [
             {
               type: "text" as const,

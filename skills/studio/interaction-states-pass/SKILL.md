@@ -39,7 +39,12 @@ custom widget (dropdown, accordion, modal, popover).
 State changes should be smooth, not snapped:
 
 ```css
-button { transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
+button {
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
 ```
 
 0.15–0.3s for hover/focus/active; 0.3–0.5s for modals/drawers/toasts entering or leaving. Faster

@@ -6,7 +6,7 @@ description: Scan a Studio HTML/UI build for generic AI-template visual tropes �
 # AI Slop Check
 
 Scan for the visual tropes that make a design read as "AI-generated template" rather than
-intentional. A page indistinguishable from a hundred other AI outputs failed to look like *this*
+intentional. A page indistinguishable from a hundred other AI outputs failed to look like _this_
 subject's design. Fix everything found, directly in the file — this isn't a report to hand back,
 it's a pass with your hands on the code.
 
@@ -23,7 +23,7 @@ family.
 the layout leaned on the emoji for visual weight, swap in a real icon (Feather, Material, Phosphor,
 Heroicons) or fix the typographic hierarchy instead.
 
-**Cards.** `border-radius: 12px; border-left: 4px solid #...` as the *default* container style → a
+**Cards.** `border-radius: 12px; border-left: 4px solid #...` as the _default_ container style → a
 subtle shadow, thin all-around border, or background contrast. Keep the left-border only where it's
 semantic (callout, alert, status) or matches an existing design system.
 

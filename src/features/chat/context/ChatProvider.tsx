@@ -696,8 +696,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
             verbosity: model?.verbosity,
             signal: abortController.signal,
           },
-          prepareMessages: (msgs) =>
-            injectContext(stripHistoryImages(trimBulkyToolHistory(pruneAtSummary(msgs))), now),
+          prepareMessages: (msgs) => injectContext(stripHistoryImages(trimBulkyToolHistory(pruneAtSummary(msgs))), now),
           onTurnStart: () => {
             updateStreamingMessage({ chatId: id, message: { role: Role.Assistant, content: [] } });
           },
