@@ -10,30 +10,14 @@
  */
 
 import type { Message } from "@/shared/types/chat";
+import { elideToolArguments } from "@/shared/lib/toolHistoryTrim";
 
 const MAX_TOOL_TEXT_CHARS = 1500;
+const TOOL_PREVIEW_CHARS = 1200;
 
 function truncate(text: string): string {
   if (text.length <= MAX_TOOL_TEXT_CHARS) return text;
-  return `${text.slice(0, MAX_TOOL_TEXT_CHARS)}\n…[truncated ${text.length - MAX_TOOL_TEXT_CHARS} chars — re-read the source if you need the full current text]`;
-}
-
-/** Elide long string fields inside a tool-call arguments JSON (e.g. source_create_file content). */
-function compactArguments(raw: string): string {
-  if (raw.length <= MAX_TOOL_TEXT_CHARS) return raw;
-  try {
-    const args = JSON.parse(raw) as Record<string, unknown>;
-    let changed = false;
-    for (const [key, value] of Object.entries(args)) {
-      if (typeof value === "string" && value.length > MAX_TOOL_TEXT_CHARS) {
-        args[key] = truncate(value);
-        changed = true;
-      }
-    }
-    return changed ? JSON.stringify(args) : raw;
-  } catch {
-    return raw;
-  }
+  return `${text.slice(0, TOOL_PREVIEW_CHARS)}\n…[truncated ${text.length - TOOL_PREVIEW_CHARS} chars — re-read the source if you need the full current text]`;
 }
 
 /** Return a copy of an agent message with bulky tool payloads truncated. */
@@ -41,13 +25,19 @@ export function compactAgentMessage(message: Message): Message {
   let changed = false;
   const content = message.content.map((part) => {
     if (part.type === "tool_call") {
-      const args = compactArguments(part.arguments);
+      const args = elideToolArguments(part.arguments, {
+        maxChars: MAX_TOOL_TEXT_CHARS,
+        previewChars: TOOL_PREVIEW_CHARS,
+      });
       if (args === part.arguments) return part;
       changed = true;
       return { ...part, arguments: args };
     }
     if (part.type === "tool_result") {
-      const args = compactArguments(part.arguments);
+      const args = elideToolArguments(part.arguments, {
+        maxChars: MAX_TOOL_TEXT_CHARS,
+        previewChars: TOOL_PREVIEW_CHARS,
+      });
       const result = part.result.map((r) => {
         if (r.type !== "text" || r.text.length <= MAX_TOOL_TEXT_CHARS) return r;
         return { ...r, text: truncate(r.text) };

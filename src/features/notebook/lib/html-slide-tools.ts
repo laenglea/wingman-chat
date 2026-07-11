@@ -7,6 +7,7 @@ import type { Client } from "@/shared/lib/client";
 import { blobToDataUrl } from "@/shared/lib/opfs-core";
 import type { Message, TextContent, Tool } from "@/shared/types/chat";
 import type { File } from "@/shared/types/file";
+import { elideToolArguments } from "@/shared/lib/toolHistoryTrim";
 import { assembleSlideHtml } from "./html-slide-assembly";
 import { notebookImageOptions } from "./image-options";
 import { CANVAS_H, CANVAS_W } from "./pptx-utils";
@@ -814,8 +815,6 @@ export function createHtmlSlideTools(
 
 // ── Conversation pruning ──────────────────────────────────────────────
 
-const ELIDED_NOTE = "…elided to save context — call read_file(path) for the current content…";
-
 /**
  * `prepareMessages` hook for slide-generation runs: every write_file /
  * edit_file tool call carries full file content in its arguments and is
@@ -845,30 +844,11 @@ export function pruneSlideWriteHistory(messages: Message[], keepRecent = 2): Mes
       if (part.type !== "tool_call") return part;
       if (part.name !== "write_file" && part.name !== "edit_file") return part;
       if (protectedIds.has(part.id)) return part;
-      const pruned = elideBulkyArguments(part.arguments);
+      const pruned = elideToolArguments(part.arguments, { maxChars: 256, previewChars: 0 });
       if (pruned === part.arguments) return part;
       changed = true;
       return { ...part, arguments: pruned };
     });
     return changed ? { ...message, content } : message;
   });
-}
-
-/** Replace long string fields in a tool-call arguments JSON with a stub. */
-function elideBulkyArguments(raw: string): string {
-  try {
-    const args = JSON.parse(raw) as Record<string, unknown>;
-    let changed = false;
-    for (const key of ["content", "find", "replace"]) {
-      const value = args[key];
-      if (typeof value === "string" && value.length > 256) {
-        args[key] = ELIDED_NOTE;
-        changed = true;
-      }
-    }
-    return changed ? JSON.stringify(args) : raw;
-  } catch {
-    // Unparseable arguments (model mis-escaped) — leave untouched.
-    return raw;
-  }
 }

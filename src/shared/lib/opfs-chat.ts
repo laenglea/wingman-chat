@@ -78,6 +78,7 @@ export type StoredContent =
 export interface StoredMessage {
   role: "user" | "assistant";
   content: StoredContent[];
+  usage?: Message["usage"];
   error?: { code: string; message: string } | null;
 }
 
@@ -164,6 +165,7 @@ export async function extractMessageBlobsForChat(chatId: string, message: Messag
   return {
     role: message.role,
     content: extractedContent,
+    usage: message.usage,
     error: message.error,
   };
 }
@@ -177,6 +179,7 @@ export async function rehydrateMessageBlobsForChat(chatId: string, message: Stor
   return {
     role: message.role,
     content: rehydratedContent,
+    usage: message.usage,
     error: message.error,
   };
 }

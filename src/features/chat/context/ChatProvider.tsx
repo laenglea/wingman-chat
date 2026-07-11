@@ -14,15 +14,8 @@ import { getErrorInfo } from "@/shared/lib/errors";
 import { compactThreshold } from "@/shared/lib/models";
 import { notify } from "@/shared/lib/notify";
 import { trimBulkyToolHistory } from "@/shared/lib/toolHistoryTrim";
-import type {
-  Content,
-  Message,
-  Model,
-  TextContent,
-  ToolCallContent,
-  ToolContext,
-  ToolResultContent,
-} from "@/shared/types/chat";
+import { serializeToolResultForApi } from "@/shared/lib/utils";
+import type { Content, Message, Model, TextContent, ToolCallContent, ToolContext } from "@/shared/types/chat";
 import { Role } from "@/shared/types/chat";
 import type {
   ConsentResult,
@@ -41,7 +34,9 @@ function messagesSinceSummary(messages: Message[]): Message[] {
   return idx > 0 ? messages.slice(idx) : messages;
 }
 
-const SKILL_TOOL_NAMES = new Set(["read_skill", "read_skill_resource"]);
+function isUserMessage(message: Message): boolean {
+  return message.role === Role.User && message.content.some((part) => part.type !== "tool_result");
+}
 
 /**
  * Skill instructions are durable behavioral guidance, so they must survive
@@ -51,11 +46,32 @@ const SKILL_TOOL_NAMES = new Set(["read_skill", "read_skill_resource"]);
  * another tool call in the same turn would otherwise have its sibling result
  * pruned, leaving an orphaned function_call the Responses API rejects.
  */
-function preservedSkillContent(message: Message): Message[] {
-  const texts = message.content
-    .filter((p): p is ToolResultContent => p.type === "tool_result" && SKILL_TOOL_NAMES.has(p.name))
-    .flatMap((p) => p.result.filter((r): r is TextContent => r.type === "text").map((r) => r.text));
-  return texts.length ? [{ role: Role.Assistant, content: texts.map((text) => ({ type: "text", text })) }] : [];
+function preservedSkillMessages(messages: Message[]): Message[] {
+  const skills = new Map<string, string>();
+
+  for (const message of messages) {
+    for (const part of message.content) {
+      if (part.type !== "tool_result" || part.name !== "read_skill") continue;
+      const raw = part.result.find((item): item is TextContent => item.type === "text")?.text;
+      if (!raw) continue;
+
+      try {
+        const parsed = JSON.parse(raw) as { name?: unknown; instructions?: unknown };
+        if (typeof parsed.name !== "string" || typeof parsed.instructions !== "string") continue;
+        // Refresh insertion order when a skill was read more than once so the
+        // most recently loaded instructions win without duplicating them.
+        skills.delete(parsed.name);
+        skills.set(parsed.name, parsed.instructions);
+      } catch {
+        // Failed skill reads and legacy non-JSON results are not durable guidance.
+      }
+    }
+  }
+
+  return [...skills].map(([name, instructions]) => ({
+    role: Role.Assistant,
+    content: [{ type: "text", text: `[Active skill: ${name}]\n${instructions}` }],
+  }));
 }
 
 /** Drop messages before the last summary marker so API requests stay small,
@@ -64,7 +80,7 @@ function pruneAtSummary(messages: Message[]): Message[] {
   const idx = messages.findLastIndex((m) => m.content.some((p) => p.type === "summary"));
   if (idx <= 0) return messages;
 
-  const preserved = messages.slice(0, idx).flatMap(preservedSkillContent);
+  const preserved = preservedSkillMessages(messages.slice(0, idx));
   const pruned = [...preserved, ...messages.slice(idx)];
   if (pruned.length < messages.length) {
     console.log(`[Summary] Pruning ${messages.length - pruned.length} messages before summary marker`);
@@ -76,7 +92,7 @@ function pruneAtSummary(messages: Message[]): Message[] {
 // the last human turn, not a tool result. `now` is captured once per run so the loop
 // keeps a stable, cacheable prefix.
 function injectContext(messages: Message[], now: Date): Message[] {
-  const idx = messages.findLastIndex((m) => m.role === Role.User && m.content.some((p) => p.type !== "tool_result"));
+  const idx = messages.findLastIndex(isUserMessage);
   if (idx < 0) return messages;
 
   const platform = window.innerWidth < 768 ? "mobile" : "desktop";
@@ -145,18 +161,20 @@ function estimateTokens(messages: Message[]): number {
   return Math.ceil(chars / 4);
 }
 
-/**
- * Wire-style view of messages for the summarizer/classifier: reasoning is
- * dropped (never replayed to the API either) and binary payloads become short
- * placeholders — JSON.stringifying megabytes of base64 into a helper-model
- * prompt would dwarf the history it's supposed to condense.
- */
-function sanitizeForSummary(messages: Message[]): Message[] {
-  const placeholder = (part: { type: string; name?: string }): TextContent => ({
+function mediaPlaceholder(part: { type: string; name?: string }): TextContent {
+  return {
     type: "text",
     text: `[${part.type}${part.name ? `: ${part.name}` : ""}]`,
-  });
+  };
+}
 
+/**
+ * Wire-style view of messages for the summarizer: reasoning is dropped (never
+ * replayed to the API either) and binary payloads become short placeholders —
+ * JSON.stringifying megabytes of base64 into the helper-model prompt would
+ * dwarf the history it's supposed to condense.
+ */
+function sanitizeForSummary(messages: Message[]): Message[] {
   return messages.map((m) => ({
     role: m.role,
     content: m.content.flatMap((part): Content[] => {
@@ -166,16 +184,18 @@ function sanitizeForSummary(messages: Message[]): Message[] {
         case "image":
         case "audio":
         case "file":
-          return [placeholder(part)];
+          return [mediaPlaceholder(part)];
         case "tool_result":
-          // meta/content are UI-only; binary results become placeholders.
+          // arguments duplicate the paired tool_call and are only used by the
+          // UI. Results use the same compact representation as the API wire.
+          const output = serializeToolResultForApi(part.result);
           return [
             {
               type: "tool_result",
               id: part.id,
               name: part.name,
-              arguments: part.arguments,
-              result: part.result.map((r) => (r.type === "text" ? r : placeholder(r))),
+              arguments: "",
+              result: output ? [{ type: "text", text: output }] : [],
             },
           ];
         default:
@@ -183,6 +203,25 @@ function sanitizeForSummary(messages: Message[]): Message[] {
       }
     }),
   }));
+}
+
+/** Recent human/assistant prose for title, category, and risk classification. */
+function sanitizeForClassification(messages: Message[]): Message[] {
+  const recent: Message[] = [];
+
+  for (let i = messages.length - 1; i >= 0 && recent.length < 6; i--) {
+    const message = messages[i];
+    const content = message.content.flatMap((part): Content[] => {
+      if (part.type === "text" || part.type === "summary") return [part];
+      if (part.type === "image" || part.type === "audio" || part.type === "file") {
+        return [mediaPlaceholder(part)];
+      }
+      return [];
+    });
+    if (content.length > 0) recent.unshift({ role: message.role, content });
+  }
+
+  return recent;
 }
 
 function estimateWindowTokens(window: Message[]): number {
@@ -542,15 +581,16 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const defaultThreshold = classificationCfg?.threshold ?? 0.5;
       const hasCategories = categoryConfigs.length > 0;
       const hasRisks = riskConfigs.length > 0;
-      const needsTitle = !initialTitle || conversation.length % 6 === 1;
+      const userTurnCount = conversation.filter(isUserMessage).length;
+      const needsTitle = !initialTitle || userTurnCount % 3 === 1;
       if (needsTitle || hasCategories || hasRisks) {
         const summarizerModel = classificationCfg?.model || config.chat?.summarizer || currentModel.id;
         client
           .classifyChat(
             summarizerModel,
-            // Wire-style view: the classifier reads the last few messages as
-            // JSON — inline base64 images/files would be re-uploaded every turn.
-            sanitizeForSummary(conversation),
+            // Classification concerns user intent, not tool implementation or
+            // output. Keep only recent prose and lightweight media placeholders.
+            sanitizeForClassification(conversation),
             categoryConfigs.map((c) => ({ id: categorySlug(c.name), description: c.description })),
             riskConfigs.map((r) => ({ id: riskSlug(r.name), description: r.description })),
           )
