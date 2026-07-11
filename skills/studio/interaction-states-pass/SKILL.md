@@ -1,6 +1,6 @@
 ---
 name: interaction-states-pass
-description: Verify every interactive element in an HTML/UI Studio build has hover, active, focus, disabled, and loading states plus smooth transitions and clear action feedback; add what's missing. Use before shipping anything clickable, or as part of polish-pass.
+description: Check an HTML/UI Studio build's hover, active, focus, disabled, and loading states, then fix what's missing. Use only when the user explicitly requests an interaction-state review or a polish-pass.
 ---
 
 # Interaction States Pass

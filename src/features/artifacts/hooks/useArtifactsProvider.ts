@@ -1,5 +1,6 @@
 import { Braces, Shapes, SquareCode } from "lucide-react";
 import { useCallback, useMemo, useRef } from "react";
+import { ARTIFACT_VALIDATORS, validateArtifactFile } from "@/features/artifacts/lib/artifactValidators";
 import type { FileSystemManager } from "@/features/artifacts/lib/fs";
 import artifactsInstructionsText from "@/features/artifacts/prompts/artifacts.txt?raw";
 import interpreterInstructionsText from "@/features/artifacts/prompts/interpreter.txt?raw";
@@ -17,6 +18,7 @@ import { executeJavaScript } from "@/features/tools/lib/javascript";
 import { withSandboxLock } from "@/features/tools/lib/sandboxLock";
 import { mountSkillFiles } from "@/features/tools/lib/skillResourceMount";
 import { getConfig } from "@/shared/config";
+import { formatArtifactValidationIssue } from "@/shared/lib/artifact-validation";
 import { createFileTools, type FileData, type FileEntry, type WritableFileSource } from "@/shared/lib/file-tools";
 import { isDataUrl } from "@/shared/lib/fileContent";
 import { normalizeArtifactPath } from "@/shared/lib/sandbox";
@@ -80,6 +82,39 @@ function mergeSkillFiles(base: SandboxFiles, skillFiles: SandboxFiles): Set<stri
   return injected;
 }
 
+interface SnapshotValidation {
+  errors: string[];
+  warnings: string[];
+}
+
+/** Validate changed artifacts after an executor snapshot is committed. */
+async function validateChangedArtifactFiles(before: SandboxFiles, after: SandboxFiles): Promise<SnapshotValidation> {
+  const report: SnapshotValidation = { errors: [], warnings: [] };
+  for (const [path, file] of Object.entries(after)) {
+    const previous = before[path];
+    if (previous?.content === file.content && previous.contentType === file.contentType) continue;
+    const validation = await validateArtifactFile({ path, content: file.content, contentType: file.contentType });
+    report.errors.push(...validation.errors.map((issue) => `${path}: ${formatArtifactValidationIssue(issue)}`));
+    report.warnings.push(...validation.warnings.map((issue) => `${path}: ${formatArtifactValidationIssue(issue)}`));
+  }
+  return report;
+}
+
+function formatSnapshotValidation(report: SnapshotValidation): string {
+  const sections: string[] = [];
+  if (report.errors.length) {
+    sections.push(
+      `Validation errors (files were saved; continue editing and fix before finishing):\n${report.errors
+        .map((error) => `- ${error}`)
+        .join("\n")}`,
+    );
+  }
+  if (report.warnings.length) {
+    sections.push(`Validation warnings:\n${report.warnings.map((warning) => `- ${warning}`).join("\n")}`);
+  }
+  return sections.length ? `\n${sections.join("\n")}` : "";
+}
+
 /**
  * Adapt FileSystemManager into a WritableFileSource for the shared file tools.
  */
@@ -140,7 +175,7 @@ export function useArtifactsProvider(): ToolProvider | null {
 
   const artifactsTools = useCallback((): Tool[] => {
     const fsAdapter = createFsAdapter(fsRef);
-    const fileTools = createFileTools(fsAdapter);
+    const fileTools = createFileTools(fsAdapter, { validators: ARTIFACT_VALIDATORS });
 
     const contextTools: Tool[] = [
       {
@@ -231,7 +266,9 @@ export function useArtifactsProvider(): ToolProvider | null {
                   path: file.path,
                   contentType: file.contentType,
                   binary: true,
-                  note: "Binary file. Use the Python tool to process it at /home/user/.",
+                  note: file.contentType?.startsWith("image/")
+                    ? "Binary image. If it is visible in the conversation, inspect it directly with built-in vision. Otherwise use the vision/OCR helper only as needed."
+                    : "Binary file. Use the appropriate Python or JavaScript library only when programmatic processing is needed.",
                 }
               : {
                   path: file.path,
@@ -270,7 +307,7 @@ export function useArtifactsProvider(): ToolProvider | null {
           },
         },
         description:
-          "Execute Python code with optional package dependencies. Pass the full script body in `code` (use `path` instead to run an existing .py artifact). For long scripts heavy with quotes or backslashes (regex, nested strings), prefer writing the script to a .py artifact first and running it via `path` — this avoids JSON-escaping mistakes in the `code` string. All artifact files are available under /home/user/, and files created, modified, or deleted there are synced back. To run a skill's bundled scripts, pass its name(s) in `skills`: its resources mount read-only under /home/user/skills/<name>/ for that run (e.g. `import runpy; runpy.run_path('skills/<name>/scripts/extract.py')`).",
+          "Execute Python code when the task requires computation, programmatic file processing, transformation, batch work, or file generation. Do not use it merely to inspect or OCR an image already included in the user's message; use built-in vision for that. Pass the full script body in `code` (use `path` instead to run an existing .py artifact). For long scripts heavy with quotes or backslashes (regex, nested strings), prefer writing the script to a .py artifact first and running it via `path` — this avoids JSON-escaping mistakes in the `code` string. All artifact files are available under /home/user/, and files created, modified, or deleted there are synced back. To run a skill's bundled scripts, pass its name(s) in `skills`: its resources mount read-only under /home/user/skills/<name>/ for that run (e.g. `import runpy; runpy.run_path('skills/<name>/scripts/extract.py')`).",
         strict: true,
         parameters: {
           type: "object",
@@ -368,6 +405,7 @@ export function useArtifactsProvider(): ToolProvider | null {
 
               // Sync changed files back to artifacts and surface the ones written
               // so the chat can show them as chips on the assistant's response.
+              let artifactValidation: SnapshotValidation = { errors: [], warnings: [] };
               if (fs && result.files) {
                 // Drop the read-only skill resources we mounted so they don't
                 // persist as artifacts (they were never part of the overlay).
@@ -375,9 +413,10 @@ export function useArtifactsProvider(): ToolProvider | null {
                 const summary = await fs.applyOverlaySnapshot(result.files, { deleteMissing: true });
                 const written = [...summary.createdPaths, ...summary.updatedPaths];
                 if (written.length > 0) context?.setMeta?.({ artifactFiles: written });
+                artifactValidation = await validateChangedArtifactFiles(artifactFiles, result.files);
               }
 
-              return [{ type: "text" as const, text: result.output }];
+              return [{ type: "text" as const, text: result.output + formatSnapshotValidation(artifactValidation) }];
             } catch (error) {
               return executionFailure(
                 context,
@@ -400,9 +439,12 @@ export function useArtifactsProvider(): ToolProvider | null {
         },
         description:
           "Execute JavaScript in a sandboxed Web Worker (off the UI thread, isolated from the page, no network). " +
+          "Use it only when the task requires actual execution; do not use it merely to inspect or OCR an image " +
+          "already included in the user's message, which the chat model can inspect with built-in vision. " +
           "Use it for browser-native work: WebCodecs, OffscreenCanvas, createImageBitmap, crypto.subtle, WebAssembly, " +
           "TextEncoder/Decoder, and bundled libraries available as globals when referenced: `mediabunny` (media " +
-          "transcoding), `echarts` (headless SSR charts → SVG), and `jsPDF` (PDF generation). Files are NOT mounted " +
+          "transcoding), `echarts` (headless SSR charts → SVG), `echartsSource` (browser bundle string for " +
+          "self-contained interactive chart HTML), and `jsPDF` (PDF generation). Files are NOT mounted " +
           "as a real filesystem — read and write artifacts through the injected " +
           "`vfs` helper: `vfs.read(path)` / `vfs.readBytes(path)` / `vfs.readJSON(path)` and `vfs.write(path, data, " +
           "contentType?)` / `vfs.writeBytes` / `vfs.writeJSON`, plus `vfs.list()`, `vfs.exists(path)`, `vfs.remove(path)`. " +
@@ -486,13 +528,15 @@ export function useArtifactsProvider(): ToolProvider | null {
 
               // Sync changed files back to artifacts and surface the ones written
               // so the chat can show them as chips on the assistant's response.
+              let artifactValidation: SnapshotValidation = { errors: [], warnings: [] };
               if (fs && result.files) {
                 const summary = await fs.applyOverlaySnapshot(result.files, { deleteMissing: true });
                 const written = [...summary.createdPaths, ...summary.updatedPaths];
                 if (written.length > 0) context?.setMeta?.({ artifactFiles: written });
+                artifactValidation = await validateChangedArtifactFiles(artifactFiles, result.files);
               }
 
-              return [{ type: "text" as const, text: result.output }];
+              return [{ type: "text" as const, text: result.output + formatSnapshotValidation(artifactValidation) }];
             } catch (error) {
               return executionFailure(
                 context,

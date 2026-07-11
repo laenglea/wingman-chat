@@ -1,22 +1,21 @@
 ---
 name: polish-pass
-description: Final pre-ship quality gate for an interactive or visual Studio build — checks accessibility, AI-slop tropes, hierarchy/rhythm, and interaction states (dispatched in parallel via the agent tool), then fixes what's found. Use before delivering any hi-fi HTML/UI artifact, or when asked to "polish this" / make it "ready to ship".
+description: Run a final review of accessibility, AI-template tropes, hierarchy/rhythm, and interaction states, then fix what's found. Use only when the user explicitly asks to polish the build, run final checks, or make it ready to ship.
 ---
 
 # Polish Pass
 
-The umbrella gate before an interactive/visual build goes to the user. A polished and an unpolished
+An optional umbrella review for an interactive/visual build. A polished and an unpolished
 build are the same idea at different levels of care — the gap is what people actually notice. Don't
 run this on work that's still mid-structure (broken layout, missing sections, content the user is
 still iterating on) — say so and ask whether to polish now or after the structure settles.
 
 ## Dispatch four checks
 
-Launch all four with the `agent` tool in a single message — each is a self-contained briefing (the
-agent has no access to this conversation), so pass it the file path and tell it to read the file
-itself before checking. Tell each agent explicitly: report every issue including low-confidence
-ones, with a severity estimate — filtering happens after aggregation, not by self-censoring in the
-agent.
+When the `agent` tool is available and the build is large enough to justify delegation, launch the
+four checks in parallel. Each briefing must be self-contained: pass the file path and tell the agent
+to read it before checking. Ask for concrete findings with severity and evidence, not speculative
+low-confidence lists.
 
 1. `read_skill accessibility-pass` and audit contrast, semantic HTML, keyboard/focus, and
    motion/forms.
@@ -27,8 +26,8 @@ agent.
 4. `read_skill interaction-states-pass` and inventory every interactive element for
    hover/active/disabled/focus/loading plus transitions and action feedback.
 
-If the build is small enough to hold in one pass, running all four checks yourself sequentially is
-fine — dispatch is for when parallelizing genuinely saves time, not a mandatory ritual.
+If `agent` is unavailable or the build is small, run the checks yourself. Delegation is an
+optimization, not part of the quality bar.
 
 ## Aggregate and fix
 

@@ -24,7 +24,8 @@ Start by surveying the sources with `source_list_files`, then study the material
   - **Status → Risks → Asks** (operational / steering-committee updates)
   - **Problem → Options → Decision** (decision-forcing briefs)
   - **Before → After → How** (proposal / transformation pitches)
-- **Consecutive slides must use different archetypes.** A good 10-slide deck uses 6–8 different ones.
+- **Consecutive slides must use different compositions.** Treat the archetypes below as vocabulary,
+  not quotas; use only forms earned by the material.
 - For decks of 6+ slides, include either an opening **TL;DR / Executive Summary** slide (right after the cover) or a closing **Key Takeaways** slide — preferably both.
 - Titles are insight headlines (≤ 60 chars ideal, 80 hard cap), never topic labels like "Overview" or "Conclusion".
 
@@ -36,7 +37,7 @@ Archetype menu (pick one per slide):
 5. **Full-bleed image + overlay** — photo covers the slide; text on a solid color panel (~40% width).
 6. **Quote / pull-quote** — large quote, attribution in small caps.
 7. **Data chart focus** — one chart at 60–70% of the slide; the title IS the takeaway.
-8. **KPI grid** — 3–4 stat cards: huge number, short label, tiny delta.
+8. **KPI constellation** — 2–4 genuinely comparable measures arranged around one conclusion; cards are optional.
 9. **2×2 matrix / framework** — quadrant labels, every quadrant populated.
 10. **Timeline** — 3–6 horizontal steps with date, title, one-liner.
 11. **Comparison** — two panels with identical internal structure.
@@ -48,9 +49,10 @@ Archetype menu (pick one per slide):
 Write the shared stylesheet every slide will load:
 - CSS custom properties: `--bg`, `--ink`, `--ink-muted`, `--accent`, `--accent-2`, `--muted`, `--text-xs/sm/md/lg/xl/hero`, `--space-1..8`, `--font-display`, `--font-body`. If the style block above specifies a tokens map, use those exact values.
 - Reusable classes: `.slide`, `.title`, `.subtitle`, `.caption`, `.kpi`, `.quote`, and the layout helpers your spine needs.
-- Pick exactly **one background color** for content slides (a second is allowed for section dividers — not more).
+- Declare the small field/ink/signal palette established by the chosen style. Use multiple fields only
+  when they create meaningful rhythm or section structure.
 - Recommended default slide grid (writers may override per archetype): `.slide { display: grid; grid-template-rows: 200px 1fr 100px; padding: 80px 96px; gap: 32px; }`
-- No JavaScript anywhere in the deck. Use **oklch()** or the style's stated hex palette — do not invent new colors.
+- No JavaScript anywhere in the deck. Use the declared tokens consistently; do not introduce ad hoc colors slide by slide.
 
 ### 3. The plan — `set_deck_plan(…)`
 

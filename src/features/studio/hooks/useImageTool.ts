@@ -84,7 +84,7 @@ export function useImageTool(): Tool | null {
       prompt: {
         type: "string",
         description:
-          "The image request in the user's own words. Pass it through faithfully — preserve their intent and do not invent style, lighting, or details they did not ask for. Resolve only contextual references (e.g. what 'it' refers to). When reference images are provided, describe just the changes to make.",
+          "The complete production prompt. Preserve every explicit user constraint and do not change the subject or intent. When the user delegates the look, or the image belongs inside a larger artifact, add concrete composition, palette, lighting, material, camera, and negative-space direction grounded in that brief. When editing reference images, describe the requested changes and what must remain unchanged.",
       },
       images: {
         type: "array",

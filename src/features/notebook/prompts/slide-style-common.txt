@@ -15,25 +15,28 @@ Every element on a slide must serve the message. If you can remove something and
 
 Before writing slide 1:
 
-- Pick **one** background color for content slides (a second is allowed only for section dividers).
 - Pick **at most two** type families (display + body). Declare them as `--font-display` and `--font-body`.
-- Pick a **palette of 4–6 colors max**: one dominant, one secondary, one accent, plus 1–2 neutrals. Use the 60/30/10 weighting.
+- Pick a restrained **field / ink / signal** palette and declare it as CSS variables. The palette must
+  have a traceable relationship to the subject, source imagery, or brand evidence.
 - Pick a **type scale** and **spacing scale** as CSS custom properties. Reuse them everywhere.
-- **Commit to a visual motif** — pick ONE distinctive repeated element and carry it across every slide. Examples: rounded image frames with a 2px accent border; icons housed in coloured circles in a fixed size; a thick single-side bar on the left of every title; a fixed corner ornament; a consistent caption pill. The motif is the deck's signature — it's what makes a deck feel *designed* rather than templated. Pick one, declare it as a CSS class, reuse it.
+- **Commit to one visual signature derived from the subject.** It might be a map coordinate system,
+  archival caption language, technical measurement marks, a crop behavior, a material edge, or a
+  chart annotation treatment. Repeat its logic, not necessarily the identical decoration. Generic
+  title bars, corner ornaments, icon circles, and caption pills do not become distinctive through repetition.
 
 Consistency across slides is what separates "professional deck" from "ten random slides."
 
 ### Layout Variety & Rhythm
 
-Never repeat the same archetype on consecutive slides. A good deck alternates dense/breathing, text/visual, wide/focused.
-
-A 10-slide deck should include a mix of: hero cover, section divider, hero-stat, data chart, KPI grid, framework/matrix/timeline, quote/callout, comparison, closing. Never a whole deck of "title + three bullets."
+Never repeat the same composition on consecutive slides. Alternate dense/breathing, analytical/immersive,
+wide/focused. Use only forms the content earns; do not force a KPI grid, quote, matrix, or timeline to
+complete a template checklist. Never a whole deck of "title + three bullets."
 
 ### Visual Hierarchy
 
 - Every slide has **exactly one focal point** — the element the eye hits first.
 - Use dramatic size contrast: titles are 3–5× body, hero stats 8–12×.
-- Apply 60/30/10 color weighting. Never give all colors equal weight.
+- Establish a dominant field and use signal colors sparingly. Never give all colors equal weight.
 - Key numbers are displayed **large**, with a tiny label beneath — not buried in prose.
 
 ### Typography Discipline
@@ -65,7 +68,8 @@ Bad (over cap / wraps to 3+ lines):
 
 ### Every Slide Earns its Visual
 
-No text-only slides. Every slide includes at least one of: a chart, an image, a hero number, a framework diagram, a quote treated as a visual element, or a dramatic typographic composition.
+Every slide needs a non-prose focal point: a chart, image, hero number, framework, quote treatment, or
+deliberate typographic composition. Do not add an icon or decorative chart merely to satisfy this rule.
 
 ### Claim ↔ Evidence
 

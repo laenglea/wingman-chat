@@ -1,7 +1,6 @@
 ---
 label: "Whiteboard"
 description: "Clean minimal design with hand-drawn feel and open whitespace"
-default: true
 ---
 
 ## Visual Style

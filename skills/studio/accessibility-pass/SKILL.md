@@ -1,6 +1,6 @@
 ---
 name: accessibility-pass
-description: Audit an HTML/UI Studio build for accessibility — contrast, semantic HTML, keyboard/focus, motion, forms — and fix what's found. Use when asked to "check accessibility" / "is this accessible", before shipping anything interactive, or as part of polish-pass (which includes this check — don't run both at ship time).
+description: Audit an HTML/UI Studio build for accessibility — contrast, semantic HTML, keyboard/focus, motion, forms — and fix what's found. Use only when the user explicitly requests an accessibility review or a polish-pass.
 ---
 
 # Accessibility Pass

@@ -8,6 +8,12 @@
 
 import { FilePen, FilePlus2, FileSearch, Files, FileText, FolderInput, Search, Trash2 } from "lucide-react";
 import type { TextContent, Tool } from "../types/chat";
+import {
+  type ArtifactValidationResult,
+  type ArtifactValidator,
+  formatArtifactValidationIssue,
+  validateArtifact,
+} from "./artifact-validation";
 import { isDataUrl } from "./fileContent";
 import { artifactLanguage } from "./fileTypes";
 import { formatLineOutput, getLineRange, grepText, matchGlob, splitLines, truncateLine } from "./text-utils";
@@ -60,6 +66,8 @@ export interface FileToolsOptions {
   defaultContextLines?: number;
   /** Tool name namespace prefix (e.g. "source_" for notebook). Empty string by default. */
   namespace?: string;
+  /** Optional syntax/structure validators run before text writes and extension-changing moves. */
+  validators?: readonly ArtifactValidator[];
 }
 
 const DEFAULTS: Required<FileToolsOptions> = {
@@ -70,6 +78,7 @@ const DEFAULTS: Required<FileToolsOptions> = {
   maxGrepLineChars: 200,
   defaultContextLines: 2,
   namespace: "",
+  validators: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -82,6 +91,32 @@ function text(t: string): TextContent[] {
 
 function error(message: string): TextContent[] {
   return [{ type: "text" as const, text: JSON.stringify({ error: message }) }];
+}
+
+function errorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
+}
+
+async function validateWrite(
+  path: string,
+  content: string,
+  contentType: string | undefined,
+  opts: Required<FileToolsOptions>,
+): Promise<ArtifactValidationResult> {
+  return validateArtifact({ path, content, contentType }, opts.validators);
+}
+
+function validationDetails(result: ArtifactValidationResult):
+  | {
+      errors?: string[];
+      warnings?: string[];
+    }
+  | undefined {
+  if (!result.errors.length && !result.warnings.length) return undefined;
+  return {
+    errors: result.errors.length ? result.errors.map(formatArtifactValidationIssue) : undefined,
+    warnings: result.warnings.length ? result.warnings.map(formatArtifactValidationIssue) : undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -162,9 +197,10 @@ function createReadTool(source: ReadableFileSource, opts: Required<FileToolsOpti
 
       if (isDataUrl(content)) {
         const ct = file.contentType ?? "application/octet-stream";
-        return text(
-          `# ${path} (binary, ${ct})\n[Binary file — not shown as text. Use the Python tool to process it (the file is available in the sandbox).]`,
-        );
+        const guidance = ct.startsWith("image/")
+          ? "If this image is already visible in the conversation, inspect it directly with built-in vision. Otherwise use a vision/OCR helper only when needed."
+          : "Use the appropriate interpreter library only when programmatic processing is needed; the file is available in the sandbox.";
+        return text(`# ${path} (binary, ${ct})\n[Binary file — not shown as text. ${guidance}]`);
       }
 
       const allLines = splitLines(content);
@@ -222,7 +258,8 @@ function createWriteTool(source: WritableFileSource, opts: Required<FileToolsOpt
         return [{ code: content, language: path ? artifactLanguage(path) : "text" }];
       },
     },
-    description: "Create a new file or update an existing file with the specified path and content.",
+    description:
+      "Create a new file or update an existing file with the specified path and content. Recognized structured formats are saved first, then validated; validation errors are reported so you can continue editing and retry.",
     parameters: {
       type: "object",
       properties: {
@@ -244,8 +281,22 @@ function createWriteTool(source: WritableFileSource, opts: Required<FileToolsOpt
       // non-string would otherwise be written verbatim through the `as string` cast.
       if (typeof args.content !== "string") return error("content is required and must be a string.");
 
-      await source.write(path, args.content);
-      return text(JSON.stringify({ success: true, message: `File created: ${path}`, path }));
+      try {
+        await source.write(path, args.content);
+      } catch (writeError) {
+        return error(errorMessage(writeError));
+      }
+      const validation = await validateWrite(path, args.content, undefined, opts);
+      return text(
+        JSON.stringify({
+          success: true,
+          message: validation.errors.length
+            ? `File created: ${path}. It was saved with validation errors; fix them in a follow-up edit.`
+            : `File created: ${path}`,
+          path,
+          validation: validationDetails(validation),
+        }),
+      );
     },
   };
 }
@@ -419,7 +470,7 @@ function createEditTool(source: WritableFileSource, opts: Required<FileToolsOpti
       }),
     },
     description:
-      "Make targeted edits to an existing text file by replacing exact snippets. Prefer this over create_file when refining a file or building one up in steps — only the changed snippets are sent, avoiding a large re-escaped body. Pass one or more edits in `edits`; each `find` is matched against the ORIGINAL file (not applied in sequence), so the snippets must not overlap. `find` must match the current text (including whitespace) and be unique unless replace_all is true; minor whitespace/quote/dash differences are tolerated automatically.",
+      "Make targeted edits to an existing text file by replacing exact snippets. Prefer this over create_file when refining a file or building one up in steps — only the changed snippets are sent, avoiding a large re-escaped body. Pass one or more edits in `edits`; each `find` is matched against the ORIGINAL file (not applied in sequence), so the snippets must not overlap. `find` must match the current text (including whitespace) and be unique unless replace_all is true; minor whitespace/quote/dash differences are tolerated automatically. Recognized structured formats are saved first, then validation findings are reported.",
     parameters: {
       type: "object",
       properties: {
@@ -461,15 +512,23 @@ function createEditTool(source: WritableFileSource, opts: Required<FileToolsOpti
       const result = applyEdits(file.content, coerced.edits);
       if ("error" in result) return error(`${result.error.replace(/\.$/, "")} (in ${path}).`);
 
-      await source.write(path, result.next, file.contentType);
+      try {
+        await source.write(path, result.next, file.contentType);
+      } catch (writeError) {
+        return error(errorMessage(writeError));
+      }
+      const validation = await validateWrite(path, result.next, file.contentType, opts);
 
       const note = result.usedFuzzy ? "; matched with whitespace/punctuation normalization" : "";
       const count = `${result.spans} edit${result.spans === 1 ? "" : "s"}`;
       return text(
         JSON.stringify({
           success: true,
-          message: `Applied ${count} to ${path} (${result.next.length} chars${note})`,
+          message: `Applied ${count} to ${path} (${result.next.length} chars${note})${
+            validation.errors.length ? "; saved with validation errors that need a follow-up edit" : ""
+          }`,
           path,
+          validation: validationDetails(validation),
         }),
       );
     },
@@ -538,11 +597,25 @@ function createMoveTool(source: WritableFileSource, opts: Required<FileToolsOpti
       const to = args.to as string;
       if (!from || !to) return error("Both from and to are required");
 
+      const file = await source.read(from);
+
       const success = await source.move(from, to);
       if (!success) {
         return error(`Failed to move from ${from} to ${to}. Source may not exist or destination already exists.`);
       }
-      return text(JSON.stringify({ success: true, message: `File moved from ${from} to ${to}`, from, to }));
+      const validation =
+        file && !isDataUrl(file.content) ? await validateWrite(to, file.content, file.contentType, opts) : undefined;
+      return text(
+        JSON.stringify({
+          success: true,
+          message: validation?.errors.length
+            ? `File moved from ${from} to ${to}. It was saved with validation errors; fix them in a follow-up edit.`
+            : `File moved from ${from} to ${to}`,
+          from,
+          to,
+          validation: validation ? validationDetails(validation) : undefined,
+        }),
+      );
     },
   };
 }

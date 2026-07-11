@@ -31,14 +31,16 @@ Each `generate_slide` prompt must be a detailed visual description. Think of you
 - **Mood**: The overall feeling — corporate, warm, futuristic, editorial, etc.
 
 ### Good prompt example
-> "A dark navy slide with a large white sans-serif title 'Market Growth' top-left. Center: a clean bar chart showing Q1: $2.3M, Q2: $3.1M, Q3: $4.7M, Q4: $5.2M in gradient teal bars. Bottom-right: small white text 'Source: Annual Report 2024'. Minimal, modern corporate style with subtle grid lines."
+> "A coastal-resilience slide built like an annotated tide map: weathered cyan field, deep ink contour lines, one coral warning signal. The short headline 'Three neighborhoods cross the 2050 flood line' sits in a clear upper-left zone. A cropped aerial shoreline dominates the canvas; three precise elevation markers form the reading path. Editorial cartographic typography, tactile paper grain, no cards or generic icons."
 
 ### Bad prompt example
 > "A slide about market growth with some numbers" — too vague, no visual direction.
 
 ### Style consistency across slides
 
-The framework passes the previously-generated slide image as a **style reference** when you generate the next slide. To preserve consistency: in every prompt, repeat the same palette (hex codes), type families, compositional anchors, and overall mood verbatim from slide 1. Drift between slides = failure. Treat the deck as one continuous visual system.
+The framework passes the first generated slide image as a **style reference** for the remaining slides.
+In every prompt, repeat the same palette roles, type character, subject-derived signature, and material
+language. Vary the composition to fit each message while keeping the deck recognizably one system.
 
 ### What image generation cannot do reliably
 

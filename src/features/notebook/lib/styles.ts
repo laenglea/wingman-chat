@@ -21,7 +21,6 @@ import studioInfographicInstructions from "../prompts/studio-infographic.txt?raw
 import studioMindMapInstructions from "../prompts/studio-mind-map.txt?raw";
 import studioQuizInstructions from "../prompts/studio-quiz.txt?raw";
 import studioReportInstructions from "../prompts/studio-report.txt?raw";
-import studioSlideInstructions from "../prompts/studio-slide-deck.txt?raw";
 import studioSlideImageInstructions from "../prompts/studio-slide-images.txt?raw";
 import studioSlideOnePagerInstructions from "../prompts/studio-slide-one-pager.txt?raw";
 import studioSlidePlannerInstructions from "../prompts/studio-slide-planner.txt?raw";
@@ -136,9 +135,11 @@ export const OUTPUT_META: Record<OutputType, OutputMeta> = {
   },
   slides: {
     title: "Slides",
-    template: studioSlideInstructions,
+    // Multi-slide HTML uses buildSlidePrompts; image and one-page modes have
+    // dedicated prompts. Keep this empty so buildInstructions adds only overrides.
+    template: "",
     styles: slideStyles,
-    defaultStyleId: "whiteboard",
+    defaultStyleId: "auto",
   },
   infographic: {
     title: "Infographic",

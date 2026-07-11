@@ -42,7 +42,11 @@ content throughout.
   template answer — use only if it's truly best.
 - **Typography carries the personality.** Pair display and body faces deliberately (not your default
   families); set an intentional type scale with real weight/width/spacing choices. Make the type
-  treatment itself memorable.
+  treatment itself memorable. When the offline font choices are limited, don't expect typography
+  alone to create identity — composition, color, imagery, and material treatment must carry weight too.
+- **Make the subject visible.** Use a product state, real image, data shape, domain object, texture, or
+  other material cue from the subject's world. A page should not become generic prose in neutral
+  rectangles just because the copy is accurate.
 - **Structure is information.** Numbering, eyebrows, dividers, labels should encode something true,
   not decorate. Numbered markers (01/02/03) only when the content is actually a sequence.
 - **Motion deliberately.** One orchestrated moment (page-load sequence, scroll reveal, hover
@@ -59,9 +63,11 @@ front, and reference them everywhere instead of inventing values inline:
 - **Spacing** — a 4px or 8px scale (`4/8/16/24/40/64`). Off-scale padding/margins read as chaotic.
 - **Type** — a defined scale (`12/14/16/18/20/24/30/36/48`), 1–2 font families max, real weight/width
   pairing rather than two near-identical sans-serifs.
-- **Color** — subtly toned white/black (`#FAFAFA`/`#1A1A1A`, or toned to the palette's hue), never
-  pure `#FFFFFF`/`#000000`. Building a palette from scratch, use `oklch()` with matched lightness/
-  chroma and varied hue so colors feel related instead of arbitrary.
+- **Color** — choose a dominant field, a contrasting structural color, an accent, and readable ink.
+  Unless the source brand or user asks for monochrome, use at least two chromatic roles and let one
+  occupy meaningful area; gray is support, not the art direction. Use pure or toned neutrals according
+  to the brief rather than treating either as inherently more designed. Building a palette from
+  scratch, use `oklch()` to control lightness/chroma rather than collecting arbitrary hex values.
 - **Motion** — `0.2–0.3s ease` transitions on hover/active/focus; wrap in
   `@media (prefers-reduced-motion: reduce)`.
 - **Focus** — never `outline: none` without a replacement:
@@ -70,25 +76,28 @@ front, and reference them everywhere instead of inventing values inline:
 - **One CTA per screen.** Everything else is visibly secondary — competing same-weight buttons cause
   paralysis, not choice.
 
-## Avoid the AI-design defaults
+## Choose a direction positively
 
-Current AI design clusters on three looks: (1) warm cream (~#F4F1EA) + high-contrast serif display +
-terracotta accent; (2) near-black + a single acid-green/vermilion accent; (3) broadsheet layout with
-hairline rules, zero radius, dense columns. All are legitimate _for some briefs_, but they appear
-regardless of subject. Where the brief pins a direction, follow it exactly. Where it leaves an axis
-free, **don't spend that freedom on a default** — make a choice for _this_ subject. Once built,
-`read_skill ai-slop-check` catches what slipped through.
+Do not design by starting with a generic template and removing its obvious AI tells; that usually
+leaves a tasteful gray shell. Start with three concrete cues from the subject's world, then translate
+each into a visual decision. A material can suggest surface and depth, a physical process can suggest
+layout and motion, and a native data shape can suggest rhythm or navigation.
+
+Choose a composition whose silhouette fits the job: an immersive field, an asymmetric information
+canvas, a focused product stage, a sequential story, or a dense instrument panel. Do not default to a
+centered max-width column followed by interchangeable card grids. Cards are for discrete objects or
+actions, not the universal container for every section.
 
 ## Process: plan → critique → build
 
-1. Brainstorm a compact **token system**: Color (4–6 named hex values), Type (2+ roles — a
-   characterful display face used with restraint, a body face, a utility face), Layout (a concept,
-   with one-line prose + ASCII wireframes), and a **Signature** (the one element the page is
-   remembered by, embodying the brief).
-2. **Critique the plan against the brief:** if any part reads like the generic default you'd produce
-   for any similar page, revise it and say what changed. Only then write code, deriving every color
-   and type decision from the plan.
-3. Watch CSS specificity — type-selectors (`.section`) and element-level classes (`.cta`) cancel each
+1. Write a compact **brief-to-form map**: three subject cues and the color, composition, imagery or
+   material decision each one causes. If a choice cannot be traced to the brief, replace it.
+2. Define the system: 4–6 color roles, type roles, spacing/type scales, a layout silhouette, and one
+   signature element that embodies the subject. Check the first viewport in grayscale mentally: its
+   composition should still be recognizable, not just a header above equal cards.
+3. **Critique the plan against the brief:** if the palette and layout could be dropped onto an
+   unrelated startup, portfolio, or dashboard unchanged, revise them. Only then write code.
+4. Watch CSS specificity — type-selectors (`.section`) and element-level classes (`.cta`) cancel each
    other's margins/paddings; structure selectors carefully.
 
 ## Interactive prototypes
@@ -127,10 +136,10 @@ decides, but a designer has an opinion, and "they're all good" isn't one.
 
 ## Restraint and self-critique
 
-Spend your boldness in one place — let the signature element be the memorable thing and keep
-everything around it quiet. Build to a quality floor without announcing it: responsive to mobile,
-visible keyboard focus, reduced-motion respected. Chanel's rule: before leaving the house, remove one
-accessory.
+Give the signature element room, then echo its logic two or three times through color, shape, spacing,
+or motion so the page feels authored rather than decorated once. Supporting areas can be quieter
+without collapsing to gray. Build to a quality floor without announcing it: responsive to mobile,
+visible keyboard focus, reduced-motion respected.
 
 ## Writing in the design
 
@@ -139,7 +148,7 @@ what people control, not how the system is built). Active voice; an action keeps
 flow ("Publish" → "Published"). Treat errors and empty states as direction, not mood. Sentence case,
 plain verbs, no filler; each element does exactly one job.
 
-## Before it ships
+## Optional review
 
-Before handing off anything interactive, `read_skill polish-pass` — it runs the AI-slop, hierarchy/
-rhythm, interaction-state, and accessibility checks together and fixes what's found.
+When the user asks to polish the result, make it ready to ship, or run final design checks, use
+`read_skill polish-pass`; otherwise skip the multi-pass review.

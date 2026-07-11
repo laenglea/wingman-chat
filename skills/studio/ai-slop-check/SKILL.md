@@ -1,6 +1,6 @@
 ---
 name: ai-slop-check
-description: Scan a Studio HTML/UI build for generic AI-template visual tropes — gradients, emoji decoration, rounded-corner-with-left-border cards, hand-drawn SVG, overused fonts, the cream+serif+terracotta house style — and fix them. Use when asked "does this look AI-generated" / "remove the slop", when a mid-iteration build risks reading as generic, or as part of polish-pass (which already includes this check — don't run both at ship time).
+description: Scan a Studio HTML/UI build for generic AI-template visual tropes and fix them. Use only when the user explicitly asks whether it looks AI-generated, asks to remove the slop, or requests a polish-pass.
 ---
 
 # AI Slop Check
@@ -15,9 +15,9 @@ don't guess from memory.
 
 ## What to detect and replace
 
-**Gradients.** Rainbow or 3+ stop gradients, saturated purple→pink / orange→pink hero blends, overlay
-gradients that don't improve legibility → flat color, or two low-contrast stops in the same hue
-family.
+**Generic gradients.** Rainbow or fashionable hero blends used without a subject/brand reason →
+replace with a brief-specific color field, image, texture, pattern, or deliberate color blocking. Do
+not "fix" them by draining the page to gray.
 
 **Emoji.** 🚀/✅/🎉 prepended to headlines, buttons, or list items with no brand reason → remove; if
 the layout leaned on the emoji for visual weight, swap in a real icon (Feather, Material, Phosphor,
@@ -27,17 +27,14 @@ Heroicons) or fix the typographic hierarchy instead.
 subtle shadow, thin all-around border, or background contrast. Keep the left-border only where it's
 semantic (callout, alert, status) or matches an existing design system.
 
-**Imagery.** Hand-drawn SVG people/scenes/blobs, "giant-head" AI-style illustration → real
-photography, a professional icon set, or an honest striped placeholder with a monospace label
-(`product shot 1200×800`). A placeholder shows intent; a weak illustration shows you didn't have the
-asset.
+**Imagery.** Generic hand-drawn SVG people/scenes/blobs or "giant-head" illustrations → a real source
+image, a brief-specific generated asset, a professional icon treatment, or a purposeful abstract/data
+motif. Use a labelled placeholder only for an explicit wireframe or design handoff, never a finished
+artifact.
 
 **Type.** Inter, Roboto, Arial, Fraunces, or a bare system stack used as a silent default (no brand or
 user reason) → a font chosen with intent for this subject; `read_skill frontend-design` for pairing
 guidance.
-
-**White/black.** Exact `#FFFFFF` on exact `#000000` → subtly toned instead (`#FAFAFA`/`#1A1A1A`
-neutral, or toned to match the palette's hue).
 
 **Color values.** Five near-identical blues (`#0066CC`, `#0077DD`, `#3498DB`...) invented inline →
 consolidate to a token or an `oklch()`-derived palette (same lightness/chroma, varied hue) so hues
@@ -56,4 +53,6 @@ direction actually chosen for this brief.
 
 Apply fixes directly. Where more than one replacement is reasonable (which non-Inter font, exactly
 which shade), pick the most defensible option and note it in the handoff so the user can override.
+Removing a trope must reveal a more subject-specific direction; desaturation and generic neutral
+minimalism are not successful cleanup.
 End with one line: tropes found (by category) and what changed — not a table, not a report.

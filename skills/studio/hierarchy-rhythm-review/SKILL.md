@@ -1,6 +1,6 @@
 ---
 name: hierarchy-rhythm-review
-description: Check an HTML/UI Studio build's visual hierarchy (what's looked at first/second/third) and rhythm (spacing/type scale discipline, repetition with strategic variation); fix what's off. Use when hierarchy feels unclear, "the spacing feels off", or as part of polish-pass.
+description: Check an HTML/UI Studio build's visual hierarchy and spacing/type rhythm, then fix what's off. Use only when the user explicitly requests this review, says the hierarchy/spacing feels off, or requests a polish-pass.
 ---
 
 # Hierarchy & Rhythm Review

@@ -9,10 +9,11 @@
     "bundle:pyodide": "node scripts/bundle-pyodide-packages.mjs",
     "test:pyodide": "node scripts/test-pyodide-bundle.mjs",
     "prebuild": "npm run bundle:pyodide",
-    "build": "vp check --no-fmt --no-lint && vp build",
+    "build": "vp check --no-fmt --no-lint && npm run check:skills && vp build",
     "format": "vp fmt",
     "lint": "vp lint",
-    "check": "vp check",
+    "check": "vp check && npm run check:skills",
+    "check:skills": "node scripts/validate-skills.mjs",
     "preview": "vp preview"
   },
   "dependencies": {

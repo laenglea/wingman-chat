@@ -8,6 +8,10 @@ than estimating by hand. Two tools share one artifact filesystem:
 - `execute_python_code` — Run Python code via Pyodide
 - `execute_javascript_code` — Run JavaScript in a sandboxed Web Worker (browser-native APIs, no network)
 
+Use an interpreter only for execution: programmatic extraction, transformation, computation, batch
+processing, or file generation. Inspect images included in the user's message with built-in vision;
+do not create an OCR/vision wrapper just to read one.
+
 ### Working principles
 
 - **Compute, don't guess.** When correctness hinges on real numbers, dates, counts,
@@ -76,6 +80,8 @@ Use JavaScript for:
 - Browser media and graphics: WebCodecs (audio/video encode/decode), `OffscreenCanvas` + 2D/WebGL contexts, `createImageBitmap`, `ImageData`
 - Media containers via the bundled **mediabunny** library (muxing/demuxing, transcoding)
 - Charts via the bundled **echarts** library (headless SSR → SVG)
+- Interactive chart pages via **echartsSource**, the minified browser build as a string you can embed
+  in a self-contained HTML `<script>`
 - PDF generation via the bundled **jsPDF** library
 - Web Crypto (`crypto.subtle`), `WebAssembly`, `TextEncoder`/`TextDecoder`, `structuredClone`, `URL`, `Blob`
 - JSON-heavy transforms and any logic that's simpler or more idiomatic in JS
@@ -96,6 +102,17 @@ How to use it:
      vfs.write("/chart.svg", chart.renderToSVGString(), "image/svg+xml");
      chart.dispose();
      ```
+   - `echartsSource` — the minified ECharts browser bundle as a string. Embed it when the deliverable
+     needs live hover, filters, or resizing without a CDN:
+     ```js
+     const html = `<!doctype html><div id="chart" style="height:480px"></div>
+     <script>${echartsSource}</script><script>
+       const chart = echarts.init(document.getElementById('chart'));
+       chart.setOption({ xAxis: { type: 'category', data: ['A','B'] }, yAxis: {}, series: [{ type: 'bar', data: [4,7] }] });
+       addEventListener('resize', () => chart.resize());
+     <\/script>`;
+     vfs.write('/chart.html', html, 'text/html');
+     ```
      Prefer SVG (scalable and previewable). For a raster PNG, call `await svgToPng(svgString, { width, height })` to get a `Uint8Array`.
    - `jsPDF` — the jsPDF class for PDF generation:
      ```js
@@ -110,7 +127,8 @@ How to use it:
 Limitations:
 - No network access: `fetch`/`XMLHttpRequest`/`WebSocket` to remote URLs are blocked (relative `fetch` reads the VFS).
 - No DOM and no Window-only APIs: `document`, `AudioContext`/Web Audio, and `MediaRecorder` are unavailable in the worker. Use `OffscreenCanvas` and WebCodecs instead.
-- No npm packages — only the worker's built-in Web APIs and the bundled `mediabunny`, `echarts`, and `jsPDF`.
+- No npm packages — only the worker's built-in Web APIs and the bundled `mediabunny`, `echarts`,
+  `echartsSource`, and `jsPDF`.
 
 ### Choosing and combining tools
 
@@ -118,6 +136,7 @@ Pick whatever is most efficient — one runtime or both. The tools share one art
 
 Rough strengths, as orientation rather than rules:
 - **Python** — computation, statistics, data and tabular work (pandas), file/text/JSON/CSV/SQL munging (stdlib + built-in `sqlite3`), and document libraries (PDF, Excel, Word, PowerPoint). The broadest toolbox.
-- **JavaScript** — browser-native APIs (WebCodecs, OffscreenCanvas, Web Crypto, WebAssembly) and clean vector deliverables (echarts → SVG, jsPDF).
+- **JavaScript** — browser-native APIs (WebCodecs, OffscreenCanvas, Web Crypto, WebAssembly),
+  self-contained interactive ECharts pages, and clean vector/PDF deliverables.
 
 When a later step wants a different runtime's strength, hand off through an artifact file — for example, compute series in Python, write `/chart_data.json`, then render an echarts SVG in JavaScript. When one runtime already does the job, stay in it — e.g. chart a DataFrame in place with matplotlib instead of shipping it to JavaScript.

@@ -358,7 +358,7 @@ function makeConsole(append: (line: string) => void) {
 function sandboxRequire(name: unknown): never {
   throw new Error(
     `require(${JSON.stringify(name)}) is not available — the sandbox has no npm or CommonJS. ` +
-      "Use the provided globals (vfs, llm, Buffer, mediabunny, echarts, jsPDF) and browser APIs.",
+      "Use the provided globals (vfs, llm, Buffer, mediabunny, echarts, echartsSource, jsPDF) and browser APIs.",
   );
 }
 
@@ -422,6 +422,11 @@ const LAZY_GLOBALS: { name: string; test: RegExp; load: () => Promise<unknown> }
   // echarts reads the Node-only `global` when `window` is absent;
   // `ensureRuntimeCompat` defines it before any library loads.
   { name: "echarts", test: /\becharts\b/, load: () => import("echarts") },
+  {
+    name: "echartsSource",
+    test: /\bechartsSource\b/,
+    load: async () => (await import("echarts/dist/echarts.min.js?raw")).default,
+  },
   { name: "jsPDF", test: /\bjsPDF\b/, load: async () => (await import("jspdf")).jsPDF },
 ];
 

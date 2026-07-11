@@ -1,6 +1,6 @@
 ---
 name: design-system-extract
-description: Extract a design system from a brand guide, codebase, screenshots, or a finished artifact — design tokens (color, type, spacing, radii, shadow) as a tokens file, plus a reusable-component inventory with variants and states. Use when asked to "extract tokens", "make this a system", "build a component library", or before designing work that must match an existing visual language.
+description: Extract a design system from a brand guide, codebase, screenshots, or finished artifact. Use when the user explicitly asks for tokens, a component inventory/library, or to turn an existing visual language into a reusable system.
 ---
 
 # Design System Extract
@@ -8,9 +8,9 @@ description: Extract a design system from a brand guide, codebase, screenshots, 
 Turn a visual source into structure: a **tokens file** future designs reference instead of
 re-deriving values, and a **component inventory** that shows the reusable pieces hiding inside a
 one-off design. Extract from what actually exists — a codebase's theme files, a brand guide,
-screenshots, or an artifact built earlier in this workspace. Never guess a value; invented tokens
-defeat the point. If there's no source at all, this isn't extraction — build a direction with
-`frontend-design` first.
+screenshots, or an artifact built earlier in this workspace. Values from code/brand files are exact;
+values sampled from screenshots are estimates and must be labelled as such. If there is no source at
+all, this is not extraction — build a direction with `frontend-design` instead.
 
 ## Extract tokens
 

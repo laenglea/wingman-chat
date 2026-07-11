@@ -376,7 +376,7 @@ const IMAGE_SLIDE_CONCURRENCY = 3;
 export async function generateImageSlides(ctx: GenerateContext): Promise<Result> {
   const config = getConfig();
   const rendererModel = config.notebook?.renderer || config.renderer?.model || "";
-  const options = notebookImageOptions(rendererModel, { aspect: "3:2", quality: "medium" });
+  const options = notebookImageOptions(rendererModel, { aspect: "16:9", quality: "medium" });
 
   let plan: string[] = [];
   const planTool: Tool = {
@@ -414,7 +414,8 @@ export async function generateImageSlides(ctx: GenerateContext): Promise<Result>
   await run(ctx.client, ctx.model, ctx.instructions, [message], [...ctx.sourceTools, planTool]);
   if (plan.length === 0) throw new Error("No slides planned");
 
-  const frame = (prompt: string) => `A professional full-bleed landscape presentation slide (clean design). ${prompt}`;
+  const frame = (prompt: string) =>
+    `A full-bleed 16:9 landscape presentation slide. Preserve the requested art direction exactly. ${prompt}`;
   const slides = Array.from<string | undefined>({ length: plan.length });
 
   // Stream the contiguous run of finished slides from the start, so the preview

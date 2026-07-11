@@ -1,25 +1,28 @@
 ---
 label: "Executive"
-description: "A polished summary with key findings and recommendations"
+description: "A decision-ready report with subject-derived editorial direction"
 default: true
 ---
 
 ## Visual Design & Content Structure
 
-Create a polished, corporate executive report:
+Create a decision-ready executive report whose visual language comes from the subject, not from a
+generic corporate template.
 
-- Clean sans-serif design (system font stack: `-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`)
-- Light background (#FFFFFF) with dark text (#1a1a2e), navy accent (#0f3460) for headings
-- Professional color palette: navy (#0f3460), steel blue (#3a86a8), slate gray (#6c757d), muted gold (#c9a227) for highlights
-- Clear hierarchy: large bold title, subtle subtitle, well-spaced sections
-- Generous whitespace and comfortable typography (16px base, 1.6 line-height)
+Before writing HTML, choose and consistently apply:
 
-Organize with:
+- one dominant field, one ink color, one supporting field, and one signal accent tied to the subject
+  or brand evidence; avoid default navy-and-gray styling;
+- a display/body type pairing appropriate to the material and available offline;
+- one subject-derived signature such as an archival caption, measurement rule, geographic marker,
+  product-state crop, or distinctive data annotation;
+- an editorial composition: strong opening thesis, clear evidence sequence, and a decisive close.
 
-1. **Executive Summary** — 2-3 sentence overview of key findings in a highlighted box
-2. **Key Metrics** — 3-5 important numbers in a horizontal card layout with large figures and small labels
-3. **Analysis Sections** — deeper exploration with headings, narrative text, and supporting data
-4. **Data Tables** — structured data with professional styling
-5. **Conclusions & Recommendations** — actionable key takeaways
+Structure follows the decision, not a fixed component list. Open with the answer or tension. Follow
+with only the evidence needed to understand it, surface risks or uncertainty beside the relevant
+claim, and close with recommendations, owners, or asks. Use hero metrics only for genuinely important
+numbers. Prefer one strong chart, annotated image, comparison, or table over rows of interchangeable
+cards. Give each section a clear focal point and vary density so the report has rhythm.
 
-Not every section is required — use what fits the source material.
+The finished report should scan quickly for a time-constrained reader while rewarding closer reading.
+All quantitative claims remain traceable to their sources; never invent a metric to complete a layout.

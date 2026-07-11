@@ -22,25 +22,26 @@ The HTML must be fully self-contained:
 
 ## Charts and Visualizations
 
-When data supports it, include inline SVG charts. Build them with raw SVG elements (no libraries):
+When data supports it, include inline SVG charts. Choose the chart from the analytical question, then
+build it with raw SVG elements (no libraries):
 - **Bar charts** — horizontal or vertical with labeled axes
-- **Pie/donut charts** — with legends and percentage labels
+- **Part-to-whole** — usually a stacked bar; use a donut only for one simple share
 - **Line charts** — with data points and gridlines
 - **Comparison charts** — grouped bars or stacked bars
 
 For each chart:
 - Use a color palette consistent with the report style
-- Include axis labels, legends, and data labels
+- Label important values directly; use axes and legends only where they improve understanding
 - Add `<title>` elements for accessibility
 - Keep them simple and readable
 
 ## Tables
 
-Style tables with:
+Use tables only when exact lookup matters. Style them with:
 - Full width, collapsed borders
 - Header row with background color
-- Alternating row colors
-- Hover highlight on rows
+- Restrained row separation; alternating fills only when they materially improve scanning
+- A hover highlight when the report benefits from row inspection
 - Right-aligned numeric columns
 - Proper padding
 
