@@ -1,8 +1,15 @@
 import type { Content, Message, MessageError, Tool, ToolCallContent, ToolContext } from "../types/chat";
 import type { AgentContext } from "../types/telemetry";
 import type { Client } from "./client";
+import { isContextOverflowError } from "./errors";
 import { traceExecuteTool, traceInvokeAgent } from "./otel";
 import { parseToolArguments, ToolArgumentsParseError, toolArgumentHints } from "./toolArguments";
+
+/** Safety bound on model calls in one run, guarding against a runaway tool loop. */
+const DEFAULT_MAX_TURNS = 100;
+
+/** How many times one turn may compact-and-retry after a context overflow. */
+const MAX_OVERFLOW_COMPACTIONS = 2;
 
 /** Options forwarded verbatim to `client.complete`. */
 export type CompleteOptions = Parameters<Client["complete"]>[5];
@@ -43,6 +50,18 @@ export interface RunHooks {
    */
   prepareMessages?: (messages: Message[]) => Message[];
 
+  /**
+   * Called when a model request overflows the context window mid-run (e.g. tool
+   * results ballooned it after the proactive compaction). Return a compacted
+   * copy of the messages to retry with, or the same array to give up. Lets the
+   * loop recover instead of failing the whole turn.
+   */
+  onContextOverflow?: (messages: Message[]) => Message[] | Promise<Message[]>;
+
+  /** Cap on model calls in one run. Defaults to a safety bound; a runaway
+   * tool-calling loop stops here rather than never terminating. */
+  maxTurns?: number;
+
   /** Options forwarded to `client.complete` (includes signal, effort, verbosity, …). */
   options?: CompleteOptions;
 
@@ -76,18 +95,51 @@ async function runLoop(
   hooks: RunHooks,
   invokeCtx: AgentContext,
 ): Promise<Message[]> {
-  const { onStream, onTurnStart, onTurnEnd, onToolResult, prepareMessages, options } = hooks;
+  const { onStream, onTurnStart, onTurnEnd, onToolResult, prepareMessages, onContextOverflow, options } = hooks;
   const signal = options?.signal;
+  const maxTurns = hooks.maxTurns ?? DEFAULT_MAX_TURNS;
   let conversation = [...messages];
 
-  while (true) {
-    onTurnStart?.();
-    const modelMessages = prepareMessages ? prepareMessages(conversation) : conversation;
+  // Send one model request, recovering from a mid-run context overflow by
+  // compacting and re-sending rather than failing the turn. Bounded so a
+  // request that stays too large after compacting still surfaces the error.
+  const sendTurn = async (): Promise<Message> => {
+    for (let compactions = 0; ; compactions++) {
+      const modelMessages = prepareMessages ? prepareMessages(conversation) : conversation;
+      try {
+        return await client.complete(model, instructions, modelMessages, tools, onStream, {
+          ...options,
+          parentContext: invokeCtx,
+        });
+      } catch (error) {
+        if (
+          onContextOverflow &&
+          compactions < MAX_OVERFLOW_COMPACTIONS &&
+          !signal?.aborted &&
+          isContextOverflowError(error)
+        ) {
+          try {
+            const compacted = await onContextOverflow(conversation);
+            if (compacted !== conversation) {
+              conversation = compacted;
+              continue;
+            }
+          } catch (compactError) {
+            // Compaction itself failed (e.g. the summarizer errored); surface the
+            // original overflow, which is the more actionable error.
+            console.warn("[agent] context-overflow recovery failed", compactError);
+          }
+        }
+        throw error;
+      }
+    }
+  };
 
-    const assistantMessage = await client.complete(model, instructions, modelMessages, tools, onStream, {
-      ...options,
-      parentContext: invokeCtx,
-    });
+  // Bounded to keep a runaway tool-calling loop from never terminating.
+  for (let turn = 0; turn < maxTurns; turn++) {
+    onTurnStart?.();
+
+    const assistantMessage = await sendTurn();
     if (signal?.aborted) return conversation;
 
     conversation = [...conversation, assistantMessage];
@@ -103,6 +155,9 @@ async function runLoop(
       if (signal?.aborted) return conversation;
     }
   }
+
+  // Turn budget exhausted: stop with whatever we have rather than looping forever.
+  return conversation;
 }
 
 async function dispatchToolCall(

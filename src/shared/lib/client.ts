@@ -24,11 +24,17 @@ import type {
 } from "@/shared/types/chat";
 import { Role } from "@/shared/types/chat";
 import type { AgentContext } from "@/shared/types/telemetry";
-import { isAbortError } from "./errors";
+import { isAbortError, isRecoverableStreamError, waitBeforeStreamRetry } from "./errors";
 import { modelName, modelType } from "./models";
 import { traceGenAI } from "./otel";
 import { dropOrphanFunctionCalls } from "./recovery";
 import { serializeToolResultForApi, simplifyMarkdown } from "./utils";
+
+/**
+ * Extra application-level retries for stream failures the SDK's own maxRetries
+ * does not cover — a connection dropped mid-response after streaming started.
+ */
+const MAX_STREAM_RETRIES = 2;
 
 function expandToSentences(text: string, start: number, end: number): string {
   const sentenceBoundaries = /[.!?]+\s*|\n+/g;
@@ -323,124 +329,151 @@ export class Client {
         // the item id is optional and the call id isn't on the delta events.)
         const toolCallsByIndex = new Map<number, ToolCallContent>();
 
-        const runner = this.oai.responses
-          .stream({
-            model: model,
-            store: false,
-            truncation: "auto",
-            tools: this.toTools(tools),
-            input: dropOrphanFunctionCalls(items),
-            instructions: instructions,
-            ...(options?.effort
-              ? {
-                  reasoning: {
-                    effort: options.effort,
-                    summary: options.summary ?? "auto",
-                  },
-                }
-              : {}),
-            ...(options?.verbosity
-              ? {
-                  text: { verbosity: options.verbosity },
-                }
-              : {}),
-          })
-          .on("response.reasoning_summary_text.delta", (event) => {
-            const r = ensureReasoning(event.item_id);
-            r.summary = (r.summary ?? "") + event.delta;
-            emit();
-          })
-          .on("response.reasoning_text.delta", (event) => {
-            ensureReasoning(event.item_id).text += event.delta;
-            emit();
-          })
-          .on("response.output_text.delta", (event) => {
-            const last = contentParts[contentParts.length - 1];
-            if (last?.type === "text") {
-              last.text += event.delta;
-            } else {
-              contentParts.push({ type: "text", text: event.delta });
-            }
-            emit();
-          })
-          // Materialize the tool-call part as soon as the call starts, so its
-          // spinner appears right after the intro instead of only once the model
-          // has finished writing all the arguments.
-          .on("response.output_item.added", (event) => {
-            if (event.item.type === "function_call") {
-              const part: ToolCallContent = {
-                type: "tool_call",
-                id: event.item.call_id,
-                name: event.item.name,
-                arguments: event.item.arguments ?? "",
-              };
-              toolCallsByIndex.set(event.output_index, part);
-              contentParts.push(part);
+        // Build and run one streaming attempt. Resets the accumulators so a
+        // retry re-streams from empty and the UI overwrites the partial render
+        // instead of duplicating deltas. Re-sending is replay-safe: the caller
+        // commits the assistant message (and runs its tools) only after this
+        // resolves, so a failed attempt left nothing committed.
+        const attemptStream = () => {
+          // Clearing only matters on a retry: drop the failed attempt's partial
+          // render so the UI overwrites it instead of appending duplicate deltas.
+          const hadPartial = contentParts.length > 0;
+          contentParts.length = 0;
+          toolCallsByIndex.clear();
+          if (hadPartial) emit();
+
+          const runner = this.oai.responses
+            .stream({
+              model: model,
+              store: false,
+              truncation: "auto",
+              tools: this.toTools(tools),
+              input: dropOrphanFunctionCalls(items),
+              instructions: instructions,
+              ...(options?.effort
+                ? {
+                    reasoning: {
+                      effort: options.effort,
+                      summary: options.summary ?? "auto",
+                    },
+                  }
+                : {}),
+              ...(options?.verbosity
+                ? {
+                    text: { verbosity: options.verbosity },
+                  }
+                : {}),
+            })
+            .on("response.reasoning_summary_text.delta", (event) => {
+              const r = ensureReasoning(event.item_id);
+              r.summary = (r.summary ?? "") + event.delta;
               emit();
-            }
-          })
-          // Grow the arguments live as the model writes them (e.g. the Python script).
-          .on("response.function_call_arguments.delta", (event) => {
-            const part = toolCallsByIndex.get(event.output_index);
-            if (part) {
-              part.arguments += event.delta;
+            })
+            .on("response.reasoning_text.delta", (event) => {
+              ensureReasoning(event.item_id).text += event.delta;
               emit();
-            }
-          })
-          .on("response.output_item.done", (event) => {
-            if (event.item.type === "function_call") {
-              const existing = toolCallsByIndex.get(event.output_index);
-              if (existing) {
-                existing.arguments = event.item.arguments; // authoritative final value
+            })
+            .on("response.output_text.delta", (event) => {
+              const last = contentParts[contentParts.length - 1];
+              if (last?.type === "text") {
+                last.text += event.delta;
               } else {
-                contentParts.push({
+                contentParts.push({ type: "text", text: event.delta });
+              }
+              emit();
+            })
+            // Materialize the tool-call part as soon as the call starts, so its
+            // spinner appears right after the intro instead of only once the model
+            // has finished writing all the arguments.
+            .on("response.output_item.added", (event) => {
+              if (event.item.type === "function_call") {
+                const part: ToolCallContent = {
                   type: "tool_call",
                   id: event.item.call_id,
                   name: event.item.name,
-                  arguments: event.item.arguments,
-                });
+                  arguments: event.item.arguments ?? "",
+                };
+                toolCallsByIndex.set(event.output_index, part);
+                contentParts.push(part);
+                emit();
               }
-              emit();
+            })
+            // Grow the arguments live as the model writes them (e.g. the Python script).
+            .on("response.function_call_arguments.delta", (event) => {
+              const part = toolCallsByIndex.get(event.output_index);
+              if (part) {
+                part.arguments += event.delta;
+                emit();
+              }
+            })
+            .on("response.output_item.done", (event) => {
+              if (event.item.type === "function_call") {
+                const existing = toolCallsByIndex.get(event.output_index);
+                if (existing) {
+                  existing.arguments = event.item.arguments; // authoritative final value
+                } else {
+                  contentParts.push({
+                    type: "tool_call",
+                    id: event.item.call_id,
+                    name: event.item.name,
+                    arguments: event.item.arguments,
+                  });
+                }
+                emit();
+              }
+            });
+
+          // Wire abort. Handle the already-aborted case explicitly —
+          // addEventListener on a signal that has already fired never invokes.
+          if (options?.signal) {
+            if (options.signal.aborted) {
+              runner.abort();
+            } else {
+              options.signal.addEventListener("abort", () => runner.abort(), { once: true });
             }
-          });
-
-        // Wire abort. Handle the already-aborted case explicitly —
-        // addEventListener on a signal that has already fired never invokes.
-        if (options?.signal) {
-          if (options.signal.aborted) {
-            runner.abort();
-          } else {
-            options.signal.addEventListener("abort", () => runner.abort(), { once: true });
           }
-        }
 
-        // Attach an error listener so mid-stream errors don't surface as
-        // unhandled EventEmitter errors. The same error rejects
-        // `finalResponse()` below, where we actually handle it.
-        runner.on("error", () => {});
+          // Attach an error listener so mid-stream errors don't surface as
+          // unhandled EventEmitter errors. The same error rejects
+          // `finalResponse()`, where we actually handle it.
+          runner.on("error", () => {});
+
+          return runner.finalResponse();
+        };
 
         const assistant: Message = { role: Role.Assistant, content: contentParts };
 
-        try {
-          const finalResponse = await runner.finalResponse();
-          assistant.usage = {
-            model: finalResponse.model,
-            inputTokens: finalResponse.usage?.input_tokens,
-            cachedInputTokens: finalResponse.usage?.input_tokens_details?.cached_tokens,
-            outputTokens: finalResponse.usage?.output_tokens,
-            reasoningTokens: finalResponse.usage?.output_tokens_details?.reasoning_tokens,
-          };
-          return {
-            result: assistant,
-            response: { id: finalResponse.id, ...assistant.usage },
-          };
-        } catch (error) {
-          // On abort (our signal or runner.abort()), return partial content
-          // as a successful result.
-          if (options?.signal?.aborted || isAbortError(error)) {
-            return { result: assistant, response: { id: "", model } };
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const finalResponse = await attemptStream();
+            assistant.usage = {
+              model: finalResponse.model,
+              inputTokens: finalResponse.usage?.input_tokens,
+              cachedInputTokens: finalResponse.usage?.input_tokens_details?.cached_tokens,
+              outputTokens: finalResponse.usage?.output_tokens,
+              reasoningTokens: finalResponse.usage?.output_tokens_details?.reasoning_tokens,
+            };
+            return {
+              result: assistant,
+              response: { id: finalResponse.id, ...assistant.usage },
+            };
+          } catch (error) {
+            // Abort (our signal or runner.abort()) is terminal: return whatever
+            // streamed so far as a successful, partial result.
+            if (options?.signal?.aborted || isAbortError(error)) {
+              return { result: assistant, response: { id: "", model } };
+            }
+            // A stream that dropped mid-response is retryable — the SDK's own
+            // maxRetries only covers pre-stream failures. Re-send from scratch.
+            if (attempt < MAX_STREAM_RETRIES && isRecoverableStreamError(error)) {
+              await waitBeforeStreamRetry(attempt, error, options?.signal);
+              if (options?.signal?.aborted) {
+                return { result: assistant, response: { id: "", model } };
+              }
+              continue;
+            }
+            throw error;
           }
-          throw error;
         }
       },
       options?.parentContext,

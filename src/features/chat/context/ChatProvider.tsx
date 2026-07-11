@@ -737,6 +737,8 @@ export function ChatProvider({ children }: ChatProviderProps) {
             signal: abortController.signal,
           },
           prepareMessages: (msgs) => injectContext(stripHistoryImages(trimBulkyToolHistory(pruneAtSummary(msgs))), now),
+          onContextOverflow: (msgs) =>
+            compactIfNeeded(msgs, 1, client, config.chat?.summarizer || currentModel.id, currentModel.id),
           onTurnStart: () => {
             updateStreamingMessage({ chatId: id, message: { role: Role.Assistant, content: [] } });
           },
