@@ -250,7 +250,11 @@ export function modelType(id: string): ModelType | undefined {
 }
 
 export function modelName(id: string): string {
-  const normalizedId = id.replace(/-(\d+)-(\d+)(?=(?:-|$))/g, "-$1.$2");
+  const normalizedId = id
+    // Provider-qualified ids use dots as namespace separators (for example,
+    // `anthropic.claude-…`). Keep decimal version dots such as `4.6` intact.
+    .replace(/([a-z])\.([a-z])/gi, "$1-$2")
+    .replace(/-(\d+)-(\d+)(?=(?:-|$))/g, "-$1.$2");
 
   return normalizedId
     .split("-")
@@ -290,6 +294,17 @@ export function modelName(id: string): string {
     .join(" ");
 }
 
+const REGION_QUALIFIED_MODEL_ID =
+  /^(?:[a-z]{2}|global)\.(?=(?:[a-z0-9-]+\.)?(?:claude|gpt|o[134]|gemini|imagen|dall-e|flux|llama|mistral|magistral|deepseek|glm|kimi|qwen|nemotron|nova|command|jamba|grok|phi|mai|fable)(?:[.-]|$))/i;
+
 export function shortModelName(id: string): string {
-  return modelName(id.replace(/-(\d{4}-\d{2}-\d{2}|\d{8})$/, ""));
+  const unqualifiedId = id
+    // Cross-region inference profiles prefix the real model id with a country
+    // code (for example `eu.` or `ch.`) or `global.`. Only strip it when the
+    // remainder starts with a known model family, avoiding clashes with real
+    // two-letter namespaces.
+    .replace(REGION_QUALIFIED_MODEL_ID, "")
+    .replace(/-(\d{4}-\d{2}-\d{2}|\d{8})$/, "");
+
+  return modelName(unqualifiedId);
 }
