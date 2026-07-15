@@ -106,6 +106,36 @@ async function validateWrite(
   return validateArtifact({ path, content, contentType }, opts.validators);
 }
 
+/**
+ * Recover a text body from a few common non-strict function-call shapes.
+ * Strict-capable model APIs should always send `content` as a string, but some
+ * OpenAI-compatible/realtime providers ignore strict schemas and emit an array
+ * of lines or wrap the text in `{ html: ... }` / `{ text: ... }` instead.
+ * Keep this deliberately narrow so arbitrary objects are never stringified into
+ * a file by accident.
+ */
+function coerceFileContent(args: Record<string, unknown>): string | undefined {
+  const aliases = ["content", "html", "text", "body", "source", "code"] as const;
+  const raw =
+    args.content ??
+    aliases
+      .slice(1)
+      .map((key) => args[key])
+      .find((value) => value !== undefined);
+
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw) && raw.every((line): line is string => typeof line === "string")) {
+    return raw.join("\n");
+  }
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const wrapped = raw as Record<string, unknown>;
+    for (const key of aliases) {
+      if (typeof wrapped[key] === "string") return wrapped[key];
+    }
+  }
+  return undefined;
+}
+
 function validationDetails(result: ArtifactValidationResult):
   | {
       errors?: string[];
@@ -245,6 +275,7 @@ function createReadTool(source: ReadableFileSource, opts: Required<FileToolsOpti
 function createWriteTool(source: WritableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}create_file`,
+    strict: true,
     display: {
       header: (_args, state) => ({
         icon: FilePlus2,
@@ -273,20 +304,22 @@ function createWriteTool(source: WritableFileSource, opts: Required<FileToolsOpt
         },
       },
       required: ["path", "content"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
       const path = args.path as string;
       if (!path) return error("path is required");
-      // Require a string explicitly: an empty string is a valid (empty) file, but a
-      // non-string would otherwise be written verbatim through the `as string` cast.
-      if (typeof args.content !== "string") return error("content is required and must be a string.");
+      // Empty strings remain valid. The coercion is a fallback for providers
+      // which ignore the strict schema; it never stringifies arbitrary values.
+      const content = coerceFileContent(args);
+      if (content === undefined) return error("content is required and must be a string.");
 
       try {
-        await source.write(path, args.content);
+        await source.write(path, content);
       } catch (writeError) {
         return error(errorMessage(writeError));
       }
-      const validation = await validateWrite(path, args.content, undefined, opts);
+      const validation = await validateWrite(path, content, undefined, opts);
       return text(
         JSON.stringify({
           success: true,
@@ -462,6 +495,7 @@ function applyEdits(
 function createEditTool(source: WritableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}edit_file`,
+    strict: true,
     display: {
       header: (args, state) => ({
         icon: FilePen,
@@ -488,15 +522,18 @@ function createEditTool(source: WritableFileSource, opts: Required<FileToolsOpti
                 description: "Replacement text (empty string deletes the matched text).",
               },
               replace_all: {
-                type: "boolean",
-                description: "Replace every occurrence of find instead of requiring a unique match (default false).",
+                type: ["boolean", "null"],
+                description:
+                  "Replace every occurrence of find instead of requiring a unique match. Pass false or null for the default behavior.",
               },
             },
-            required: ["find", "replace"],
+            required: ["find", "replace", "replace_all"],
+            additionalProperties: false,
           },
         },
       },
       required: ["path", "edits"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
       const path = args.path as string;

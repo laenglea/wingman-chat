@@ -29,7 +29,7 @@ export interface ToolArgumentHints {
 // String fields whose name implies a code/command/text payload. When a tool has
 // several string properties we only enable recovery if one of them matches —
 // otherwise we can't tell which holds the blob and leave it to jsonrepair.
-const PAYLOAD_NAME = /^(code|command|script|source|sql|query|content|body|text|input|patch|diff)$/i;
+const PAYLOAD_NAME = /^(code|command|script|source|sql|query|content|body|text|input|instructions|prompt|patch|diff)$/i;
 
 function asObject(value: unknown): Record<string, unknown> {
   // Tool arguments are always a JSON object. A bare array/number/string means
@@ -56,9 +56,11 @@ export function toolArgumentHints(parameters: unknown): ToolArgumentHints {
   const stringNames = names.filter((n) => isStringType(properties[n]));
   if (stringNames.length === 0) return {};
 
-  // Unambiguous when there's exactly one string field; otherwise require a
-  // recognizable payload name so we don't slice the wrong one.
-  const payloadKey = stringNames.length === 1 ? stringNames[0] : stringNames.find((n) => PAYLOAD_NAME.test(n));
+  // Only recover fields whose name identifies them as a free-text payload.
+  // A lone top-level string is not necessarily the payload: edit_file, for
+  // example, has a string `path` plus quote-heavy strings nested in `edits`.
+  // Treating `path` as dominant would discard the edits on malformed input.
+  const payloadKey = stringNames.find((n) => PAYLOAD_NAME.test(n));
   if (!payloadKey) return {};
 
   return { payloadKey, otherKeys: names.filter((n) => n !== payloadKey) };
@@ -154,12 +156,20 @@ function recoverDominantStringField(
   if (!open) return null;
   const start = open.index + open[0].length;
 
+  // Keys which already occur before the payload cannot also be legitimate
+  // trailing fields in the same JSON object. Remember this before scanning the
+  // payload: HTML/JS frequently contains data such as `{"path":"/api"}`, and
+  // that inner key must not be mistaken for the outer create_file `path`.
+  const leadingText = text.slice(0, open.index);
+  const leadingKeys = new Set(otherKeys.filter((key) => new RegExp(`"${key}"\\s*:`).test(leadingText)));
+
   // Value ends at the earliest of: the final closing brace, or the *last*
   // `,"<otherKey>":` separator (trailing fields come after the payload, so the
   // last occurrence is the real separator — an inner one inside code won't win).
   let boundary = text.lastIndexOf("}");
   if (boundary < start) boundary = text.length;
   for (const key of otherKeys) {
+    if (leadingKeys.has(key)) continue;
     const rel = lastIndexOfPattern(text.slice(start), new RegExp(`,\\s*"${key}"\\s*:`, "g"));
     if (rel >= 0) boundary = Math.min(boundary, start + rel);
   }
@@ -173,7 +183,13 @@ function recoverDominantStringField(
 
   // Best-effort scalars for the remaining fields (null when absent or unparseable).
   for (const key of otherKeys) {
-    const m = new RegExp(`"${key}"\\s*:\\s*(null|true|false|"[^"]*"|\\[[^\\]]*\\]|-?\\d+(?:\\.\\d+)?)`).exec(text);
+    // Search on the side where the outer field lives. This prevents a `path`,
+    // `skills`, etc. embedded in the recovered source from winning over the
+    // actual sibling argument.
+    const siblingText = leadingKeys.has(key) ? leadingText : text.slice(boundary);
+    const m = new RegExp(`"${key}"\\s*:\\s*(null|true|false|"[^"]*"|\\[[^\\]]*\\]|-?\\d+(?:\\.\\d+)?)`).exec(
+      siblingText,
+    );
     if (m) {
       try {
         result[key] = JSON.parse(m[1]);
