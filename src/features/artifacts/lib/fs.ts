@@ -40,6 +40,13 @@ export interface OverlaySnapshotOptions {
   defaultContentType?: string;
 }
 
+/** A file cannot replace an existing file, contain one, or sit below one. */
+function hasFileTreeConflict(path: string, existingPaths: readonly string[]): boolean {
+  return existingPaths.some(
+    (existing) => existing === path || existing.startsWith(`${path}/`) || path.startsWith(`${existing}/`),
+  );
+}
+
 /**
  * FileSystemManager - OPFS-backed file system for artifacts
  *
@@ -163,39 +170,72 @@ export class FileSystemManager implements FileSystem {
     const normalizedOld = this.normalizePath(oldPath);
     const normalizedNew = this.normalizePath(newPath);
 
+    if (normalizedOld === normalizedNew || normalizedNew.startsWith(`${normalizedOld}/`)) {
+      return false;
+    }
+
+    const allFiles = await opfs.listArtifacts(this.chatId);
+
     // Check if source is a file
     const file = await opfs.readArtifact(this.chatId, normalizedOld);
     if (file) {
-      // Check if destination already exists
-      const destFile = await opfs.readArtifact(this.chatId, normalizedNew);
-      if (destFile) {
+      const unaffectedFiles = allFiles.filter((path) => path !== normalizedOld);
+      if (hasFileTreeConflict(normalizedNew, unaffectedFiles)) {
         return false;
       }
 
-      // Copy content to new location and delete old
-      await opfs.writeArtifact(this.chatId, normalizedNew, file.content, file.contentType);
-      await opfs.deleteArtifact(this.chatId, normalizedOld);
+      // Copy first so the source remains intact on failure. The write itself
+      // can fail after creating a partial file, so every error removes it.
+      try {
+        await opfs.writeArtifact(this.chatId, normalizedNew, file.content, file.contentType);
+        await opfs.deleteArtifact(this.chatId, normalizedOld);
+      } catch (error) {
+        await opfs.deleteArtifact(this.chatId, normalizedNew).catch(() => undefined);
+        throw error;
+      }
       this.emit("fileRenamed", normalizedOld, normalizedNew);
       return true;
     }
 
     // Check if source is a folder
-    const allFiles = await opfs.listArtifacts(this.chatId);
     const affectedFiles = allFiles.filter((f) => f.startsWith(`${normalizedOld}/`));
 
     if (affectedFiles.length > 0) {
-      // Rename all files in the folder
-      for (const filePath of affectedFiles) {
-        const relativePath = filePath.substring(normalizedOld.length);
-        const newFilePath = normalizedNew + relativePath;
+      const affectedSet = new Set(affectedFiles);
+      const unaffectedFiles = allFiles.filter((path) => !affectedSet.has(path));
+      const moves = affectedFiles.map((from) => ({
+        from,
+        to: normalizedNew + from.substring(normalizedOld.length),
+      }));
 
-        const fileData = await opfs.readArtifact(this.chatId, filePath);
-        if (fileData) {
-          await opfs.writeArtifact(this.chatId, newFilePath, fileData.content, fileData.contentType);
-          await opfs.deleteArtifact(this.chatId, filePath);
-          this.emit("fileRenamed", filePath, newFilePath);
-        }
+      // Reject all collisions before changing anything.
+      if (moves.some(({ to }) => hasFileTreeConflict(to, unaffectedFiles))) {
+        return false;
       }
+
+      // This store is small, so stage the reads plainly before changing anything.
+      const staged: Array<{ from: string; to: string; file: { content: string; contentType?: string } }> = [];
+      for (const move of moves) {
+        const sourceFile = await opfs.readArtifact(this.chatId, move.from);
+        if (!sourceFile) return false;
+        staged.push({ ...move, file: sourceFile });
+      }
+
+      const written: string[] = [];
+      try {
+        for (const { to, file: sourceFile } of staged) {
+          // Track the attempt before writing: OPFS may create the file and then
+          // reject while writing or closing the stream.
+          written.push(to);
+          await opfs.writeArtifact(this.chatId, to, sourceFile.content, sourceFile.contentType);
+        }
+        await opfs.deleteArtifactFolder(this.chatId, normalizedOld);
+      } catch (error) {
+        await Promise.allSettled(written.map((path) => opfs.deleteArtifact(this.chatId, path)));
+        throw error;
+      }
+
+      for (const { from, to } of moves) this.emit("fileRenamed", from, to);
       return true;
     }
 

@@ -33,11 +33,16 @@ function memorySource(initial: Record<string, string> = {}): {
 }
 
 describe("artifact file tools", () => {
-  it("advertises strict create and edit schemas", () => {
+  it("advertises strict, closed schemas for every file tool", () => {
     const { source } = memorySource();
     const tools = createFileTools(source);
     const create = tools.find((tool) => tool.name === "create_file");
     const edit = tools.find((tool) => tool.name === "edit_file");
+
+    for (const tool of tools) {
+      expect(tool.strict, tool.name).toBe(true);
+      expect(tool.parameters.additionalProperties, tool.name).toBe(false);
+    }
 
     expect(create).toBeDefined();
     expect(edit).toBeDefined();
@@ -111,5 +116,58 @@ describe("artifact file tools", () => {
     });
 
     expect(files.get("/index.html")?.content).toBe(`<h1 class="new">Hello</h1>`);
+  });
+
+  it("preserves untouched content when an HTML edit needs fuzzy punctuation matching", async () => {
+    const original = `<aside title="Curly “quote”">Keep me</aside>   \n<p>Target — value</p>\n`;
+    const { files, source } = memorySource({ "/index.html": original });
+    const edit = createFileTools(source).find((tool) => tool.name === "edit_file");
+
+    await edit?.function({
+      path: "/index.html",
+      edits: [{ find: "<p>Target - value</p>", replace: "<p>Changed</p>", replace_all: false }],
+    });
+
+    expect(files.get("/index.html")?.content).toBe(`<aside title="Curly “quote”">Keep me</aside>   \n<p>Changed</p>\n`);
+  });
+
+  it("keeps exact edits exact when another edit in the batch needs fuzzy matching", async () => {
+    const { files, source } = memorySource({
+      "/index.html": `<p>"same"</p>\n<p>“same”</p>\n<p>Target — value</p>`,
+    });
+    const edit = createFileTools(source).find((tool) => tool.name === "edit_file");
+
+    await edit?.function({
+      path: "/index.html",
+      edits: [
+        { find: "<p>“same”</p>", replace: "<p>curly</p>", replace_all: false },
+        { find: "<p>Target - value</p>", replace: "<p>changed</p>", replace_all: false },
+      ],
+    });
+
+    expect(files.get("/index.html")?.content).toBe(`<p>"same"</p>\n<p>curly</p>\n<p>changed</p>`);
+  });
+
+  it("continues read pagination from the last line actually returned", async () => {
+    const { source } = memorySource({
+      "/long.txt": ["1111111111", "2222222222", "3333333333"].join("\n"),
+    });
+    const read = createFileTools(source, { maxReadLines: 3, maxReadChars: 12 }).find(
+      (tool) => tool.name === "read_file",
+    );
+
+    const first = await read?.function({ path: "/long.txt", startLine: null, endLine: null });
+    const firstResult = first?.[0];
+    expect(firstResult?.type).toBe("text");
+    if (!firstResult || firstResult.type !== "text") throw new Error("Expected a text result");
+    expect(firstResult.text).toContain("lines 1-1 of 3");
+    expect(firstResult.text).toContain("Use startLine=2 to continue");
+    expect(firstResult.text).not.toContain("2222222222");
+
+    const second = await read?.function({ path: "/long.txt", startLine: 2, endLine: null });
+    const secondResult = second?.[0];
+    expect(secondResult?.type).toBe("text");
+    if (!secondResult || secondResult.type !== "text") throw new Error("Expected a text result");
+    expect(secondResult.text).toContain("2: 2222222222");
   });
 });

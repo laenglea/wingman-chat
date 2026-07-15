@@ -156,6 +156,7 @@ function validationDetails(result: ArtifactValidationResult):
 function createListTool(source: ReadableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}list_files`,
+    strict: true,
     display: {
       header: (_args, state) => ({ icon: Files, label: state.error ? "List failed" : "Listed files" }),
     },
@@ -164,17 +165,20 @@ function createListTool(source: ReadableFileSource, opts: Required<FileToolsOpti
       type: "object",
       properties: {
         directory: {
-          type: "string",
-          description: "Optional directory path to filter files. If not provided, lists all files.",
+          type: ["string", "null"],
+          description: "Directory path to filter files, or null to list all files.",
         },
       },
-      required: [],
+      required: ["directory"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
-      const dir = (args.directory as string | undefined) ?? "/";
+      const rawDir = (args.directory as string | null | undefined) ?? "/";
+      const dir = rawDir === "/" ? rawDir : rawDir.replace(/\/+$/, "");
 
       const entries = await source.list();
-      const filtered = !dir || dir === "/" ? entries : entries.filter((e) => e.path.startsWith(dir));
+      const filtered =
+        !dir || dir === "/" ? entries : entries.filter((e) => e.path === dir || e.path.startsWith(`${dir}/`));
       filtered.sort((a, b) => a.path.localeCompare(b.path));
 
       const lines = filtered.map((e) => {
@@ -190,6 +194,7 @@ function createListTool(source: ReadableFileSource, opts: Required<FileToolsOpti
 function createReadTool(source: ReadableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}read_file`,
+    strict: true,
     display: {
       header: (_args, state) => ({
         icon: FileText,
@@ -205,15 +210,18 @@ function createReadTool(source: ReadableFileSource, opts: Required<FileToolsOpti
           description: "The file path to read.",
         },
         startLine: {
-          type: "number",
-          description: "Start line number (1-indexed). Default: 1.",
+          type: ["integer", "null"],
+          minimum: 1,
+          description: "Start line number (1-indexed), or null for 1.",
         },
         endLine: {
-          type: "number",
-          description: "End line number (1-indexed, inclusive).",
+          type: ["integer", "null"],
+          minimum: 1,
+          description: "End line number (1-indexed, inclusive), or null for the default page size.",
         },
       },
-      required: ["path"],
+      required: ["path", "startLine", "endLine"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
       const path = args.path as string;
@@ -236,38 +244,49 @@ function createReadTool(source: ReadableFileSource, opts: Required<FileToolsOpti
       const allLines = splitLines(content);
       const totalLines = allLines.length;
 
-      const startLine = Math.max(1, (args.startLine as number) ?? 1);
+      const rawStartLine = args.startLine as number | null | undefined;
+      const startLine = Math.max(1, Math.floor(rawStartLine ?? 1));
 
       if (startLine > totalLines) {
         return error(`startLine ${startLine} is beyond end of file (${totalLines} lines)`);
       }
 
-      const endLine =
-        args.endLine != null
-          ? Math.min(args.endLine as number, totalLines)
-          : Math.min(startLine + opts.maxReadLines - 1, totalLines);
+      const maxEndLine = Math.min(startLine + opts.maxReadLines - 1, totalLines);
+      const requestedEndLine = args.endLine == null ? maxEndLine : Math.floor(args.endLine as number);
+      const endLine = Math.min(Math.max(startLine, requestedEndLine), maxEndLine);
 
       const requestedLines = getLineRange(allLines, startLine, endLine);
-
-      let output = requestedLines.join("\n");
+      const returnedLines: string[] = [];
+      let outputChars = 0;
       let charTruncated = false;
+      let longLineTruncated = false;
+      for (const line of requestedLines) {
+        const separatorChars = returnedLines.length > 0 ? 1 : 0;
+        if (outputChars + separatorChars + line.length <= opts.maxReadChars) {
+          returnedLines.push(line);
+          outputChars += separatorChars + line.length;
+          continue;
+        }
 
-      if (output.length > opts.maxReadChars) {
-        output = output.slice(0, opts.maxReadChars);
         charTruncated = true;
+        if (returnedLines.length === 0) {
+          returnedLines.push(line.slice(0, opts.maxReadChars));
+          longLineTruncated = true;
+        }
+        break;
       }
 
-      const formatted = formatLineOutput(charTruncated ? splitLines(output) : requestedLines, startLine);
-      const hasMore = endLine < totalLines;
-      const nextStart = endLine + 1;
-      const notice = charTruncated
-        ? ` [truncated at ${opts.maxReadChars} chars. Use startLine=${nextStart} to continue]`
-        : hasMore
-          ? ` [Use startLine=${nextStart} to continue]`
-          : "";
-      const header = `# ${path} (lines ${startLine}-${endLine} of ${totalLines})${notice}`;
+      const actualEndLine = startLine + returnedLines.length - 1;
+      const hasMore = actualEndLine < totalLines;
+      const nextStart = actualEndLine + 1;
+      const notices: string[] = [];
+      if (charTruncated) notices.push(`truncated at ${opts.maxReadChars} chars`);
+      if (longLineTruncated) notices.push(`line ${startLine} itself exceeds the character cap`);
+      if (hasMore) notices.push(`Use startLine=${nextStart} to continue`);
+      const notice = notices.length > 0 ? ` [${notices.join(". ")}]` : "";
+      const header = `# ${path} (lines ${startLine}-${actualEndLine} of ${totalLines})${notice}`;
 
-      return text(`${header}\n${formatted}`);
+      return text(`${header}\n${formatLineOutput(returnedLines, startLine)}`);
     },
   };
 }
@@ -361,20 +380,75 @@ const FUZZY_FOLD_REGEXES: Array<{ re: RegExp; to: string }> = FUZZY_FOLDS.map(({
   to,
 }));
 
+interface NormalizedTextMap {
+  text: string;
+  /** Original UTF-16 start/end offsets for each UTF-16 code unit in `text`. */
+  starts: number[];
+  ends: number[];
+}
+
 /**
- * Normalize text so a model's snippet still matches when it drifts on whitespace
- * or punctuation: collapse NFKC, strip trailing whitespace per line, and fold
- * smart quotes, unicode dashes, and exotic spaces to their ASCII equivalents.
- * Only used as a fallback after an exact match fails.
+ * Normalize text for matching while retaining the original span represented by
+ * every normalized code unit. This lets fuzzy matching replace only the matched
+ * source text instead of writing the normalized copy of the entire file.
  */
-function normalizeForFuzzyMatch(s: string): string {
-  let out = s
-    .normalize("NFKC")
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .join("\n");
-  for (const { re, to } of FUZZY_FOLD_REGEXES) out = out.replace(re, to);
-  return out;
+function normalizeForFuzzyMatch(source: string): NormalizedTextMap {
+  const rawChars: string[] = [];
+  const rawStarts: number[] = [];
+  const rawEnds: number[] = [];
+
+  for (let offset = 0; offset < source.length; ) {
+    const codePoint = source.codePointAt(offset);
+    if (codePoint === undefined) break;
+    const original = String.fromCodePoint(codePoint);
+    const end = offset + original.length;
+    let normalized = original.normalize("NFKC");
+    for (const { re, to } of FUZZY_FOLD_REGEXES) normalized = normalized.replace(re, to);
+
+    // A compatibility character can expand to several code units. Each one
+    // still represents the same original source span.
+    for (let i = 0; i < normalized.length; i++) {
+      rawChars.push(normalized[i]);
+      rawStarts.push(offset);
+      rawEnds.push(end);
+    }
+    offset = end;
+  }
+
+  const rawText = rawChars.join("");
+  const chars: string[] = [];
+  const starts: number[] = [];
+  const ends: number[] = [];
+
+  // Drop trailing whitespace per line while retaining mappings for the
+  // characters that survive. Newlines stay anchored after removed whitespace.
+  for (let lineStart = 0; lineStart <= rawText.length; ) {
+    const newline = rawText.indexOf("\n", lineStart);
+    const lineEnd = newline >= 0 ? newline : rawText.length;
+    const trimmedEnd = lineStart + rawText.slice(lineStart, lineEnd).trimEnd().length;
+
+    for (let i = lineStart; i < trimmedEnd; i++) {
+      chars.push(rawChars[i]);
+      starts.push(rawStarts[i]);
+      ends.push(rawEnds[i]);
+    }
+    if (newline < 0) break;
+
+    chars.push(rawChars[newline]);
+    starts.push(rawStarts[newline]);
+    ends.push(rawEnds[newline]);
+    lineStart = newline + 1;
+  }
+
+  return { text: chars.join(""), starts, ends };
+}
+
+function findAll(text: string, search: string): number[] {
+  const indices: number[] = [];
+  for (let from = text.indexOf(search); from >= 0; from = text.indexOf(search, from + search.length)) {
+    indices.push(from);
+  }
+  return indices;
 }
 
 /**
@@ -431,18 +505,15 @@ function coerceEdits(args: Record<string, unknown>): { edits: EditOp[] } | { err
  * Apply all edits against the ORIGINAL content (not sequentially): every `find`
  * is located in the same base text, the resulting spans are checked for overlap,
  * then applied right-to-left so earlier offsets stay valid. Matching is exact
- * first; if any edit misses, the whole operation retries in fuzzy-normalized
- * space (which also rewrites the untouched parts of the file to that normal form
- * — an accepted trade since the model's text already diverged from the file).
+ * first; an edit that misses retries in fuzzy-normalized space and maps its
+ * matches back to spans in the untouched original text.
  */
 function applyEdits(
   original: string,
   edits: EditOp[],
 ): { next: string; usedFuzzy: boolean; spans: number } | { error: string } {
-  const allExact = edits.every((e) => original.includes(e.find));
-  const usedFuzzy = !allExact;
-  const base = usedFuzzy ? normalizeForFuzzyMatch(original) : original;
-  const norm = (s: string) => (usedFuzzy ? normalizeForFuzzyMatch(s) : s);
+  let mappedBase: NormalizedTextMap | undefined;
+  let usedFuzzy = false;
 
   interface Span {
     start: number;
@@ -452,14 +523,20 @@ function applyEdits(
   }
   const spans: Span[] = [];
   for (let i = 0; i < edits.length; i++) {
-    const find = norm(edits[i].find);
-    const replace = edits[i].replace;
-    if (find.length === 0) return { error: `edits[${i}].find is empty after normalization.` };
+    let find = edits[i].find;
+    let indices = findAll(original, find);
+    let fuzzyMatch = false;
 
-    const indices: number[] = [];
-    for (let from = base.indexOf(find); from >= 0; from = base.indexOf(find, from + find.length)) {
-      indices.push(from);
+    if (indices.length === 0) {
+      mappedBase ??= normalizeForFuzzyMatch(original);
+      find = normalizeForFuzzyMatch(find).text;
+      if (find.length === 0) return { error: `edits[${i}].find is empty after normalization.` };
+      indices = findAll(mappedBase.text, find);
+      fuzzyMatch = true;
+      usedFuzzy = true;
     }
+
+    const replace = edits[i].replace;
     if (indices.length === 0) {
       return {
         error: `edits[${i}]: \`find\` text not found. An earlier read may be stale — read_file and retry with the exact current text.`,
@@ -470,7 +547,15 @@ function applyEdits(
         error: `edits[${i}]: \`find\` matches ${indices.length} places. Provide a longer, unique snippet or set replace_all: true.`,
       };
     }
-    for (const start of indices) spans.push({ start, end: start + find.length, replace, editIndex: i });
+    for (const start of indices) {
+      const end = start + find.length;
+      spans.push({
+        start: fuzzyMatch && mappedBase ? mappedBase.starts[start] : start,
+        end: fuzzyMatch && mappedBase ? mappedBase.ends[end - 1] : end,
+        replace,
+        editIndex: i,
+      });
+    }
   }
 
   spans.sort((a, b) => a.start - b.start);
@@ -482,11 +567,11 @@ function applyEdits(
     }
   }
 
-  let next = base;
+  let next = original;
   for (let i = spans.length - 1; i >= 0; i--) {
     next = next.slice(0, spans[i].start) + spans[i].replace + next.slice(spans[i].end);
   }
-  if (next === base) {
+  if (next === original) {
     return { error: "No changes — the replacement(s) produced identical content." };
   }
   return { next, usedFuzzy, spans: spans.length };
@@ -575,6 +660,7 @@ function createEditTool(source: WritableFileSource, opts: Required<FileToolsOpti
 function createDeleteTool(source: WritableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}delete_file`,
+    strict: true,
     display: {
       header: (_args, state) => ({ icon: Trash2, label: state.error ? "Delete failed" : "Deleted file" }),
     },
@@ -588,6 +674,7 @@ function createDeleteTool(source: WritableFileSource, opts: Required<FileToolsOp
         },
       },
       required: ["path"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
       const path = args.path as string;
@@ -603,6 +690,7 @@ function createDeleteTool(source: WritableFileSource, opts: Required<FileToolsOp
 function createMoveTool(source: WritableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}move_file`,
+    strict: true,
     display: {
       header: (args, state) => {
         const from = (typeof args?.from === "string" ? args.from : "").replace(/^\/+/, "");
@@ -628,6 +716,7 @@ function createMoveTool(source: WritableFileSource, opts: Required<FileToolsOpti
         },
       },
       required: ["from", "to"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
       const from = args.from as string;
@@ -660,6 +749,7 @@ function createMoveTool(source: WritableFileSource, opts: Required<FileToolsOpti
 function createGrepTool(source: ReadableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}grep`,
+    strict: true,
     display: {
       header: (args, state) => ({
         icon: Search,
@@ -677,19 +767,21 @@ function createGrepTool(source: ReadableFileSource, opts: Required<FileToolsOpti
           description: "Regex pattern to search for.",
         },
         filePattern: {
-          type: "string",
-          description: 'Optional glob to filter files (e.g., "*.csv").',
+          type: ["string", "null"],
+          description: 'Glob to filter files (e.g., "*.csv"), or null for all files.',
         },
         ignoreCase: {
-          type: "boolean",
-          description: "Case-insensitive search. Default: true.",
+          type: ["boolean", "null"],
+          description: "Case-insensitive search, or null for true.",
         },
         contextLines: {
-          type: "number",
-          description: `Context lines before/after match. Default: ${opts.defaultContextLines}.`,
+          type: ["integer", "null"],
+          minimum: 0,
+          description: `Context lines before/after match, or null for ${opts.defaultContextLines}.`,
         },
       },
-      required: ["pattern"],
+      required: ["pattern", "filePattern", "ignoreCase", "contextLines"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
       const pattern = args.pattern as string;
@@ -697,7 +789,7 @@ function createGrepTool(source: ReadableFileSource, opts: Required<FileToolsOpti
 
       const filePattern = args.filePattern as string | undefined;
       const ignoreCase = (args.ignoreCase as boolean) ?? true;
-      const contextLines = (args.contextLines as number) ?? opts.defaultContextLines;
+      const contextLines = Math.max(0, Math.floor((args.contextLines as number | null) ?? opts.defaultContextLines));
 
       const entries = await source.list();
       let searchEntries = entries;
@@ -755,6 +847,7 @@ function createGrepTool(source: ReadableFileSource, opts: Required<FileToolsOpti
 function createGlobTool(source: ReadableFileSource, opts: Required<FileToolsOptions>): Tool {
   return {
     name: `${opts.namespace}glob`,
+    strict: true,
     display: {
       header: (args, state) => ({
         icon: FileSearch,
@@ -772,6 +865,7 @@ function createGlobTool(source: ReadableFileSource, opts: Required<FileToolsOpti
         },
       },
       required: ["pattern"],
+      additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
       const pattern = args.pattern as string;
