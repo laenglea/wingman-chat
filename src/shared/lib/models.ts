@@ -296,6 +296,7 @@ export function modelName(id: string): string {
 
 const REGION_QUALIFIED_MODEL_ID =
   /^(?:[a-z]{2}|global)\.(?=(?:[a-z0-9-]+\.)?(?:claude|gpt|o[134]|gemini|imagen|dall-e|flux|llama|mistral|magistral|deepseek|glm|kimi|qwen|nemotron|nova|command|jamba|grok|phi|mai|fable)(?:[.-]|$))/i;
+const CHAT_MODEL_VENDOR_PREFIX = /^(?:anthropic|openai)[./:-]+/i;
 
 export function shortModelName(id: string): string {
   const unqualifiedId = id
@@ -304,6 +305,9 @@ export function shortModelName(id: string): string {
     // remainder starts with a known model family, avoiding clashes with real
     // two-letter namespaces.
     .replace(REGION_QUALIFIED_MODEL_ID, "")
+    // The chat footer already has limited space and the family identifies these
+    // models clearly enough. Keep full vendor names elsewhere, such as pickers.
+    .replace(CHAT_MODEL_VENDOR_PREFIX, "")
     .replace(/-(\d{4}-\d{2}-\d{2}|\d{8})$/, "");
 
   return modelName(unqualifiedId);
