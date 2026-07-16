@@ -91,10 +91,47 @@ describe("artifact file tools", () => {
     const result = await create?.function({ path: "/bad.html", content: { unexpected: true } });
 
     expect(files.has("/bad.html")).toBe(false);
-    expect(result?.[0]).toEqual({
-      type: "text",
-      text: JSON.stringify({ error: "content is required and must be a string." }),
-    });
+    const first = result?.[0];
+    if (!first || first.type !== "text") throw new Error("Expected a text result");
+    const parsed = JSON.parse(first.text) as { error: string };
+    expect(parsed.error).toContain("content is required and must be a string");
+    expect(parsed.error).toContain("path, content");
+  });
+
+  it("accepts common path aliases from non-strict providers", async () => {
+    const { files, source } = memorySource();
+    const create = createFileTools(source).find((tool) => tool.name === "create_file");
+
+    await create?.function({ file_path: "/aliased.py", content: "print('hi')" });
+    await create?.function({ filename: "/named.py", content: "print('ho')" });
+
+    expect(files.get("/aliased.py")?.content).toBe("print('hi')");
+    expect(files.get("/named.py")?.content).toBe("print('ho')");
+  });
+
+  it("accepts common content aliases from non-strict providers", async () => {
+    const { files, source } = memorySource();
+    const create = createFileTools(source).find((tool) => tool.name === "create_file");
+
+    await create?.function({ path: "/contents.py", contents: "print('hi')" });
+    await create?.function({ path: "/file-content.py", file_content: "print('ho')" });
+
+    expect(files.get("/contents.py")?.content).toBe("print('hi')");
+    expect(files.get("/file-content.py")?.content).toBe("print('ho')");
+  });
+
+  it("names the received keys when the path is missing entirely", async () => {
+    const { files, source } = memorySource();
+    const create = createFileTools(source).find((tool) => tool.name === "create_file");
+
+    const result = await create?.function({ content: "print('hi')" });
+
+    expect(files.size).toBe(0);
+    const first = result?.[0];
+    if (!first || first.type !== "text") throw new Error("Expected a text result");
+    const parsed = JSON.parse(first.text) as { error: string };
+    expect(parsed.error).toContain("path is required");
+    expect(parsed.error).toContain("Received argument keys: content");
   });
 
   it("applies quote-heavy HTML edits", async () => {

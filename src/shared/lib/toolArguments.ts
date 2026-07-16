@@ -24,6 +24,7 @@ export class ToolArgumentsParseError extends Error {
 export interface ToolArgumentHints {
   payloadKey?: string;
   otherKeys?: string[];
+  declaredKeys?: string[];
 }
 
 // String fields whose name implies a code/command/text payload. When a tool has
@@ -31,11 +32,15 @@ export interface ToolArgumentHints {
 // otherwise we can't tell which holds the blob and leave it to jsonrepair.
 const PAYLOAD_NAME = /^(code|command|script|source|sql|query|content|body|text|input|instructions|prompt|patch|diff)$/i;
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
 function asObject(value: unknown): Record<string, unknown> {
   // Tool arguments are always a JSON object. A bare array/number/string means
   // the model emitted something malformed enough that repair "succeeded" on the
   // wrong shape — treat that as a non-object and let callers see empty args.
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return isPlainObject(value) ? value : {};
 }
 
 function isStringType(schema: unknown): boolean {
@@ -55,17 +60,17 @@ export function toolArgumentHints(parameters: unknown): ToolArgumentHints {
   if (!properties || typeof properties !== "object") return {};
 
   const names = Object.keys(properties);
+  if (names.length === 0) return {};
   const stringNames = names.filter((n) => isStringType(properties[n]));
-  if (stringNames.length === 0) return {};
 
   // Only recover fields whose name identifies them as a free-text payload.
   // A lone top-level string is not necessarily the payload: edit_file, for
   // example, has a string `path` plus quote-heavy strings nested in `edits`.
   // Treating `path` as dominant would discard the edits on malformed input.
   const payloadKey = stringNames.find((n) => PAYLOAD_NAME.test(n));
-  if (!payloadKey) return {};
+  if (!payloadKey) return { declaredKeys: names };
 
-  return { payloadKey, otherKeys: names.filter((n) => n !== payloadKey) };
+  return { payloadKey, otherKeys: names.filter((n) => n !== payloadKey), declaredKeys: names };
 }
 
 /**
@@ -136,6 +141,129 @@ function lenientUnescape(raw: string, quote: string): string {
     }
   }
   return out;
+}
+
+/** True when `slice` contains one of `chars` not preceded by an odd number of backslashes. */
+function hasUnescapedChar(slice: string, chars: readonly string[]): boolean {
+  let backslashes = 0;
+  for (const ch of slice) {
+    if (ch === "\\") {
+      backslashes++;
+      continue;
+    }
+    if (chars.includes(ch) && backslashes % 2 === 0) return true;
+    backslashes = 0;
+  }
+  return false;
+}
+
+/** True when the slice contains an escaped-backslash pair (`\\`), read left to right. */
+function hasEscapedBackslashPair(slice: string): boolean {
+  for (let i = 0; i < slice.length - 1; i++) {
+    if (slice[i] !== "\\") continue;
+    if (slice[i + 1] === "\\") return true;
+    i++; // lone escape unit — skip its target
+  }
+  return false;
+}
+
+/**
+ * Decode `\<quote>` and `\\` sequences, leaving every other backslash sequence
+ * untouched. Used when line breaks arrived raw: the remaining `\n`/`\t` in the
+ * payload are then literal source text (a Python "\n"), not escaped whitespace,
+ * while `\"` and `\\` still show deliberate escaping that must be reversed.
+ */
+function unescapeQuotesAndBackslashes(slice: string, quoteChars: readonly string[]): string {
+  let out = "";
+  for (let i = 0; i < slice.length; i++) {
+    if (slice[i] === "\\" && i + 1 < slice.length && (slice[i + 1] === "\\" || quoteChars.includes(slice[i + 1]))) {
+      out += slice[i + 1];
+      i++;
+    } else {
+      out += slice[i];
+    }
+  }
+  return out;
+}
+
+/** Decode `\uXXXX` sequences only, keeping every other backslash pair verbatim. */
+function unescapeUnicodeOnly(segment: string): string {
+  let out = "";
+  for (let i = 0; i < segment.length; i++) {
+    const ch = segment[i];
+    const hex = ch === "\\" && segment[i + 1] === "u" ? segment.slice(i + 2, i + 6) : "";
+    if (/^[0-9a-fA-F]{4}$/.test(hex)) {
+      out += String.fromCharCode(parseInt(hex, 16));
+      i += 5;
+    } else if (ch === "\\" && i + 1 < segment.length) {
+      out += ch + segment[i + 1];
+      i++;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/**
+ * Positionally decode a payload whose delimiter quotes arrived raw. Escape
+ * sequences OUTSIDE the payload's own string literals are structural (`\n`
+ * between statements of a flattened file) and decode leniently — lenient keeps
+ * non-JSON sequences like `C:\build` intact. INSIDE a raw-quoted literal they
+ * are source text (`"C:\new\temp.txt"`, `re.compile("\d+")`, `EOL = "\n"`) and
+ * stay verbatim except `\uXXXX` — unless an escaped-backslash pair anywhere in
+ * the slice proves the model was escaping backslashes too, in which case the
+ * literals are JSON-encoded and decode fully (`r"\\d{4}"` → `r"\d{4}"`).
+ * Apostrophes are not treated as literal delimiters (prose like "don't" in a
+ * comment would open a phantom string) unless they delimit the payload itself.
+ */
+function decodeAroundRawStrings(slice: string, quote: string): string {
+  const toggles = new Set(['"', "`", quote]);
+  const literalsAreEncoded = hasEscapedBackslashPair(slice);
+  let out = "";
+  let segmentStart = 0;
+  let stringChar: string | null = null;
+  const flush = (end: number, inString: boolean) => {
+    const segment = slice.slice(segmentStart, end);
+    out += inString && !literalsAreEncoded ? unescapeUnicodeOnly(segment) : lenientUnescape(segment, quote);
+    segmentStart = end;
+  };
+  for (let i = 0; i < slice.length; i++) {
+    const ch = slice[i];
+    if (ch === "\\") {
+      i++;
+    } else if (stringChar) {
+      if (ch === stringChar) {
+        flush(i + 1, true);
+        stringChar = null;
+      }
+    } else if (toggles.has(ch)) {
+      flush(i, false);
+      stringChar = ch;
+    }
+  }
+  flush(slice.length, stringChar !== null);
+  return out;
+}
+
+/**
+ * Decode a recovered payload slice by first judging how much the model actually
+ * escaped. Raw (unescaped) delimiter quotes plus raw newlines mean the code was
+ * dumped fully verbatim — decoding `\n` there would corrupt regexes and Windows
+ * paths into control characters. Raw quotes alone mean string literals arrived
+ * as source text: decode positionally around them. Raw newlines alone mean
+ * whitespace was never escaped, so `\n`/`\t` stay literal and only
+ * quote/backslash escapes are decoded. Otherwise fall through to the full
+ * lenient decode.
+ */
+function decodePayloadSlice(slice: string, quote: string, closingQuote: string): string {
+  const quoteChars = quote === closingQuote ? [quote] : [quote, closingQuote];
+  const rawQuote = hasUnescapedChar(slice, quoteChars);
+  const rawNewline = slice.includes("\n");
+  if (rawQuote && rawNewline) return slice;
+  if (rawQuote) return decodeAroundRawStrings(slice, quote);
+  if (rawNewline) return unescapeQuotesAndBackslashes(slice, quoteChars);
+  return lenientUnescape(slice, quote);
 }
 
 function escapeRegExp(text: string): string {
@@ -242,11 +370,18 @@ function recoverDominantStringField(
           .replace(/```(?:json)?/gi, "")
           .trim()
       : "";
-  const beforeOuterEnd = possibleOuterEnd >= 0 ? text.slice(0, possibleOuterEnd).trimEnd() : "";
-  let boundary =
-    possibleOuterEnd >= start && afterOuterEnd === "" && beforeOuterEnd.endsWith(closingQuote)
-      ? possibleOuterEnd
-      : text.length;
+  // Accept the outer `}` as the value's end when the text before it is the
+  // closing quote, optionally followed by a trailing comma (`"...",}`).
+  let boundary = text.length;
+  if (possibleOuterEnd >= start && afterOuterEnd === "") {
+    let cut = possibleOuterEnd;
+    while (cut > start && /\s/.test(text[cut - 1])) cut--;
+    if (text[cut - 1] === ",") {
+      cut--;
+      while (cut > start && /\s/.test(text[cut - 1])) cut--;
+    }
+    if (cut > start && text[cut - 1] === closingQuote) boundary = cut;
+  }
   let trailing: Record<string, unknown> = {};
   for (const key of otherKeys) {
     if (leadingKeys.has(key)) continue;
@@ -276,10 +411,111 @@ function recoverDominantStringField(
   const result: Record<string, unknown> = {
     ...leading,
     ...trailing,
-    [payloadKey]: lenientUnescape(text.slice(start, end), quote),
+    [payloadKey]: decodePayloadSlice(text.slice(start, end), quote, closingQuote),
   };
 
   return result;
+}
+
+// Wrapper keys some providers/models nest the real arguments under
+// (e.g. `{"arguments": {"path": …, "content": …}}`).
+const WRAPPER_KEYS = ["arguments", "args", "input", "parameters", "params", "tool_input", "toolInput", "properties"];
+
+/**
+ * Unwrap `{"arguments": {...}}`-style nesting, but only when the tool schema is
+ * known and rules out the wrapper being a legitimate argument: the wrapper key
+ * must not be declared, and the inner object must carry at least one declared key.
+ */
+function unwrapKnownWrapper(args: Record<string, unknown>, hints?: ToolArgumentHints): Record<string, unknown> {
+  const declared = hints?.declaredKeys;
+  if (!declared?.length) return args;
+  const keys = Object.keys(args);
+  if (keys.length !== 1) return args;
+  const [key] = keys;
+  if (declared.includes(key) || !WRAPPER_KEYS.includes(key)) return args;
+  const inner = args[key];
+  if (!isPlainObject(inner)) return args;
+  const innerKeys = Object.keys(inner);
+  if (innerKeys.length > 0 && !innerKeys.some((k) => declared.includes(k))) return args;
+  return inner;
+}
+
+/**
+ * Coerce a successfully parsed value into an arguments object:
+ * - a string is a double-encoded arguments payload — parse it again (bounded);
+ * - a one-element array is an accidental wrapping of the arguments object;
+ * - known wrapper keys (`arguments`, `input`, …) are peeled off.
+ * Returns undefined when the value cannot be shaped into an object, so callers
+ * can fall through to recovery/repair instead of silently yielding `{}`.
+ */
+function normalizeParsed(
+  parsed: unknown,
+  hints: ToolArgumentHints | undefined,
+  depth: number,
+): Record<string, unknown> | undefined {
+  if (parsed === null || parsed === undefined) return {};
+  if (typeof parsed === "string") {
+    const inner = parsed.trim();
+    if (!inner) return {};
+    if (depth <= 0) return undefined;
+    try {
+      return parseArgumentsText(inner, hints, depth - 1);
+    } catch {
+      return undefined;
+    }
+  }
+  if (Array.isArray(parsed)) {
+    if (parsed.length !== 1 || !isPlainObject(parsed[0])) return undefined;
+    return unwrapKnownWrapper(parsed[0], hints);
+  }
+  if (isPlainObject(parsed)) return unwrapKnownWrapper(parsed, hints);
+  return undefined;
+}
+
+/**
+ * Split text that is several complete JSON objects back to back — a streaming
+ * accumulation glitch where a provider re-sends the full argument snapshot
+ * instead of a delta (`{...}{...}`). Only succeeds when every segment parses
+ * strictly, so malformed payload content can never be mistaken for segments.
+ */
+function splitConcatenatedObjects(text: string): Record<string, unknown>[] | null {
+  if (!text.startsWith("{") || !text.endsWith("}")) return null;
+  const objects: Record<string, unknown>[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}") {
+      depth--;
+      if (depth < 0) return null;
+      if (depth === 0) {
+        try {
+          const parsed: unknown = JSON.parse(text.slice(start, i + 1));
+          if (!isPlainObject(parsed)) return null;
+          objects.push(parsed);
+        } catch {
+          return null;
+        }
+      }
+    } else if (depth === 0 && !/\s/.test(ch)) {
+      return null;
+    }
+  }
+  if (depth !== 0 || inString) return null;
+  return objects.length >= 2 ? objects : null;
 }
 
 /**
@@ -288,10 +524,14 @@ function recoverDominantStringField(
  * producing arguments that `JSON.parse` rejects (e.g. `{"code":"print("hi")"}`).
  *
  * Order of attempts:
- *  1. Strict `JSON.parse` — well-formed args always win and are never touched.
- *  2. Schema-aware recovery of the dominant string field (when `hints.payloadKey`
+ *  1. Strict `JSON.parse` — well-formed args always win. The parsed value is
+ *     still normalized: double-encoded strings are parsed again, one-element
+ *     arrays and `{"arguments": {...}}` wrappers are unwrapped.
+ *  2. Concatenated complete objects (`{...}{...}` streaming snapshot glitch) —
+ *     the last snapshot wins.
+ *  3. Schema-aware recovery of the dominant string field (when `hints.payloadKey`
  *     is known) — precise and boundary-anchored.
- *  3. `jsonrepair` — generic last resort for tools without a payload field.
+ *  4. `jsonrepair` — generic last resort for tools without a payload field.
  *
  * Recovery runs *before* `jsonrepair` because `jsonrepair` can silently truncate
  * a code payload (e.g. `python3 -c "print('hi')"` → `python3 -c `); for the code
@@ -302,12 +542,40 @@ function recoverDominantStringField(
 export function parseToolArguments(raw: string | undefined | null, hints?: ToolArgumentHints): Record<string, unknown> {
   const text = (raw ?? "").trim();
   if (!text) return {};
+  return parseArgumentsText(text, hints, 2);
+}
 
+function parseArgumentsText(
+  text: string,
+  hints: ToolArgumentHints | undefined,
+  depth: number,
+): Record<string, unknown> {
+  let strictParsed: unknown;
+  let strictOk = false;
   try {
-    return asObject(JSON.parse(text));
+    strictParsed = JSON.parse(text);
+    strictOk = true;
   } catch {
     // Fall through to recovery.
   }
+  if (strictOk) {
+    const normalized = normalizeParsed(strictParsed, hints, depth);
+    if (normalized) return normalized;
+    // Valid JSON of the wrong shape (multiple objects in an array, a bare
+    // number, an undecodable nested string). Recovery slices malformed text and
+    // would corrupt valid JSON, so fail fast with an actionable error instead.
+    throw new ToolArgumentsParseError(
+      text,
+      new Error(
+        typeof strictParsed === "string"
+          ? "Arguments were a JSON-encoded string whose contents could not be parsed as an object."
+          : "Arguments parsed to a JSON value that is not a single object.",
+      ),
+    );
+  }
+
+  const snapshots = splitConcatenatedObjects(text);
+  if (snapshots) return unwrapKnownWrapper(snapshots[snapshots.length - 1], hints);
 
   if (hints?.payloadKey) {
     const recovered = recoverDominantStringField(text, hints.payloadKey, hints.otherKeys ?? []);
@@ -315,7 +583,9 @@ export function parseToolArguments(raw: string | undefined | null, hints?: ToolA
   }
 
   try {
-    return asObject(JSON.parse(jsonrepair(text)));
+    const normalized = normalizeParsed(JSON.parse(jsonrepair(text)), hints, depth);
+    if (normalized) return normalized;
+    throw new Error("Arguments did not repair to a JSON object.");
   } catch (reason) {
     throw new ToolArgumentsParseError(text, reason);
   }

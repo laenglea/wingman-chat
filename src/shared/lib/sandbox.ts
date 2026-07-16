@@ -75,4 +75,3 @@ export function getArtifactLinkPath(url: string): string | null {
   const normalized = normalizeArtifactPath(candidate);
   return normalized && normalized !== "/" ? normalized : null;
 }
-

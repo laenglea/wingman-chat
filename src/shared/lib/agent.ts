@@ -189,7 +189,7 @@ async function dispatchToolCall(
     if (error instanceof ToolArgumentsParseError) {
       return toolErrorMessage(
         toolCall,
-        'Error: The tool arguments were not valid JSON. This usually means a string value (e.g. `code`) contains an unescaped " or \\. Re-send the call with every " escaped as \\", every \\ as \\\\, and newlines as \\n. For long scripts with many quotes, write the code to a .py artifact and run it via `path` to avoid JSON escaping entirely.',
+        `Error: The tool arguments could not be parsed (${error.message}). Re-send the call as a single JSON object with the declared parameters. If a string value (e.g. \`code\`) contains " or \\, escape every " as \\", every \\ as \\\\, and newlines as \\n. For long scripts with many quotes, write the code to a .py artifact and run it via \`path\` to avoid JSON escaping entirely.`,
         { code: "TOOL_ARGS_INVALID_JSON", message: "The tool arguments could not be parsed as JSON." },
       );
     }

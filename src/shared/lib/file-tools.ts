@@ -115,7 +115,7 @@ async function validateWrite(
  * a file by accident.
  */
 function coerceFileContent(args: Record<string, unknown>): string | undefined {
-  const aliases = ["content", "html", "text", "body", "source", "code"] as const;
+  const aliases = ["content", "contents", "html", "text", "body", "source", "code", "file_content"] as const;
   const raw =
     args.content ??
     aliases
@@ -134,6 +134,24 @@ function coerceFileContent(args: Record<string, unknown>): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Same fallback idea for the target path: providers that garble the strict
+ * schema sometimes deliver it under a `file_path`/`filename` style key.
+ */
+function coerceFilePath(args: Record<string, unknown>): string | undefined {
+  for (const key of ["path", "file_path", "filepath", "file_name", "filename", "file"] as const) {
+    const value = args[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
+/** Describe what actually arrived, so the model can self-correct the retry. */
+function describeArgs(args: Record<string, unknown>): string {
+  const keys = Object.keys(args);
+  return keys.length ? `Received argument keys: ${keys.join(", ")}.` : "Received no arguments.";
 }
 
 function validationDetails(result: ArtifactValidationResult):
@@ -302,9 +320,9 @@ function createWriteTool(source: WritableFileSource, opts: Required<FileToolsOpt
       }),
       // Show just the file content (the path is the header preview), highlighted by extension.
       input: (args) => {
-        const content = typeof args?.content === "string" ? args.content : "";
+        const content = args ? coerceFileContent(args) : undefined;
         if (!content) return [];
-        const path = typeof args?.path === "string" ? args.path : undefined;
+        const path = args ? coerceFilePath(args) : undefined;
         return [{ code: content, language: path ? artifactLanguage(path) : "text" }];
       },
     },
@@ -326,12 +344,20 @@ function createWriteTool(source: WritableFileSource, opts: Required<FileToolsOpt
       additionalProperties: false,
     },
     function: async (args: Record<string, unknown>) => {
-      const path = args.path as string;
-      if (!path) return error("path is required");
+      const path = coerceFilePath(args);
+      if (!path) {
+        return error(
+          `path is required and must be a string like "/script.py". ${describeArgs(args)} Re-send the call as {"path": "...", "content": "..."}.`,
+        );
+      }
       // Empty strings remain valid. The coercion is a fallback for providers
       // which ignore the strict schema; it never stringifies arbitrary values.
       const content = coerceFileContent(args);
-      if (content === undefined) return error("content is required and must be a string.");
+      if (content === undefined) {
+        return error(
+          `content is required and must be a string holding the full file text. ${describeArgs(args)} Re-send the call as {"path": "${path}", "content": "..."}.`,
+        );
+      }
 
       try {
         await source.write(path, content);
