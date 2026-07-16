@@ -39,8 +39,10 @@ function asObject(value: unknown): Record<string, unknown> {
 }
 
 function isStringType(schema: unknown): boolean {
-  const type = (schema as { type?: unknown })?.type;
-  return type === "string" || (Array.isArray(type) && type.includes("string"));
+  const typed = schema as { type?: unknown; anyOf?: unknown; oneOf?: unknown };
+  const type = typed?.type;
+  const alternatives = Array.isArray(typed?.anyOf) ? typed.anyOf : Array.isArray(typed?.oneOf) ? typed.oneOf : [];
+  return type === "string" || (Array.isArray(type) && type.includes("string")) || alternatives.some(isStringType);
 }
 
 /**
@@ -72,7 +74,7 @@ export function toolArgumentHints(parameters: unknown): ToolArgumentHints {
  * …) is kept verbatim so regexes and paths survive. Only used on the recovery
  * path — well-formed arguments are parsed strictly and never reach this.
  */
-function lenientUnescape(raw: string): string {
+function lenientUnescape(raw: string, quote: string): string {
   let out = "";
   for (let i = 0; i < raw.length; i++) {
     const ch = raw[i];
@@ -81,6 +83,11 @@ function lenientUnescape(raw: string): string {
       continue;
     }
     const next = raw[i + 1];
+    if (next === quote || (quote === "\u201c" && next === "\u201d") || (quote === "\u2018" && next === "\u2019")) {
+      out += next;
+      i++;
+      continue;
+    }
     switch (next) {
       case '"':
         out += '"';
@@ -131,11 +138,69 @@ function lenientUnescape(raw: string): string {
   return out;
 }
 
-/** Index of the last match of a global regex, or -1. */
-function lastIndexOfPattern(text: string, re: RegExp): number {
-  let idx = -1;
-  for (const m of text.matchAll(re)) idx = m.index;
-  return idx;
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Match JSON, JavaScript/Python, and typographic spellings of a property key. */
+function propertyKeyPattern(key: string): string {
+  const escaped = escapeRegExp(key);
+  return `(?:"${escaped}"|'${escaped}'|\`${escaped}\`|\u201c${escaped}\u201d|\u2018${escaped}\u2019|${escaped})`;
+}
+
+function parseObjectFragment(fragment: string, declaredKeys: readonly string[]): Record<string, unknown> | null {
+  let normalized = fragment;
+  for (const key of declaredKeys) {
+    const canonical = JSON.stringify(key);
+    normalized = normalized.replace(
+      new RegExp(
+        `(?:'${escapeRegExp(key)}'|\`${escapeRegExp(key)}\`|\u201c${escapeRegExp(key)}\u201d|\u2018${escapeRegExp(key)}\u2019|${escapeRegExp(key)})\\s*:`,
+        "g",
+      ),
+      `${canonical}:`,
+    );
+  }
+  // Smart quotes are sometimes applied to the whole function call by a rich
+  // text boundary. At this point the fragment contains sibling arguments only,
+  // so converting paired smart strings cannot alter the recovered payload.
+  normalized = normalized
+    .replace(/\u201c([^\u201d]*)\u201d/g, (_match, value: string) => JSON.stringify(value))
+    .replace(/\u2018([^\u2019]*)\u2019/g, (_match, value: string) => JSON.stringify(value));
+
+  try {
+    return asObject(JSON.parse(normalized));
+  } catch {
+    try {
+      return asObject(JSON.parse(jsonrepair(normalized)));
+    } catch {
+      return null;
+    }
+  }
+}
+
+function parseLeadingSiblings(
+  text: string,
+  propertyStart: number,
+  declaredKeys: readonly string[],
+): Record<string, unknown> | null {
+  const objectStart = text.indexOf("{");
+  if (objectStart < 0 || objectStart >= propertyStart) return {};
+  const body = text
+    .slice(objectStart + 1, propertyStart)
+    .trim()
+    .replace(/,$/, "");
+  return body ? parseObjectFragment(`{${body}}`, declaredKeys) : {};
+}
+
+function parseTrailingSiblings(
+  text: string,
+  separator: number,
+  declaredKeys: readonly string[],
+): Record<string, unknown> | null {
+  const outerEnd = text.lastIndexOf("}");
+  let body = text.slice(separator + 1, outerEnd > separator ? outerEnd : text.length).trim();
+  body = body.replace(/```(?:json)?\s*$/i, "").trim();
+  return body ? parseObjectFragment(`{${body}}`, declaredKeys) : {};
 }
 
 /**
@@ -152,54 +217,68 @@ function recoverDominantStringField(
   payloadKey: string,
   otherKeys: string[],
 ): Record<string, unknown> | null {
-  const open = new RegExp(`"${payloadKey}"\\s*:\\s*"`).exec(text);
+  const open = new RegExp(`(?:^|[,{])\\s*${propertyKeyPattern(payloadKey)}\\s*:\\s*(["'\u201c\u2018\x60])`).exec(text);
   if (!open) return null;
   const start = open.index + open[0].length;
+  const quote = open[1];
+  const closingQuote = quote === "\u201c" ? "\u201d" : quote === "\u2018" ? "\u2019" : quote;
 
-  // Keys which already occur before the payload cannot also be legitimate
-  // trailing fields in the same JSON object. Remember this before scanning the
-  // payload: HTML/JS frequently contains data such as `{"path":"/api"}`, and
-  // that inner key must not be mistaken for the outer create_file `path`.
-  const leadingText = text.slice(0, open.index);
-  const leadingKeys = new Set(otherKeys.filter((key) => new RegExp(`"${key}"\\s*:`).test(leadingText)));
+  // Parse the structurally complete part before the payload. Besides recovering
+  // leading values, this is more precise than merely looking for key-shaped text
+  // that may itself occur inside a path or another string.
+  const leading = parseLeadingSiblings(text, open.index, otherKeys);
+  if (!leading) return null;
+  const leadingKeys = new Set(Object.keys(leading).filter((key) => otherKeys.includes(key)));
 
-  // Value ends at the earliest of: the final closing brace, or the *last*
-  // `,"<otherKey>":` separator (trailing fields come after the payload, so the
-  // last occurrence is the real separator — an inner one inside code won't win).
-  let boundary = text.lastIndexOf("}");
-  if (boundary < start) boundary = text.length;
+  // A key-looking sequence inside source code is only accepted as an outer
+  // boundary when everything after it parses as a sibling-object fragment.
+  // This prevents `const x = {"method":"GET","path":"/api"}` from truncating
+  // `code` when the actual outer `path` argument was omitted.
+  const possibleOuterEnd = text.lastIndexOf("}");
+  const afterOuterEnd =
+    possibleOuterEnd >= 0
+      ? text
+          .slice(possibleOuterEnd + 1)
+          .replace(/```(?:json)?/gi, "")
+          .trim()
+      : "";
+  const beforeOuterEnd = possibleOuterEnd >= 0 ? text.slice(0, possibleOuterEnd).trimEnd() : "";
+  let boundary =
+    possibleOuterEnd >= start && afterOuterEnd === "" && beforeOuterEnd.endsWith(closingQuote)
+      ? possibleOuterEnd
+      : text.length;
+  let trailing: Record<string, unknown> = {};
   for (const key of otherKeys) {
     if (leadingKeys.has(key)) continue;
-    const rel = lastIndexOfPattern(text.slice(start), new RegExp(`,\\s*"${key}"\\s*:`, "g"));
-    if (rel >= 0) boundary = Math.min(boundary, start + rel);
+    const separator = new RegExp(`,\\s*${propertyKeyPattern(key)}\\s*:`, "g");
+    const candidates = [...text.slice(start).matchAll(separator)].map((match) => start + match.index).reverse();
+    for (const candidate of candidates) {
+      const parsed = parseTrailingSiblings(text, candidate, otherKeys);
+      if (
+        parsed &&
+        Object.prototype.hasOwnProperty.call(parsed, key) &&
+        Object.keys(parsed).every((parsedKey) => otherKeys.includes(parsedKey))
+      ) {
+        if (candidate < boundary) {
+          boundary = candidate;
+          trailing = parsed;
+        }
+        break;
+      }
+    }
   }
 
   // Trim trailing whitespace, then the single closing quote of the value.
   let end = boundary;
   while (end > start && /\s/.test(text[end - 1])) end--;
-  if (text[end - 1] === '"') end--;
+  if (text[end - 1] === closingQuote) end--;
 
-  const result: Record<string, unknown> = { [payloadKey]: lenientUnescape(text.slice(start, end)) };
+  const result: Record<string, unknown> = {
+    ...leading,
+    ...trailing,
+    [payloadKey]: lenientUnescape(text.slice(start, end), quote),
+  };
 
-  // Best-effort scalars for the remaining fields (null when absent or unparseable).
-  for (const key of otherKeys) {
-    // Search on the side where the outer field lives. This prevents a `path`,
-    // `skills`, etc. embedded in the recovered source from winning over the
-    // actual sibling argument.
-    const siblingText = leadingKeys.has(key) ? leadingText : text.slice(boundary);
-    const m = new RegExp(`"${key}"\\s*:\\s*(null|true|false|"[^"]*"|\\[[^\\]]*\\]|-?\\d+(?:\\.\\d+)?)`).exec(
-      siblingText,
-    );
-    if (m) {
-      try {
-        result[key] = JSON.parse(m[1]);
-      } catch {
-        result[key] = null;
-      }
-    } else {
-      result[key] = null;
-    }
-  }
   return result;
 }
 

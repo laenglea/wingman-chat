@@ -49,6 +49,110 @@ describe("tool argument recovery", () => {
     });
   });
 
+  it.each([
+    {
+      name: "double-quoted JSON",
+      malformed: `{"code":"print("hello")","path":null,"packages":["pandas"]}`,
+      expectedCode: `print("hello")`,
+    },
+    {
+      name: "single-quoted object notation",
+      malformed: `{'code':'print('hello')','path':null,'packages':['pandas']}`,
+      expectedCode: `print('hello')`,
+    },
+    {
+      name: "typographic structural quotes",
+      malformed: `{“code”:“print("hello")”,“path”:null,“packages”:[“pandas”]}`,
+      expectedCode: `print("hello")`,
+    },
+  ])("recovers $name without changing payload quotes", ({ malformed, expectedCode }) => {
+    const parameters = {
+      type: "object",
+      properties: {
+        code: { type: "string" },
+        path: { type: ["string", "null"] },
+        packages: { type: ["array", "null"] },
+      },
+    };
+
+    expect(parseToolArguments(malformed, toolArgumentHints(parameters))).toEqual({
+      code: expectedCode,
+      path: null,
+      packages: ["pandas"],
+    });
+  });
+
+  it("keeps embedded sibling-shaped JSON when the outer optional field is omitted", () => {
+    const parameters = {
+      type: "object",
+      properties: {
+        code: { type: "string" },
+        path: { type: ["string", "null"] },
+      },
+    };
+    const code = `const request = {"method":"GET","path":"/api/items"};\nconsole.log(request);`;
+    const malformed = `{"code":"${code}"}`;
+
+    expect(parseToolArguments(malformed, toolArgumentHints(parameters))).toEqual({ code });
+  });
+
+  it("keeps a final source brace when the outer object brace is missing", () => {
+    const parameters = {
+      type: "object",
+      properties: { code: { type: "string" }, path: { type: ["string", "null"] } },
+    };
+    const code = `function answer() { return { value: 42 }; }`;
+    const malformed = `{"code":"${code}"`;
+
+    expect(parseToolArguments(malformed, toolArgumentHints(parameters))).toEqual({ code });
+  });
+
+  it("derives payload hints from anyOf-style nullable schemas", () => {
+    const parameters = {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        content: { anyOf: [{ type: "string" }, { type: "null" }] },
+      },
+    };
+
+    expect(toolArgumentHints(parameters)).toEqual({ payloadKey: "content", otherKeys: ["path"] });
+  });
+
+  it("recovers nested trailing arguments instead of reducing them to null", () => {
+    const parameters = {
+      type: "object",
+      properties: {
+        code: { type: "string" },
+        options: { type: "object" },
+        inputs: { type: "array" },
+      },
+    };
+    const malformed =
+      `{"code":"console.log("run")",` +
+      `"options":{"timeout":30,"env":{"MODE":"test"}},` +
+      `"inputs":[{"path":"/a.csv"},{"path":"/b.csv"}]}`;
+
+    expect(parseToolArguments(malformed, toolArgumentHints(parameters))).toEqual({
+      code: `console.log("run")`,
+      options: { timeout: 30, env: { MODE: "test" } },
+      inputs: [{ path: "/a.csv" }, { path: "/b.csv" }],
+    });
+  });
+
+  it("preserves valid JSON arguments exactly across quote-heavy payloads", () => {
+    const parameters = {
+      type: "object",
+      properties: { code: { type: "string" }, path: { type: ["string", "null"] } },
+    };
+    const expected = {
+      code: `const a = 'single'; const b = "double"; const c = \`template ${"${value}"}\`;`,
+      path: null,
+    };
+
+    expect(parseToolArguments(JSON.stringify(expected), toolArgumentHints(parameters))).toEqual(expected);
+  });
+
   it("does not misidentify edit_file's path as its dominant text payload", () => {
     const parameters = {
       type: "object",
