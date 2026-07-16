@@ -54,3 +54,25 @@ export function normalizeArtifactPath(path: string | undefined): string | undefi
 export function normalizeArtifactReferencePath(path: string): string {
   return path.replace(/^\.\//, "").replace(/^\//, "");
 }
+
+const ARTIFACT_LINK_SCHEME = /^(sandbox|artifact):/i;
+
+export function getArtifactLinkPath(url: string): string | null {
+  if (!url) {
+    return null;
+  }
+
+  let candidate = url;
+  if (ARTIFACT_LINK_SCHEME.test(candidate)) {
+    candidate = candidate.replace(ARTIFACT_LINK_SCHEME, "").replace(/^\/\//, "/");
+  } else if (candidate.startsWith(`${SANDBOX_HOME}/`) || candidate.startsWith("/home/pyodide/")) {
+    // Bare sandbox mount path with no scheme; normalized below.
+  } else {
+    return null;
+  }
+
+  candidate = candidate.split(/[?#]/, 1)[0];
+  const normalized = normalizeArtifactPath(candidate);
+  return normalized && normalized !== "/" ? normalized : null;
+}
+

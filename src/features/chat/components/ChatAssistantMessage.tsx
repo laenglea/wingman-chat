@@ -1,6 +1,7 @@
 import { AlertCircle, ChevronRight, Loader2, RotateCcw } from "lucide-react";
-import { memo, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { ArtifactChip } from "@/features/artifacts/components/ArtifactChip";
+import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
 import { useChat } from "@/features/chat/hooks/useChat";
 import { SkillChip } from "@/features/skills/components/SkillChip";
 import { useToolsContext } from "@/features/tools/hooks/useToolsContext";
@@ -231,6 +232,15 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
 }: ChatAssistantMessageProps) {
   const { messages, pendingElicitation, resolveElicitation, retryMessage, toolMeta } = useChat();
   const { providers } = useToolsContext();
+  const { openFile, setShowArtifactsDrawer } = useArtifacts();
+
+  const handleOpenArtifact = useCallback(
+    (path: string) => {
+      openFile(path);
+      setShowArtifactsDrawer(true);
+    },
+    [openFile, setShowArtifactsDrawer],
+  );
 
   // JS-driven hover (not CSS :hover) for the action bar — Safari leaves :hover
   // sticky after trackpad taps, so the buttons wouldn't reliably hide.
@@ -379,7 +389,9 @@ export const ChatAssistantMessage = memo(function ChatAssistantMessage({
               .some((p) => p.type === "reasoning" || p.type === "tool_call");
             return (
               <div key={partKey} className={cn(hasPrecedingItems && "mt-2")}>
-                <Markdown isStreaming={!!(isLast && isResponding)}>{part.text}</Markdown>
+                <Markdown isStreaming={!!(isLast && isResponding)} onOpenArtifact={handleOpenArtifact}>
+                  {part.text}
+                </Markdown>
               </div>
             );
           }

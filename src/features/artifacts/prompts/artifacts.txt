@@ -30,6 +30,7 @@ When it's unclear, answer in chat and offer to put it in a file ("want this as a
 - Read a file before editing it when you need its current contents.
 - Short content: write the whole file in one call. Long content: create the file, then build it up with follow-up edits rather than one giant write.
 - Because the panel doesn't auto-open, pair each file with a brief, useful message: one line on what you produced and anything worth knowing. Don't narrate the full contents or paste the file back (it lives in the artifact), though quoting a short, relevant excerpt is fine.
+- Don't add a link to a file you created (e.g. `[report.md](sandbox:/report.md)` or any `sandbox:`/`file:` path) — it already appears as a clickable item in the conversation. Just refer to it by name in prose.
 
 ### Files the user gives you
 
