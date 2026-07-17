@@ -1,4 +1,3 @@
-import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import {
   AlertCircle,
   ChevronDown,
@@ -17,13 +16,17 @@ import {
   XIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { isSupportedFile } from "@/features/translate/context/TranslateContext";
 import { useTranslate } from "@/features/translate/hooks/useTranslate";
 import { getConfig } from "@/shared/config";
 import { useDropZone } from "@/shared/hooks/useDropZone";
+import { cn } from "@/shared/lib/cn";
 import { getDriveContentUrl } from "@/shared/lib/drives";
+import { notify } from "@/shared/lib/notify";
 import { downloadFromUrl } from "@/shared/lib/utils";
 import { CopyButton } from "@/shared/ui/CopyButton";
 import { DrivePicker, type SelectedFile } from "@/shared/ui/DrivePicker";
+import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 import { InteractiveText } from "@/shared/ui/InteractiveText";
 import { PlayButton } from "@/shared/ui/PlayButton";
 import { RewritePopover } from "@/shared/ui/RewritePopover";
@@ -114,20 +117,11 @@ export function TranslatePage() {
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) {
-      // Get allowed MIME types from supported files
-      const allowedMimeTypes = supportedFiles.map((sf) => sf.mime);
-
-      if (allowedMimeTypes.length === 0) {
-        // If no supported files, don't allow file selection
-        return;
-      }
-
-      if (allowedMimeTypes.includes(file.type)) {
+    if (file && supportedFiles.length > 0) {
+      if (isSupportedFile(file)) {
         selectFile(file);
       } else {
-        const supportedExtensions = supportedFiles.map((sf) => sf.ext).join(", ");
-        alert(`Please select a valid file type: ${supportedExtensions}`);
+        notify.error("Unsupported file type", `Choose one of: ${supportedFiles.map((sf) => sf.ext).join(", ")}.`);
       }
     }
   };
@@ -144,19 +138,13 @@ export function TranslatePage() {
   };
 
   const handleDropFiles = (files: File[]) => {
-    const allowedMimeTypes = supportedFiles.map((sf) => sf.mime);
+    if (supportedFiles.length === 0) return;
 
-    if (allowedMimeTypes.length === 0) {
-      // If no supported files, don't allow file drop
-      return;
-    }
-
-    const file = files.find((f) => allowedMimeTypes.includes(f.type));
+    const file = files.find(isSupportedFile);
     if (file) {
       selectFile(file);
     } else {
-      const supportedExtensions = supportedFiles.map((sf) => sf.ext).join(", ");
-      alert(`Please drop a valid file type: ${supportedExtensions}`);
+      notify.error("Unsupported file type", `Drop one of: ${supportedFiles.map((sf) => sf.ext).join(", ")}.`);
     }
   };
 
@@ -279,7 +267,10 @@ export function TranslatePage() {
         {selectedFile || isFetchingDrive ? (
           <div
             ref={containerRef}
-            className={`flex-1 flex items-center justify-center p-4 pt-20 ${isDragging ? "bg-slate-50/80 dark:bg-slate-900/40" : ""} transition-all duration-200`}
+            className={cn(
+              "flex-1 flex items-center justify-center p-4 pt-20 transition-all duration-200",
+              isDragging && "bg-slate-50/80 dark:bg-slate-900/40",
+            )}
           >
             {/* Drop zone overlay - show placeholder file card */}
             {isDragging && supportedFiles.length > 0 ? (
@@ -438,7 +429,27 @@ export function TranslatePage() {
           </div>
         ) : (
           /* Text Translation Section - Original split screen layout */
-          <div ref={containerRef} className="w-full grow overflow-hidden flex p-4 pt-20 relative">
+          <div ref={containerRef} className="w-full grow overflow-hidden flex px-4 pt-20 relative">
+            {/* Vertical divider line - desktop only, spans full height from top of container */}
+            <div className="absolute inset-y-0 left-1/2 w-px bg-black/10 dark:bg-white/10 hidden md:block" />
+            {/* Empty state - anchored to the right half of the full-width container, same as the divider */}
+            {!currentText && !isLoading && !error && (
+              <div className="absolute inset-y-0 left-1/2 right-0 hidden md:flex items-center justify-center pointer-events-none select-none z-10">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-14 h-14 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                    <GlobeIcon size={26} className="text-neutral-400 dark:text-neutral-500" />
+                  </div>
+                  <div className="flex flex-col items-center gap-1 text-center">
+                    <p className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
+                      Translation will appear here
+                    </p>
+                    <p className="text-xs text-neutral-400 dark:text-neutral-500">
+                      Select a language and enter text to get started
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Full-screen drop zone overlay with centered file placeholder */}
             {isDragging && supportedFiles.length > 0 && (
               <div className="absolute inset-0 flex items-center justify-center z-30 bg-white/80 dark:bg-neutral-950/80 backdrop-blur-sm">
@@ -461,63 +472,49 @@ export function TranslatePage() {
               </div>
             )}
 
-            <div className={`w-full h-full ${layoutMode === "wide" ? "max-w-full mx-auto" : "max-w-300 mx-auto"}`}>
+            <div className={cn("w-full h-full", layoutMode === "wide" ? "max-w-full mx-auto" : "max-w-300 mx-auto")}>
               <div className="relative h-full w-full overflow-hidden">
                 {/* Responsive layout: vertical stack on mobile/narrow screens, horizontal on wide screens */}
                 <div className="h-full flex flex-col md:flex-row min-h-0 transition-all duration-200">
                   {/* Source section */}
-                  <div className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">
+                  <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
                     {/* File upload controls */}
-                    <div className="absolute top-2 left-3 z-10">
+                    <div className="h-7 flex items-center px-2 shrink-0">
                       {supportedFiles.length > 0 &&
                         (config.drives.length > 0 ? (
-                          <Menu>
-                            <MenuButton className="inline-flex items-center gap-1 pl-0.5 pr-2 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 text-sm transition-colors">
-                              <UploadIcon size={14} />
-                              <span>Upload file</span>
-                            </MenuButton>
-                            <MenuItems
-                              modal={false}
-                              transition
-                              anchor="bottom start"
-                              className="mt-1 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 shadow-lg py-1 z-50 min-w-40"
-                            >
-                              <MenuItem>
-                                <button
-                                  type="button"
-                                  onClick={handleFileUploadClick}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 data-focus:bg-neutral-100 dark:data-focus:bg-neutral-800 transition-colors"
-                                >
-                                  <UploadIcon size={15} className="text-neutral-500" />
-                                  Upload
-                                </button>
-                              </MenuItem>
-                              {config.drives.map((drive) => (
-                                <MenuItem key={drive.id}>
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveDrive(drive)}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 data-focus:bg-neutral-100 dark:data-focus:bg-neutral-800 transition-colors"
-                                  >
-                                    <HardDrive size={15} className="text-neutral-500" />
-                                    {drive.name}
-                                  </button>
-                                </MenuItem>
-                              ))}
-                            </MenuItems>
-                          </Menu>
+                          <DropdownMenu
+                            anchor="bottom start"
+                            trigger={
+                              <MenuButton className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 text-sm transition-colors">
+                                <UploadIcon size={14} className="-ml-0.5" />
+                                <span>Upload file</span>
+                              </MenuButton>
+                            }
+                          >
+                            <DropdownMenuItem icon={<UploadIcon size={15} />} onClick={handleFileUploadClick}>
+                              Upload
+                            </DropdownMenuItem>
+                            {config.drives.map((drive) => (
+                              <DropdownMenuItem
+                                key={drive.id}
+                                icon={<HardDrive size={15} />}
+                                onClick={() => setActiveDrive(drive)}
+                              >
+                                {drive.name}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenu>
                         ) : (
                           <button
                             type="button"
                             onClick={handleFileUploadClick}
-                            className="inline-flex items-center gap-1 pl-0.5 pr-2 py-1.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 text-sm transition-colors"
+                            className="inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 text-sm transition-colors"
                             title={`Select a file to translate (${supportedFiles.map((sf) => sf.ext).join(", ")})`}
                           >
                             <UploadIcon size={14} />
                             <span>Upload file</span>
                           </button>
                         ))}
-                      {supportedFiles.length === 0 && <div className="h-8"></div>}
                       <input
                         ref={fileInputRef}
                         type="file"
@@ -527,24 +524,29 @@ export function TranslatePage() {
                       />
                     </div>
 
-                    <textarea
-                      value={sourceText}
-                      onChange={(e) => setSourceText(e.target.value)}
-                      placeholder="Enter text to translate..."
-                      className="absolute inset-0 w-full h-full pl-4 pr-2 pt-12 pb-2 bg-transparent border-none resize-none overflow-y-auto text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
-                    />
+                    <div className="flex-1 relative min-h-0">
+                      <textarea
+                        value={sourceText}
+                        onChange={(e) => setSourceText(e.target.value)}
+                        placeholder="Enter text to translate..."
+                        className="absolute inset-0 w-full h-full pl-2 pr-4 pt-4 pb-2 bg-transparent border-none resize-none overflow-y-auto text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
+                      />
+                      {!sourceText && supportedFiles.length > 0 && (
+                        <p className="absolute top-10 left-2 right-4 text-xs text-neutral-400 dark:text-neutral-500 pointer-events-none select-none leading-relaxed">
+                          {`Drag and drop to translate ${supportedFiles.map((sf) => sf.ext.toLowerCase()).join(", ")} files.`}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Divider */}
-                  <div className="relative flex items-center justify-center py-2 md:py-0 md:w-4 shrink-0">
-                    <div className="absolute md:inset-y-0 md:w-px md:left-1/2 md:-translate-x-px inset-x-0 h-px md:h-auto bg-black/20 dark:bg-white/20"></div>
-                  </div>
+                  {/* Divider - mobile only (horizontal line between stacked panels) */}
+                  <div className="shrink-0 h-px w-full bg-black/10 dark:bg-white/10 md:hidden" />
 
                   {/* Target section */}
-                  <div className="flex-1 flex flex-col relative min-w-0 min-h-0 overflow-hidden">
-                    <div className="absolute top-2 left-3 z-10 flex items-center gap-2">
+                  <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+                    <div className="h-7 flex items-center md:px-6 md:pt-0 pt-6 pl-2 gap-1 shrink-0">
                       <SelectorMenu
-                        icon={<GlobeIcon size={14} />}
+                        icon={<GlobeIcon size={14} className="-ml-0.5" />}
                         label={selectedLanguage?.name || "Select Language"}
                         options={supportedLanguages.map((l) => ({ value: l.code, label: l.name }))}
                         onSelect={setTargetLang}
@@ -562,114 +564,100 @@ export function TranslatePage() {
                         options={styleOptions}
                         onSelect={setStyle}
                       />
+                      {/* Copy / TTS buttons aligned in toolbar */}
+                      {translatedText && (
+                        <div className="ml-auto flex items-center gap-1">
+                          {enableTTS && <PlayButton text={currentText} className="h-4 w-4" />}
+                          <CopyButton text={currentText} className="h-4 w-4" />
+                        </div>
+                      )}
                     </div>
 
-                    {/* Interactive text area */}
-                    <InteractiveText
-                      text={currentText}
-                      placeholder=""
-                      className="absolute inset-0 w-full h-full pl-4 pr-2 pt-12 pb-2 bg-transparent overflow-y-auto text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
-                      onTextSelect={handleTextSelect}
-                      previewText={previewText}
-                    />
+                    <div className="flex-1 relative min-h-0 overflow-hidden">
+                      {/* Interactive text area */}
+                      <InteractiveText
+                        text={currentText}
+                        // placeholder="Translation will appear here"
+                        className="absolute inset-0 w-full h-full pl-6 pr-6 pt-4 pb-2 bg-transparent overflow-y-auto text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400"
+                        onTextSelect={handleTextSelect}
+                        previewText={previewText}
+                      />
 
-                    {/* Floating prompt input */}
-                    {translatedText && (
-                      <div className="absolute bottom-4 left-4 right-4 z-20">
-                        <form onSubmit={handlePromptSubmit}>
-                          <div className="flex items-center gap-2 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl rounded-2xl border border-white/40 dark:border-neutral-700/40 shadow-lg shadow-black/5 dark:shadow-black/20 p-3">
-                            <input
-                              type="text"
-                              value={promptText}
-                              onChange={(e) => setPromptText(e.target.value)}
-                              placeholder="Refine translation..."
-                              disabled={isPromptLoading}
-                              className="flex-1 bg-transparent text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 focus:outline-none disabled:text-neutral-400"
-                            />
+                      {/* Floating prompt input */}
+                      {translatedText && (
+                        <div className="absolute bottom-4 left-4 right-4 z-20">
+                          <form onSubmit={handlePromptSubmit}>
+                            <div className="flex items-center gap-2 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl rounded-2xl border border-white/40 dark:border-neutral-700/40 shadow-lg shadow-black/5 dark:shadow-black/20 p-3">
+                              <input
+                                type="text"
+                                value={promptText}
+                                onChange={(e) => setPromptText(e.target.value)}
+                                placeholder="Refine translation..."
+                                disabled={isPromptLoading}
+                                className="flex-1 bg-transparent text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-400 focus:outline-none disabled:text-neutral-400"
+                              />
+                              <button
+                                type="submit"
+                                disabled={!promptText.trim() || isPromptLoading}
+                                className="p-2 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 disabled:text-neutral-300 dark:disabled:text-neutral-600 rounded-xl hover:bg-white/40 dark:hover:bg-neutral-800/40 transition-all"
+                                title="Apply refinement"
+                              >
+                                {isPromptLoading ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <SparklesIcon size={16} />
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Error message */}
+                            {promptError && (
+                              <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50/90 dark:bg-red-950/40 backdrop-blur-xl px-3 py-2 rounded-xl border border-red-200/40 dark:border-red-800/40">
+                                {promptError}
+                              </div>
+                            )}
+                          </form>
+                        </div>
+                      )}
+
+                      {/* Error notification for text translations */}
+                      {error && (
+                        <div className="absolute bottom-2 left-2 right-2 z-10">
+                          <div className="border border-red-200 dark:border-red-800 bg-red-50/95 dark:bg-red-950/20 backdrop-blur-lg rounded-lg overflow-hidden">
                             <button
-                              type="submit"
-                              disabled={!promptText.trim() || isPromptLoading}
-                              className="p-2 text-neutral-600 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 disabled:text-neutral-300 dark:disabled:text-neutral-600 rounded-xl hover:bg-white/40 dark:hover:bg-neutral-800/40 transition-all"
-                              title="Apply refinement"
+                              type="button"
+                              onClick={() => setErrorExpanded(!errorExpanded)}
+                              className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-red-100/50 dark:hover:bg-red-900/20 transition-colors"
                             >
-                              {isPromptLoading ? (
-                                <Loader2 size={16} className="animate-spin" />
-                              ) : (
-                                <SparklesIcon size={16} />
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Error message */}
-                          {promptError && (
-                            <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50/90 dark:bg-red-950/40 backdrop-blur-xl px-3 py-2 rounded-xl border border-red-200/40 dark:border-red-800/40">
-                              {promptError}
-                            </div>
-                          )}
-                        </form>
-                      </div>
-                    )}
-
-                    {/* Error notification for text translations */}
-                    {error && (
-                      <div className="absolute bottom-2 left-2 right-2 z-10">
-                        <div className="border border-red-200 dark:border-red-800 bg-red-50/95 dark:bg-red-950/20 backdrop-blur-lg rounded-lg overflow-hidden">
-                          <button
-                            type="button"
-                            onClick={() => setErrorExpanded(!errorExpanded)}
-                            className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-red-100/50 dark:hover:bg-red-900/20 transition-colors"
-                          >
-                            <div className="flex items-center gap-2 shrink-0">
-                              <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
-                              <span className="text-xs font-medium text-red-600 dark:text-red-400">
-                                Translation failed
-                              </span>
-                              {!errorExpanded && (
-                                <span className="text-xs text-red-500 dark:text-red-400 truncate">
-                                  Click to see details
+                              <div className="flex items-center gap-2 shrink-0">
+                                <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />
+                                <span className="text-xs font-medium text-red-600 dark:text-red-400">
+                                  Translation failed
                                 </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {errorExpanded ? (
-                                <ChevronDown className="w-3 h-3 text-red-500" />
-                              ) : (
-                                <ChevronRight className="w-3 h-3 text-red-500" />
-                              )}
-                            </div>
-                          </button>
+                                {!errorExpanded && (
+                                  <span className="text-xs text-red-500 dark:text-red-400 truncate">
+                                    Click to see details
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {errorExpanded ? (
+                                  <ChevronDown className="w-3 h-3 text-red-500" />
+                                ) : (
+                                  <ChevronRight className="w-3 h-3 text-red-500" />
+                                )}
+                              </div>
+                            </button>
 
-                          {errorExpanded && (
-                            <div className="px-3 pb-3 border-t border-red-200/50 dark:border-red-800/50">
-                              <div className="mt-2 text-xs text-red-700 dark:text-red-300 break-word">{error}</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Empty State */}
-                    {!currentText && !isLoading && !error && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                            <GlobeIcon size={28} className="text-neutral-400 dark:text-neutral-500" />
+                            {errorExpanded && (
+                              <div className="px-3 pb-3 border-t border-red-200/50 dark:border-red-800/50">
+                                <div className="mt-2 text-xs text-red-700 dark:text-red-300 break-word">{error}</div>
+                              </div>
+                            )}
                           </div>
-                          <p className="text-neutral-500 dark:text-neutral-400">Enter text to translate</p>
-                          <p className="text-sm text-neutral-400 dark:text-neutral-500 mt-1">
-                            Translation will appear here
-                          </p>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Copy button for text translations */}
-                    {translatedText && (
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        {enableTTS && <PlayButton text={currentText} className="h-4 w-4" />}
-                        <CopyButton text={currentText} className="h-4 w-4" />
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,0 +1,77 @@
+/**
+ * Sandbox path helpers.
+ *
+ * All sandbox runtimes (Pyodide, the JS worker) mount user files under a single
+ * home directory. These helpers normalize paths that cross the sandbox
+ * boundary so that LLM-supplied paths map to the canonical artifact paths
+ * used in storage.
+ */
+
+/** Shared home directory used by all sandbox runtimes (Pyodide, the JS worker). */
+export const SANDBOX_HOME = "/home/user";
+
+// Sandbox mount prefixes that LLMs may include in artifact paths.
+const SANDBOX_PREFIXES = [`${SANDBOX_HOME}/`, "/home/pyodide/"];
+
+/**
+ * Normalize an artifact path: strip sandbox mount prefixes, ensure a leading
+ * slash, collapse duplicate slashes, strip trailing slash.
+ */
+export function normalizeArtifactPath(path: string | undefined): string | undefined {
+  if (!path) {
+    return undefined;
+  }
+
+  let normalized = path.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  for (const prefix of SANDBOX_PREFIXES) {
+    if (normalized.startsWith(prefix)) {
+      normalized = normalized.slice(prefix.length - 1); // keep leading "/"
+      break;
+    }
+  }
+
+  if (!normalized.startsWith("/")) {
+    normalized = `/${normalized}`;
+  }
+
+  normalized = normalized.replace(/\/+/g, "/");
+
+  if (normalized.length > 1 && normalized.endsWith("/")) {
+    normalized = normalized.slice(0, -1);
+  }
+
+  return normalized;
+}
+
+/**
+ * Normalize a path used as a *reference* from within an artifact (e.g. an
+ * `<img src="...">` inside a markdown artifact). Drops leading `./` and `/`.
+ */
+export function normalizeArtifactReferencePath(path: string): string {
+  return path.replace(/^\.\//, "").replace(/^\//, "");
+}
+
+const ARTIFACT_LINK_SCHEME = /^(sandbox|artifact):/i;
+
+export function getArtifactLinkPath(url: string): string | null {
+  if (!url) {
+    return null;
+  }
+
+  let candidate = url;
+  if (ARTIFACT_LINK_SCHEME.test(candidate)) {
+    candidate = candidate.replace(ARTIFACT_LINK_SCHEME, "").replace(/^\/\//, "/");
+  } else if (candidate.startsWith(`${SANDBOX_HOME}/`) || candidate.startsWith("/home/pyodide/")) {
+    // Bare sandbox mount path with no scheme; normalized below.
+  } else {
+    return null;
+  }
+
+  candidate = candidate.split(/[?#]/, 1)[0];
+  const normalized = normalizeArtifactPath(candidate);
+  return normalized && normalized !== "/" ? normalized : null;
+}

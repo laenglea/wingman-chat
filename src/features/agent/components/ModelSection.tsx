@@ -3,6 +3,10 @@ import { useEffect } from "react";
 import { useAgents } from "@/features/agent/hooks/useAgents";
 import type { Agent } from "@/features/agent/types/agent";
 import { useChat } from "@/features/chat/hooks/useChat";
+import { getSavedModelId } from "@/features/chat/hooks/useModels";
+import { cn } from "@/shared/lib/cn";
+import { defaultModelId } from "@/shared/lib/models";
+import { ModelDropdown } from "@/shared/ui/ModelDropdown";
 import { Section } from "./Section";
 
 interface ModelSectionProps {
@@ -13,40 +17,52 @@ export function ModelSection({ agent }: ModelSectionProps) {
   const { updateAgent } = useAgents();
   const { models } = useChat();
 
-  // Auto-select first model if agent has no model or an invalid one
+  const isRealtimeAgent = agent.model === "realtime";
+
+  // Auto-select first non-hidden model if agent has no model or an invalid one
   useEffect(() => {
+    if (isRealtimeAgent) return;
     if (models.length === 0) return;
     const valid = agent.model && models.some((m) => m.id === agent.model);
     if (!valid) {
-      updateAgent(agent.id, { model: models[0].id });
+      updateAgent(agent.id, { model: defaultModelId(models, getSavedModelId()) });
     }
-  }, [agent.id, agent.model, models, updateAgent]);
+  }, [isRealtimeAgent, agent.id, agent.model, models, updateAgent]);
 
-  const handleSelect = (modelId: string) => {
-    updateAgent(agent.id, { model: modelId });
-  };
-
-  const effectiveModel = agent.model && models.some((m) => m.id === agent.model) ? agent.model : (models[0]?.id ?? "");
+  const effectiveModel =
+    agent.model === "realtime"
+      ? "realtime"
+      : agent.model && models.some((m) => m.id === agent.model)
+        ? agent.model
+        : defaultModelId(models, getSavedModelId());
+  const effectiveModelName =
+    effectiveModel === "realtime"
+      ? "Real-time Voice"
+      : (models.find((m) => m.id === effectiveModel)?.name ?? effectiveModel);
 
   return (
-    <Section title="Model" isOpen={true} collapsible={false}>
-      <div className="relative">
-        <select
-          value={effectiveModel}
-          onChange={(e) => handleSelect(e.target.value)}
-          className="w-full appearance-none rounded-lg bg-white/40 dark:bg-neutral-900/60 py-2 pl-3 pr-8 text-sm text-neutral-900 dark:text-neutral-100 border border-neutral-200/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-slate-500/50 dark:focus:ring-slate-400/50 hover:border-neutral-300/80 dark:hover:border-neutral-600/80 transition-colors backdrop-blur-lg cursor-pointer"
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name ?? m.id}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          size={14}
-          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400"
-        />
-      </div>
+    <Section title="Model" isOpen={true} collapsible={false} overflowVisible headerClassName="pt-2" key={agent.id}>
+      <ModelDropdown
+        models={models}
+        value={effectiveModel}
+        onChange={(modelId) => updateAgent(agent.id, { model: modelId })}
+        includeRealtime
+        trigger={({ getProps }) => (
+          <button
+            type="button"
+            {...getProps()}
+            className="w-full flex items-center justify-between rounded-lg bg-white/40 dark:bg-neutral-900/60 py-2 pl-3 pr-8 text-sm text-neutral-900 dark:text-neutral-100 border border-neutral-200/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-slate-500/50 dark:focus:ring-slate-400/50 hover:border-neutral-300/80 dark:hover:border-neutral-600/80 transition-colors backdrop-blur-lg cursor-pointer text-left"
+          >
+            <span className="truncate">{effectiveModelName}</span>
+            <ChevronDown
+              size={14}
+              className={cn(
+                "pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 transition-transform",
+              )}
+            />
+          </button>
+        )}
+      />
     </Section>
   );
 }

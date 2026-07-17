@@ -100,3 +100,22 @@ export type PendingElicitation = {
   /** True briefly after notifications/elicitation/complete is received, before the UI is dismissed */
   completed?: boolean;
 };
+
+export type RiskSeverity = "low" | "medium" | "high";
+
+export type Consent = {
+  message: string;
+  severity?: RiskSeverity;
+};
+
+export type ConsentResult = {
+  action: "accept" | "decline";
+};
+
+export type PendingConsent = {
+  kind: "category" | "risk";
+  id: string;
+  name: string;
+  consent: Consent;
+  resolve: (result: ConsentResult) => void;
+};

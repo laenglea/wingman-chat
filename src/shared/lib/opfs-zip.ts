@@ -5,8 +5,9 @@
  * the respective feature modules (e.g. features/settings/lib/agentImportExport).
  */
 
-import JSZip from "jszip";
+import type JSZip from "jszip";
 import { getDirectory, getRoot, type IndexEntry, readJson, readText, writeBlob, writeJson } from "./opfs-core";
+import { downloadBlob } from "./utils";
 
 // ============================================================================
 // Helpers
@@ -28,6 +29,35 @@ export async function addDirectoryToZip(handle: FileSystemDirectoryHandle, zipFo
   }
 }
 
+/** Create a named subfolder in a JSZip archive, throwing on failure. */
+export function getZipFolder(parent: JSZip, name: string): JSZip {
+  const folder = parent.folder(name);
+  if (!folder) {
+    throw new Error(`Failed to create zip folder: ${name}`);
+  }
+  return folder;
+}
+
+/**
+ * OS metadata entries that zip tools sneak into archives (macOS resource
+ * forks, Finder/Explorer droppings). Imported as-is they become junk folders
+ * that index rebuilds then surface as phantom items.
+ */
+export function isJunkZipEntry(path: string): boolean {
+  const name = path.replace(/\/$/, "").split("/").pop();
+  return path.startsWith("__MACOSX/") || name === ".DS_Store" || name === "Thumbs.db";
+}
+
+/** Extract a single ZIP entry (directory or file) to an OPFS path. */
+export async function extractZipEntry(entry: JSZip.JSZipObject, targetPath: string): Promise<void> {
+  if (entry.dir) {
+    await getDirectory(targetPath.replace(/\/$/, ""), { create: true });
+  } else {
+    const content = await entry.async("arraybuffer");
+    await writeBlob(targetPath, new Blob([content]));
+  }
+}
+
 // ============================================================================
 // ZIP Export/Import
 // ============================================================================
@@ -37,6 +67,7 @@ export async function addDirectoryToZip(handle: FileSystemDirectoryHandle, zipFo
  * Use empty string or '/' for root.
  */
 export async function exportFolderAsZip(folderPath: string): Promise<Blob> {
+  const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
 
   try {
@@ -56,19 +87,14 @@ export async function exportFolderAsZip(folderPath: string): Promise<Blob> {
  * Rebuilds the folder index automatically after import.
  */
 export async function importFolderFromZip(folderPath: string, zipBlob: Blob): Promise<void> {
+  const JSZip = (await import("jszip")).default;
   const zip = await JSZip.loadAsync(zipBlob);
 
   await getDirectory(folderPath, { create: true });
 
   for (const [relativePath, zipEntry] of Object.entries(zip.files)) {
-    const fullPath = `${folderPath}/${relativePath}`;
-
-    if (zipEntry.dir) {
-      await getDirectory(fullPath.replace(/\/$/, ""), { create: true });
-    } else {
-      const content = await zipEntry.async("arraybuffer");
-      await writeBlob(fullPath, new Blob([content]));
-    }
+    if (isJunkZipEntry(relativePath)) continue;
+    await extractZipEntry(zipEntry, `${folderPath}/${relativePath}`);
   }
 
   await rebuildFolderIndex(folderPath);
@@ -79,14 +105,7 @@ export async function importFolderFromZip(folderPath: string, zipBlob: Blob): Pr
  */
 export async function downloadFolderAsZip(folderPath: string, filename: string): Promise<void> {
   const blob = await exportFolderAsZip(folderPath);
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, filename);
 }
 
 // ============================================================================
@@ -99,7 +118,7 @@ export async function downloadFolderAsZip(folderPath: string, filename: string):
  *
  * Probe order per subfolder:
  *  1. AGENTS.md / AGENT.md  (agent collection)
- *  2. chat.json              (chat collection)
+ *  2. chat.json / notebook.json  (chat & notebook collections)
  *  3. agent.json / repository.json / metadata.json  (legacy formats)
  */
 export async function rebuildFolderIndex(collection: string): Promise<void> {
@@ -133,21 +152,25 @@ export async function rebuildFolderIndex(collection: string): Promise<void> {
         // Try JSON metadata files
         const metadataFiles = [
           `${collection}/${id}/chat.json`,
+          `${collection}/${id}/notebook.json`,
           `${collection}/${id}/agent.json`,
           `${collection}/${id}/repository.json`,
           `${collection}/${id}/metadata.json`,
         ];
 
+        let customTitle: string | undefined;
         for (const metaPath of metadataFiles) {
           try {
             const meta = await readJson<{
               title?: string;
               name?: string;
+              customTitle?: string;
               updated?: string;
               updatedAt?: string;
             }>(metaPath);
             if (meta) {
               title = meta.title || meta.name || title;
+              customTitle = meta.customTitle;
               updated = meta.updated || meta.updatedAt || updated;
               break;
             }
@@ -156,7 +179,7 @@ export async function rebuildFolderIndex(collection: string): Promise<void> {
           }
         }
 
-        entries.push({ id, title, updated });
+        entries.push({ id, title, ...(customTitle && { customTitle }), updated });
       }
     }
 

@@ -1,5 +1,6 @@
-import { artifactContentToBlob } from "./artifactFiles";
+import { contentToBlob } from "./fileContent";
 import { inferContentTypeFromPath } from "./fileTypes";
+import { decodeDataURL, readAsDataURL } from "./utils";
 
 /**
  * OPFS Core — File/folder CRUD, index management, storage usage, and shared utilities.
@@ -112,7 +113,7 @@ export async function writeText(
   content: string,
   contentType: string = "text/plain;charset=utf-8",
 ): Promise<void> {
-  await writeBlob(path, artifactContentToBlob(content, contentType));
+  await writeBlob(path, contentToBlob(content, contentType));
 }
 
 /**
@@ -185,16 +186,26 @@ export async function readBlob(path: string): Promise<Blob | undefined> {
  * Read file metadata without hydrating file content.
  * Returns undefined if file doesn't exist.
  */
-export async function readFileMetadata(path: string): Promise<{ size: number; contentType?: string } | undefined> {
-  const blob = await readBlob(path);
-  if (!blob) {
-    return undefined;
-  }
+export async function readFileMetadata(
+  path: string,
+): Promise<{ size: number; contentType?: string; lastModified?: number } | undefined> {
+  try {
+    const { dir, name } = parsePath(path);
+    const directory = await getDirectory(dir);
+    const fileHandle = await directory.getFileHandle(name);
+    const file = await fileHandle.getFile();
 
-  return {
-    size: blob.size,
-    contentType: blob.type || inferContentType(path),
-  };
+    return {
+      size: file.size,
+      contentType: inferContentType(path) || file.type,
+      lastModified: file.lastModified,
+    };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "NotFoundError") {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -324,6 +335,7 @@ export interface IndexEntry {
   title?: string;
   customTitle?: string;
   customIndex?: number;
+  created?: string; // ISO date string (absent on entries written before this field existed)
   updated: string; // ISO date string
 }
 
@@ -438,26 +450,19 @@ export async function getStorageUsage(): Promise<StorageUsage> {
  * Convert a data URL to a Blob.
  */
 export function dataUrlToBlob(dataUrl: string): Blob {
-  const [header, base64] = dataUrl.split(",");
-  const mimeType = header.match(/:(.*?);/)?.[1] || "application/octet-stream";
-  const byteCharacters = atob(base64);
-  const byteNumbers = new Uint8Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  return new Blob([byteNumbers], { type: mimeType });
+  return decodeDataURL(dataUrl);
 }
 
 /**
- * Convert a Blob to a data URL.
+ * Convert a Blob to a data URL. Pass `contentType` to stamp the MIME explicitly:
+ * OPFS stores raw bytes, so a blob read back from storage carries a type the
+ * browser guessed from the filename (empty, application/octet-stream, or
+ * application/macbinary on Safari) — never the original. Embedding that guess in
+ * the data URL makes the backend reject the attachment, so callers that know the
+ * real type should pass it.
  */
-export function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
+export function blobToDataUrl(blob: Blob, contentType?: string): Promise<string> {
+  return readAsDataURL(contentType && contentType !== blob.type ? new Blob([blob], { type: contentType }) : blob);
 }
 
 /**

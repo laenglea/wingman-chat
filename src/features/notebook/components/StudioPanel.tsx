@@ -2,26 +2,36 @@ import {
   AlertCircle,
   AudioLines,
   BarChart3,
-  ChevronDown,
   CircleHelp,
   Download,
   Loader2,
+  MoreVertical,
   Network,
   Presentation,
   StickyNote,
   Table2,
-  X,
+  Trash2,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { getPodcastStyles, getReportStyles, getSlideStyles } from "../hooks/useNotebook";
-import type { NotebookOutput, NotebookSource, OutputType } from "../types/notebook";
+import { useRef, useState } from "react";
+import { cn } from "@/shared/lib/cn";
+import type { File } from "@/shared/types/file";
+import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
+import type { BuildInstructionsOptions } from "../lib/styles";
+import type { NotebookOutput, OutputType } from "../types/notebook";
+import { type GeneratorOptions, OutputGeneratorDialog } from "./OutputGeneratorDialog";
 
 interface StudioPanelProps {
-  sources: NotebookSource[];
+  sources: File[];
   outputs: NotebookOutput[];
-  onGenerate: (type: OutputType, styleId?: string) => void;
+  onGenerate: (type: OutputType, styleId?: string, options?: BuildInstructionsOptions) => void;
   onDeleteOutput: (outputId: string) => void;
   onSelectOutput: (output: NotebookOutput) => void;
+  /** Called when the user picks Download from the row action menu — delegates
+   *  the actual save/modal flow to a hook owned by the page so the same
+   *  modals are reused by the preview's Download icon. */
+  onDownloadOutput: (output: NotebookOutput) => void;
+  /** Whether the output is downloadable in the current state. */
+  canDownload: (output: NotebookOutput) => boolean;
 }
 
 const OUTPUT_TYPES: {
@@ -37,82 +47,58 @@ const OUTPUT_TYPES: {
   { type: "mindmap", label: "Mind Map", icon: Network },
 ];
 
-export function StudioPanel({ sources, outputs, onGenerate, onDeleteOutput, onSelectOutput }: StudioPanelProps) {
+/**
+ * An output is previewable once it's done — or, while still generating, as soon
+ * as it has streamed partial content: slides appear one at a time, and a podcast
+ * script lands before its audio. This lets the user open an in-progress output
+ * and watch it build (the SlideViewer follows new slides live).
+ */
+function canPreviewOutput(output: NotebookOutput): boolean {
+  if (output.status === "completed") return true;
+  if (output.status !== "generating") return false;
+  return (output.slides?.length ?? 0) > 0 || Boolean(output.content);
+}
+
+export function StudioPanel({
+  sources,
+  outputs,
+  onGenerate,
+  onDeleteOutput,
+  onSelectOutput,
+  onDownloadOutput,
+  canDownload,
+}: StudioPanelProps) {
   const hasSources = sources.length > 0;
-  const [openMenu, setOpenMenu] = useState<OutputType | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const slideStyles = getSlideStyles();
-  const podcastStyles = getPodcastStyles();
-  const reportStyles = getReportStyles();
+  const [dialogType, setDialogType] = useState<OutputType | null>(null);
+  // Keep the type stable during the exit animation.
+  const stableDialogType = useRef<OutputType>("slides");
+  if (dialogType) stableDialogType.current = dialogType;
 
-  const downloadOutput = async (output: NotebookOutput) => {
-    const slug = output.title.replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+  const DIALOG_TYPES = new Set<OutputType>(["slides", "podcast", "report", "infographic", "quiz", "mindmap"]);
 
-    if (output.type === "podcast" && output.audioUrl) {
-      downloadDataUrl(output.audioUrl, `${slug}.wav`);
-    } else if (output.type === "infographic" && output.imageUrl) {
-      downloadDataUrl(output.imageUrl, `${slug}.png`);
-    } else if (output.type === "slides" && output.slides?.length) {
-      await downloadSlidesAsPdf(output.slides, slug);
-    } else if (output.type === "report" && output.content) {
-      await downloadReportAsPdf(output.content, slug);
-    }
-  };
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpenMenu(null);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const styleMenus: Partial<Record<OutputType, readonly { id: string; label: string }[]>> = {
-    slides: slideStyles,
-    podcast: podcastStyles,
-    report: reportStyles,
+  const handleDialogGenerate = (_type: OutputType, { styleId, ...rest }: GeneratorOptions) => {
+    onGenerate(_type, styleId, rest);
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col @container/studio">
       {/* Output type buttons */}
       <div className="px-3 py-3 border-b border-neutral-200 dark:border-neutral-800">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 @[13rem]/studio:grid-cols-2 gap-1.5 @[13rem]/studio:gap-2">
           {OUTPUT_TYPES.map(({ type, label, icon: Icon }) => {
-            const styles = styleMenus[type];
-            if (styles) {
+            if (DIALOG_TYPES.has(type)) {
               return (
-                <div key={type} className="relative" ref={openMenu === type ? menuRef : undefined}>
-                  <button
-                    type="button"
-                    onClick={() => setOpenMenu((v) => (v === type ? null : type))}
-                    disabled={!hasSources}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-left"
-                  >
-                    <Icon size={16} className="shrink-0" />
-                    <span className="text-xs font-medium flex-1">{label}</span>
-                    <ChevronDown size={12} className="shrink-0 opacity-50" />
-                  </button>
-                  {openMenu === type && (
-                    <div className="absolute top-full left-0 right-0 mt-1 z-30 bg-white/40 dark:bg-neutral-950/80 backdrop-blur-3xl border-2 border-white/40 dark:border-neutral-700/60 rounded-lg shadow-2xl shadow-black/40 dark:shadow-black/80 dark:ring-1 dark:ring-white/10 py-1">
-                      {styles.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => {
-                            setOpenMenu(null);
-                            onGenerate(type, s.id);
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-xs text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-700/50 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setDialogType(type)}
+                  disabled={!hasSources}
+                  title={label}
+                  className="flex items-center justify-center gap-2 p-2 @[13rem]/studio:justify-start @[13rem]/studio:px-3 @[13rem]/studio:py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-w-0 overflow-hidden"
+                >
+                  <Icon size={16} className="shrink-0" />
+                  <span className="hidden @[13rem]/studio:inline text-xs font-medium truncate">{label}</span>
+                </button>
               );
             }
             return (
@@ -121,10 +107,11 @@ export function StudioPanel({ sources, outputs, onGenerate, onDeleteOutput, onSe
                 type="button"
                 onClick={() => onGenerate(type)}
                 disabled={!hasSources}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-left"
+                title={label}
+                className="flex items-center justify-center gap-2 p-2 @[13rem]/studio:justify-start @[13rem]/studio:px-3 @[13rem]/studio:py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:border-neutral-300 dark:hover:border-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed min-w-0 overflow-hidden"
               >
                 <Icon size={16} className="shrink-0" />
-                <span className="text-xs font-medium">{label}</span>
+                <span className="hidden @[13rem]/studio:inline text-xs font-medium truncate">{label}</span>
               </button>
             );
           })}
@@ -140,22 +127,27 @@ export function StudioPanel({ sources, outputs, onGenerate, onDeleteOutput, onSe
               const Icon = typeInfo?.icon || StickyNote;
               const isGenerating = output.status === "generating";
               const isError = output.status === "error";
+              const previewable = canPreviewOutput(output);
 
               return (
                 <div
                   key={output.id}
-                  className={`group/output flex items-center gap-2 py-1.5 transition-colors ${isGenerating ? "opacity-60" : isError ? "opacity-75" : ""}`}
+                  className={cn(
+                    "relative flex items-center gap-2 py-1.5 transition-colors",
+                    isGenerating ? "opacity-60" : isError ? "opacity-75" : "",
+                  )}
                 >
                   <button
                     type="button"
                     onClick={() => {
-                      if (output.status === "completed") {
+                      if (previewable) {
                         onSelectOutput(output);
                       }
                     }}
-                    className={`flex flex-1 min-w-0 items-center gap-2 text-left ${
-                      output.status === "completed" ? "cursor-pointer" : "cursor-default"
-                    }`}
+                    className={cn(
+                      "flex flex-1 min-w-0 items-center gap-2 text-left",
+                      previewable ? "cursor-pointer" : "cursor-default",
+                    )}
                   >
                     <div className="w-6 h-6 rounded bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
                       {isGenerating ? (
@@ -170,41 +162,56 @@ export function StudioPanel({ sources, outputs, onGenerate, onDeleteOutput, onSe
                       <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">
                         {output.title}
                       </p>
-                      <p className="text-[10px] text-neutral-400">
-                        {isGenerating
-                          ? "Generating..."
-                          : isError
-                            ? output.error || "Failed"
-                            : new Date(output.createdAt).toLocaleString()}
+                      <p className="text-xs text-neutral-400">
+                        {isGenerating ? (
+                          "Generating..."
+                        ) : isError ? (
+                          output.error || "Failed"
+                        ) : (
+                          <>
+                            <span className="@[14rem]/studio:hidden">
+                              {new Date(output.createdAt).toLocaleDateString(undefined, {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </span>
+                            <span className="hidden @[14rem]/studio:inline">
+                              {new Date(output.createdAt).toLocaleString()}
+                            </span>
+                          </>
+                        )}
                       </p>
                     </div>
                   </button>
+
+                  {/* Actions menu — always visible, works on touch */}
                   {!isGenerating && (
-                    <div className="invisible group-hover/output:visible flex items-center shrink-0">
-                      {output.status === "completed" && canDownload(output) && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            downloadOutput(output);
-                          }}
-                          className="p-1 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-                          title="Download"
-                        >
-                          <Download size={12} className="text-neutral-400" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteOutput(output.id);
-                        }}
-                        className="p-1 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-                        title="Delete"
+                    <div className="shrink-0">
+                      <DropdownMenu
+                        anchor="bottom end"
+                        trigger={
+                          <MenuButton
+                            className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+                            title="Actions"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical size={14} />
+                          </MenuButton>
+                        }
                       >
-                        <X size={12} className="text-neutral-400" />
-                      </button>
+                        {output.status === "completed" && canDownload(output) && (
+                          <DropdownMenuItem icon={<Download size={13} />} onClick={() => onDownloadOutput(output)}>
+                            Download
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          icon={<Trash2 size={13} />}
+                          destructive
+                          onClick={() => onDeleteOutput(output.id)}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenu>
                     </div>
                   )}
                 </div>
@@ -213,105 +220,14 @@ export function StudioPanel({ sources, outputs, onGenerate, onDeleteOutput, onSe
           </div>
         )}
       </div>
+
+      {/* Output generator dialog */}
+      <OutputGeneratorDialog
+        open={dialogType !== null}
+        type={stableDialogType.current}
+        onClose={() => setDialogType(null)}
+        onGenerate={handleDialogGenerate}
+      />
     </div>
   );
-}
-
-function canDownload(output: NotebookOutput): boolean {
-  return (
-    (output.type === "podcast" && !!output.audioUrl) ||
-    (output.type === "infographic" && !!output.imageUrl) ||
-    (output.type === "slides" && !!output.slides?.length) ||
-    (output.type === "report" && !!output.content)
-  );
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const a = document.createElement("a");
-  a.href = dataUrl;
-  a.download = filename;
-  a.click();
-}
-
-async function downloadReportAsPdf(html: string, slug: string) {
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.left = "-9999px";
-  iframe.style.width = "800px";
-  iframe.srcdoc = html;
-
-  document.body.appendChild(iframe);
-
-  await new Promise<void>((resolve) => {
-    iframe.onload = () => resolve();
-  });
-
-  const { jsPDF } = await import("jspdf");
-  const html2canvas = (await import("html2canvas")).default;
-
-  const body = iframe.contentDocument?.body;
-  if (!body) {
-    document.body.removeChild(iframe);
-    return;
-  }
-
-  const canvas = await html2canvas(body, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    windowWidth: 800,
-  });
-
-  const imgData = canvas.toDataURL("image/jpeg", 0.85);
-  const pxW = canvas.width;
-  const pxH = canvas.height;
-
-  // A4-width in pt, scale height proportionally
-  const pdfW = 595;
-  const pdfH = (pxH / pxW) * pdfW;
-
-  const doc = new jsPDF({
-    orientation: "portrait",
-    unit: "pt",
-    format: [pdfW, pdfH],
-  });
-
-  doc.addImage(imgData, "JPEG", 0, 0, pdfW, pdfH);
-  doc.save(`${slug}.pdf`);
-
-  document.body.removeChild(iframe);
-}
-
-async function downloadSlidesAsPdf(slides: string[], slug: string) {
-  const { jsPDF } = await import("jspdf");
-
-  // Load first image to get natural dimensions
-  const firstImg = await loadImage(slides[0]);
-  const w = firstImg.naturalWidth;
-  const h = firstImg.naturalHeight;
-  const landscape = w > h;
-
-  const doc = new jsPDF({
-    orientation: landscape ? "landscape" : "portrait",
-    unit: "px",
-    format: [w, h],
-  });
-
-  doc.addImage(slides[0], "PNG", 0, 0, w, h);
-
-  for (let i = 1; i < slides.length; i++) {
-    doc.addPage([w, h], landscape ? "landscape" : "portrait");
-    doc.addImage(slides[i], "PNG", 0, 0, w, h);
-  }
-
-  doc.save(`${slug}.pdf`);
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
 }

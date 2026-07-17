@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
+import { ResizablePanel, ResizablePanelGroup } from "@/shared/ui/Resizable";
 import { CodeEditor } from "./CodeEditor";
 
 interface JsEditorProps {
@@ -31,7 +32,7 @@ export function JsEditor({ content, onRunReady, onRunningChange }: JsEditorProps
 
     // Read files fresh from filesystem at execution time
     const files: Record<string, { content: string; contentType?: string }> = {};
-    const fileList = await fs.listFiles();
+    const fileList = (await fs?.listFiles()) ?? [];
     for (const file of fileList) {
       files[file.path] = { content: file.content, contentType: file.contentType };
     }
@@ -239,27 +240,39 @@ export function JsEditor({ content, onRunReady, onRunningChange }: JsEditorProps
     <div className="h-full flex flex-col overflow-hidden">
       <iframe ref={iframeRef} sandbox="allow-scripts" className="hidden" title="JavaScript Sandbox" />
 
-      <div className={hasOutput ? "h-1/2 overflow-hidden" : "flex-1 overflow-hidden"}>
-        <CodeEditor content={content} language="javascript" />
-      </div>
-
-      {hasOutput && (
-        <div className="h-1/2 flex flex-col border-t border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between px-3 py-1">
-            <span className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Console</span>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-neutral-400 dark:text-neutral-500"
-              title="Clear console"
-            >
-              <X size={12} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs">
-            {output.map((entry, index) => renderEntry(entry, index))}
-          </div>
+      {!hasOutput ? (
+        <div className="flex-1 overflow-hidden">
+          <CodeEditor content={content} language="javascript" />
         </div>
+      ) : (
+        <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0">
+          {/* Code Editor */}
+          <ResizablePanel defaultSize={75} minSize={20} className="overflow-hidden">
+            <CodeEditor content={content} language="javascript" />
+          </ResizablePanel>
+
+          {/* Console Panel */}
+          <ResizablePanel
+            defaultSize={25}
+            minSize={10}
+            className="flex flex-col border-t border-black/5 dark:border-white/5"
+          >
+            <div className="flex items-center justify-between px-3 py-1 shrink-0">
+              <span className="text-xs uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Console</span>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-neutral-400 dark:text-neutral-500"
+                title="Clear console"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs">
+              {output.map((entry, index) => renderEntry(entry, index))}
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       )}
     </div>
   );

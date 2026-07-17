@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useState } from "react";
-import { FileSystemManager } from "@/features/artifacts/lib/fs";
+import type { FileSystemManager } from "@/features/artifacts/lib/fs";
 import { getConfig } from "@/shared/config";
+import { normalizeArtifactPath } from "@/shared/lib/sandbox";
 import { ArtifactsContext } from "./ArtifactsContext";
 
 interface ArtifactsProviderProps {
@@ -11,6 +12,7 @@ interface ArtifactsProviderProps {
 export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [showArtifactsDrawer, setShowArtifactsDrawer] = useState(false);
+  const [fs, setFs] = useState<FileSystemManager | null>(null);
   const config = getConfig();
   const [isAvailable] = useState(() => {
     try {
@@ -20,55 +22,52 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
       return false;
     }
   });
-  const [isEnabled, setIsEnabled] = useState(false);
 
-  // Create singleton FileSystemManager instance
-  const [fs] = useState(() => new FileSystemManager());
+  // Externally-injected filesystem setter. The chat feature calls this
+  // whenever the active chat changes; artifacts owns no chat knowledge.
+  const setFileSystem = useCallback((next: FileSystemManager | null) => {
+    setFs(next);
+  }, []);
 
-  // Method to set the chat ID for the filesystem (called by ChatProvider)
-  const setChatId = useCallback(
-    async (chatId: string | null) => {
-      fs.setChatId(chatId);
+  // When the active filesystem changes, reconcile the active file:
+  //  - Draft chat (fs === null): clear the active file.
+  //  - Chat with files: clear the active file if it no longer exists in the
+  //    new chat.
+  // Artifacts itself is always active when available, so there is no enabled
+  // state to toggle here. The drawer is never auto-opened — created files
+  // surface as inline chips in the conversation; the user opens the panel on
+  // demand.
+  useEffect(() => {
+    if (!fs) {
+      setActiveFile(null);
+      return;
+    }
 
-      if (!chatId) {
-        // Reset file-specific state for draft chats, but preserve drawer visibility
-        // so the panel stays open while the first message creates the chat.
-        setActiveFile(null);
-        setIsEnabled(false);
-        return;
-      }
+    let cancelled = false;
 
-      // Check if the chat has files and update UI state
-      const fileCount = await fs.getFileCount();
-
-      // Auto-enable artifacts if the chat has files
-      if (fileCount > 0) {
-        setIsEnabled(true);
-        setShowArtifactsDrawer(true);
-      }
-
-      // Clear active file if it doesn't exist in the new chat
-      if (activeFile) {
-        const fileExists = await fs.fileExists(activeFile);
-        if (!fileExists) {
-          setActiveFile(null);
+    // Clear active file if it doesn't exist in the new filesystem
+    setActiveFile((current) => {
+      if (!current) return current;
+      // Kick off async existence check; updates state when resolved.
+      void fs.fileExists(current).then((exists) => {
+        if (!cancelled && !exists) {
+          setActiveFile((prev) => (prev === current ? null : prev));
         }
-      }
-    },
-    [fs, activeFile],
-  );
+      });
+      return current;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fs]);
 
   // Subscribe to filesystem events for UI state changes
   useEffect(() => {
-    const unsubscribeCreated = fs.subscribe("fileCreated", (path: string) => {
-      setActiveFile(path);
-      setShowArtifactsDrawer(true);
-      // Auto-enable artifacts when a file is created
-      setIsEnabled(true);
-    });
+    if (!fs) return undefined;
 
     const unsubscribeDeleted = fs.subscribe("fileDeleted", (path: string) => {
-      // Clear active file if it was the deleted one
+      // Clear active file if it was the deleted one.
       setActiveFile((currentActive) => (currentActive === path ? null : currentActive));
     });
 
@@ -78,14 +77,16 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
 
     // Cleanup function
     return () => {
-      unsubscribeCreated();
       unsubscribeDeleted();
       unsubscribeRenamed();
     };
   }, [fs]);
 
   const openFile = useCallback((path: string) => {
-    setActiveFile(path);
+    // Normalize so `activeFile` is always canonical and matches paths emitted
+    // by the filesystem (see FileSystemManager.createFile/deleteFile/renameFile).
+    const normalized = normalizeArtifactPath(path);
+    if (normalized) setActiveFile(normalized);
   }, []);
 
   const toggleArtifactsDrawer = useCallback(() => {
@@ -94,15 +95,14 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
 
   const value = {
     isAvailable,
-    isEnabled,
     fs,
     activeFile,
     showArtifactsDrawer,
     openFile,
     setShowArtifactsDrawer,
     toggleArtifactsDrawer,
-    setChatId,
+    setFileSystem,
   };
 
-  return <ArtifactsContext.Provider value={value}>{children}</ArtifactsContext.Provider>;
+  return <ArtifactsContext value={value}>{children}</ArtifactsContext>;
 }

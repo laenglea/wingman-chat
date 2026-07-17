@@ -1,16 +1,19 @@
 import { Dialog, Transition } from "@headlessui/react";
 import {
   ArrowRight,
-  ChevronDown,
   Download,
   FileText,
   Globe,
   HardDrive,
+  Image as ImageIcon,
   Link,
   Loader2,
   Mic,
+  MoreVertical,
+  PencilLine,
   Plus,
   Search,
+  Trash2,
   Type,
   Upload,
   X,
@@ -19,22 +22,28 @@ import {
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { getConfig } from "@/shared/config";
 import { useDropZone } from "@/shared/hooks/useDropZone";
+import { acceptTypes } from "@/shared/lib/convert";
 import { getDriveContentUrl } from "@/shared/lib/drives";
+import { downloadBlob, downloadFromUrl, getFileName } from "@/shared/lib/utils";
+import type { File } from "@/shared/types/file";
 import { DrivePicker, type SelectedFile } from "@/shared/ui/DrivePicker";
+import { DropdownMenu, DropdownMenuDivider, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 import { Markdown } from "@/shared/ui/Markdown";
-import type { NotebookSource } from "../types/notebook";
+import { PLACEHOLDER_SOURCE_NAMES } from "../hooks/useNotebook";
 import { FieldRecorderOverlay } from "./FieldRecorderOverlay";
 
 interface SourcesPanelProps {
-  sources: NotebookSource[];
+  sources: File[];
   isSearching: boolean;
   searchWeb: (query: string, mode: "web" | "research") => Promise<string>;
   addSearchResult: (query: string, mode: "web" | "research", content: string) => Promise<void>;
   scrapeWeb: (url: string) => Promise<string>;
   addScrapeResult: (url: string, content: string) => Promise<void>;
-  onFileAdd: (file: File) => Promise<void>;
-  onTextAdd: (name: string, text: string, audioUrl?: string) => Promise<void>;
+  onFileAdd: (file: globalThis.File) => Promise<void>;
+  onTextAdd: (name: string, text: string, audioUrl?: string) => Promise<string>;
   onDeleteSource: (sourceId: string) => void;
+  onRenameSource: (oldPath: string, newPath: string) => Promise<void>;
+  onUpdateSource: (path: string, content: string, contentType?: string) => Promise<void>;
 }
 
 export function SourcesPanel({
@@ -47,12 +56,13 @@ export function SourcesPanel({
   onFileAdd,
   onTextAdd,
   onDeleteSource,
+  onRenameSource,
+  onUpdateSource,
 }: SourcesPanelProps) {
   const config = getConfig();
-  const acceptFilter = [...(config.text?.files ?? []), ...(config.extractor?.files ?? [])].join(",");
+  const acceptFilter = acceptTypes().join(",");
   const [extracting, setExtracting] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [showAddMenu, setShowAddMenu] = useState(false);
   const [showSearchOverlay, setShowSearchOverlay] = useState(false);
   const [showScrapeOverlay, setShowScrapeOverlay] = useState(false);
   const [showTextOverlay, setShowTextOverlay] = useState(false);
@@ -63,7 +73,7 @@ export function SourcesPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(
-    async (files: File[]) => {
+    async (files: globalThis.File[]) => {
       for (const file of files) {
         const fileId = file.name;
         setExtracting((prev) => new Set([...prev, fileId]));
@@ -96,7 +106,7 @@ export function SourcesPanel({
           }
           const blob = await resp.blob();
           const type = f.mime || blob.type || "";
-          const file = new File([blob], f.name, { type });
+          const file = new globalThis.File([blob], f.name, { type });
           // handleFiles also adds to extracting, so remove our entry first
           setExtracting((prev) => {
             const next = new Set(prev);
@@ -120,7 +130,7 @@ export function SourcesPanel({
   const isDragging = useDropZone(containerRef, handleFiles);
 
   return (
-    <div ref={containerRef} className="h-full flex flex-col relative">
+    <div ref={containerRef} className="h-full flex flex-col relative @container/sources">
       {/* Error */}
       {error && (
         <div className="px-3 pt-2">
@@ -134,7 +144,7 @@ export function SourcesPanel({
       )}
 
       {/* Sources list */}
-      <div className="flex-1 overflow-y-auto px-3 pt-3 pb-3 min-h-0">
+      <div className="flex-1 overflow-y-auto px-1.5 pt-3 pb-3 min-h-0">
         {(sources.length > 0 || extracting.size > 0 || isSearching) && (
           <div className="space-y-1">
             {/* Extracting indicators */}
@@ -147,106 +157,64 @@ export function SourcesPanel({
 
             {/* Source items */}
             {sources.map((source) => (
-              <SourceItem key={source.id} source={source} onDelete={() => onDeleteSource(source.id)} />
+              <SourceItem
+                key={source.path}
+                source={source}
+                onDelete={() => onDeleteSource(source.path)}
+                onRename={async (newPath) => {
+                  setError(null);
+                  try {
+                    await onRenameSource(source.path, newPath);
+                  } catch (err) {
+                    setError(err instanceof Error ? err.message : "Rename failed");
+                    throw err;
+                  }
+                }}
+                onUpdate={(content) => onUpdateSource(source.path, content, source.contentType)}
+              />
             ))}
           </div>
         )}
       </div>
 
       {/* Bottom: Add sources dropdown */}
-      <div className="px-3 pt-3 pb-5 relative">
-        <button
-          type="button"
-          onClick={() => setShowAddMenu(!showAddMenu)}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm border border-dashed border-neutral-300 dark:border-neutral-700 rounded-lg text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors"
+      <div className="@container px-3 pt-3 pb-4 relative">
+        <DropdownMenu
+          anchor="top"
+          trigger={
+            <MenuButton
+              title="Add sources"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm border border-dashed border-neutral-300 dark:border-neutral-700 rounded-lg text-neutral-600 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-neutral-600 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors"
+            >
+              <Plus size={16} className="shrink-0" />
+              <span className="hidden @[10rem]:inline">Add sources</span>
+            </MenuButton>
+          }
         >
-          <Plus size={16} />
-          Add sources
-        </button>
-
-        {showAddMenu && (
-          <>
-            <button
-              type="button"
-              aria-label="Close add sources menu"
-              className="fixed inset-0 z-40"
-              onClick={() => setShowAddMenu(false)}
-            />
-            <div className="absolute bottom-full left-3 right-3 mb-1 z-50 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddMenu(false);
-                  setShowTextOverlay(true);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-              >
-                <Type size={15} className="text-neutral-500" />
-                Text
-              </button>
-              {config.stt && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddMenu(false);
-                    setShowRecordOverlay(true);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  <Mic size={15} className="text-neutral-500" />
-                  Record
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddMenu(false);
-                  fileInputRef.current?.click();
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-              >
-                <Upload size={15} className="text-neutral-500" />
-                Upload
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddMenu(false);
-                  setShowScrapeOverlay(true);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-              >
-                <Link size={15} className="text-neutral-500" />
-                Web Page
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddMenu(false);
-                  setShowSearchOverlay(true);
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-              >
-                <Globe size={15} className="text-neutral-500" />
-                Web Search
-              </button>
-              {config.drives.map((drive) => (
-                <button
-                  key={drive.id}
-                  type="button"
-                  onClick={() => {
-                    setShowAddMenu(false);
-                    setActiveDrive(drive);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  <HardDrive size={15} className="text-neutral-500" />
-                  {drive.name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
+          <DropdownMenuItem icon={<Type size={15} />} onClick={() => setShowTextOverlay(true)}>
+            Text
+          </DropdownMenuItem>
+          {config.stt && (
+            <DropdownMenuItem icon={<Mic size={15} />} onClick={() => setShowRecordOverlay(true)}>
+              Record
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem icon={<Upload size={15} />} onClick={() => fileInputRef.current?.click()}>
+            Upload
+          </DropdownMenuItem>
+          <DropdownMenuItem icon={<Link size={15} />} onClick={() => setShowScrapeOverlay(true)}>
+            Web Page
+          </DropdownMenuItem>
+          <DropdownMenuItem icon={<Globe size={15} />} onClick={() => setShowSearchOverlay(true)}>
+            Web Search
+          </DropdownMenuItem>
+          {config.drives.length > 0 && <DropdownMenuDivider />}
+          {config.drives.map((drive) => (
+            <DropdownMenuItem key={drive.id} icon={<HardDrive size={15} />} onClick={() => setActiveDrive(drive)}>
+              {drive.name}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenu>
 
         <input
           ref={fileInputRef}
@@ -256,7 +224,7 @@ export function SourcesPanel({
           className="hidden"
           onChange={(e) => {
             if (e.target.files) {
-              handleFiles(Array.from(e.target.files));
+              void handleFiles(Array.from(e.target.files));
               e.target.value = "";
             }
           }}
@@ -330,14 +298,13 @@ export function SourcesPanel({
       {/* Field Recorder */}
       {showRecordOverlay && (
         <FieldRecorderOverlay
-          onComplete={async ({ transcript, audioUrl }) => {
+          onSave={async (transcript, audioUrl) => {
             setError(null);
             try {
-              await onTextAdd("Field Recording", transcript, audioUrl);
-              setShowRecordOverlay(false);
+              await onTextAdd(PLACEHOLDER_SOURCE_NAMES.fieldRecording, transcript, audioUrl);
             } catch (err) {
               setError(err instanceof Error ? err.message : "Failed to add recording");
-              setShowRecordOverlay(false);
+              throw err;
             }
           }}
           onClose={() => setShowRecordOverlay(false)}
@@ -374,18 +341,15 @@ function WebSearchOverlay({
 }) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<"web" | "research">("web");
-  const [showModeMenu, setShowModeMenu] = useState(false);
   const [preview, setPreview] = useState("");
   const [previewQuery, setPreviewQuery] = useState("");
   const [previewMode, setPreviewMode] = useState<"web" | "research">("web");
   const queryInputRef = useRef<HTMLInputElement>(null);
 
   const modes = {
-    web: { label: "Web", icon: Globe },
-    research: { label: "Research", icon: Zap },
+    web: { label: "Search", icon: Globe, hint: "Quick web search" },
+    research: { label: "Deep Research", icon: Zap, hint: "Deep research with synthesis" },
   };
-
-  const ModeIcon = modes[mode].icon;
 
   useEffect(() => {
     queryInputRef.current?.focus();
@@ -442,7 +406,7 @@ function WebSearchOverlay({
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  handleSearch();
+                  void handleSearch();
                 }
               }}
               placeholder="What are you looking for?"
@@ -453,53 +417,30 @@ function WebSearchOverlay({
 
           {/* Mode selector */}
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowModeMenu(!showModeMenu)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-full text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 transition-colors"
-              >
-                <ModeIcon size={12} />
-                {modes[mode].label}
-                <ChevronDown size={10} />
-              </button>
-
-              {showModeMenu && (
-                <>
+            <div className="inline-flex items-center gap-0.5 p-0.5 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-full">
+              {(Object.keys(modes) as Array<"web" | "research">).map((m) => {
+                const Icon = modes[m].icon;
+                const isActive = mode === m;
+                return (
                   <button
+                    key={m}
                     type="button"
-                    aria-label="Close search mode menu"
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowModeMenu(false)}
-                  />
-                  <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1 min-w-32.5">
-                    {(Object.keys(modes) as Array<"web" | "research">).map((m) => {
-                      const Icon = modes[m].icon;
-                      return (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => {
-                            setMode(m);
-                            setShowModeMenu(false);
-                          }}
-                          className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors ${
-                            mode === m ? "text-neutral-900 dark:text-white" : "text-neutral-600 dark:text-neutral-400"
-                          }`}
-                        >
-                          <Icon size={12} />
-                          {modes[m].label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
+                    onClick={() => setMode(m)}
+                    aria-pressed={isActive}
+                    className={`flex items-center gap-1.5 px-3 py-1 text-xs rounded-full transition-colors ${
+                      isActive
+                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm"
+                        : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                    }`}
+                  >
+                    <Icon size={12} />
+                    {modes[m].label}
+                  </button>
+                );
+              })}
             </div>
 
-            <span className="text-xs text-neutral-400 flex-1">
-              {mode === "research" ? "Deep research with synthesis" : "Quick web search"}
-            </span>
+            <span className="text-xs text-neutral-400 flex-1 truncate">{modes[mode].hint}</span>
           </div>
 
           <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950/40 min-h-48 max-h-72 overflow-y-auto">
@@ -625,7 +566,7 @@ function WebScrapeOverlay({
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  handleFetch();
+                  void handleFetch();
                 }
               }}
               placeholder="https://example.com"
@@ -692,8 +633,26 @@ function WebScrapeOverlay({
 
 // ── Text Input Overlay ──────────────────────────────────────────────────
 
-function TextInputOverlay({ onAdd, onClose }: { onAdd: (name: string, text: string) => void; onClose: () => void }) {
+function TextInputOverlay({
+  onAdd,
+  onClose,
+}: {
+  onAdd: (name: string, text: string) => Promise<void>;
+  onClose: () => void;
+}) {
   const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || saving) return;
+    setSaving(true);
+    try {
+      await onAdd(PLACEHOLDER_SOURCE_NAMES.pastedText, trimmed);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Transition appear show as={Fragment}>
@@ -744,7 +703,8 @@ function TextInputOverlay({ onAdd, onClose }: { onAdd: (name: string, text: stri
                     placeholder="Paste or type text here..."
                     rows={10}
                     autoFocus
-                    className="w-full px-3 py-2 text-sm rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y transition-colors"
+                    disabled={saving}
+                    className="w-full px-3 py-2 text-sm rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y transition-colors disabled:opacity-60"
                   />
                 </div>
 
@@ -753,17 +713,19 @@ function TextInputOverlay({ onAdd, onClose }: { onAdd: (name: string, text: stri
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-3 py-1.5 text-xs font-medium rounded-md text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors"
+                    disabled={saving}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 disabled:opacity-40 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
-                    onClick={() => onAdd("Pasted text", text.trim())}
-                    disabled={!text.trim()}
-                    className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    onClick={handleAdd}
+                    disabled={!text.trim() || saving}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
-                    Add
+                    {saving && <Loader2 size={12} className="animate-spin" />}
+                    {saving ? "Adding..." : "Add"}
                   </button>
                 </div>
               </Dialog.Panel>
@@ -777,67 +739,294 @@ function TextInputOverlay({ onAdd, onClose }: { onAdd: (name: string, text: stri
 
 // ── Source Item ─────────────────────────────────────────────────────────
 
-function sourceIcon(source: NotebookSource) {
-  if (source.audioUrl) return Mic;
-  if (source.type === "web") return Globe;
-  if (source.type === "text") return Type;
+function sourceIcon(source: File) {
+  if (source.contentType?.startsWith("audio/")) return Mic;
+  if (source.contentType?.startsWith("image/")) return ImageIcon;
+  if (/^https?:\/\//i.test(source.path)) return Globe;
   return FileText;
 }
 
-function SourceItem({ source, onDelete }: { source: NotebookSource; onDelete: () => void }) {
-  const [expanded, setExpanded] = useState(false);
+function isBinarySource(source: File): boolean {
+  return typeof source.content === "string" && source.content.startsWith("data:");
+}
+
+function SourceItem({
+  source,
+  onDelete,
+  onRename,
+  onUpdate,
+}: {
+  source: File;
+  onDelete: () => void;
+  onRename: (newPath: string) => Promise<void>;
+  onUpdate: (content: string) => Promise<void>;
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const savingRef = useRef(false);
   const Icon = sourceIcon(source);
+  const binary = isBinarySource(source);
+
+  useEffect(() => {
+    if (!renaming) return;
+    const input = renameInputRef.current;
+    if (!input) return;
+    input.focus();
+    const dot = input.value.lastIndexOf(".");
+    if (dot > 0) input.setSelectionRange(0, dot);
+    else input.select();
+  }, [renaming]);
+
+  const handleDownload = () => {
+    if (binary) {
+      downloadFromUrl(source.content, getFileName(source.path));
+    } else {
+      const blob = new Blob([source.content], { type: source.contentType || "text/plain" });
+      downloadBlob(blob, getFileName(source.path));
+    }
+  };
+
+  const startRename = () => {
+    setRenameValue(source.path);
+    setRenaming(true);
+  };
+
+  const cancelRename = () => {
+    setRenaming(false);
+    setRenameValue("");
+  };
+
+  const commitRename = async () => {
+    if (!renaming || savingRef.current) return;
+    const next = renameValue.trim();
+    if (!next || next === source.path) {
+      cancelRename();
+      return;
+    }
+    savingRef.current = true;
+    try {
+      await onRename(next);
+      setRenaming(false);
+      setRenameValue("");
+    } catch {
+      // parent surfaces the error; keep the input focused for retry
+      renameInputRef.current?.focus();
+    } finally {
+      savingRef.current = false;
+    }
+  };
 
   return (
-    <div className="group/source">
-      <div className="flex items-center gap-2.5 rounded-lg px-1 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
-        >
-          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
-            <Icon size={12} className="text-neutral-500" />
+    <>
+      <div className="flex items-center gap-1.5 rounded-lg pl-1 py-1.5 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+        {renaming ? (
+          <div className="flex flex-1 items-center gap-2.5 min-w-0">
+            <div className="hidden @[10rem]/sources:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
+              <Icon size={12} className="text-neutral-500" />
+            </div>
+            <input
+              ref={renameInputRef}
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void commitRename();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelRename();
+                }
+              }}
+              onBlur={() => void commitRename()}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 min-w-0 text-xs bg-transparent border-0 border-b border-neutral-300 dark:border-neutral-600 rounded-none px-0 py-0 text-neutral-700 dark:text-neutral-300 focus:outline-none focus:border-neutral-500 dark:focus:border-neutral-400"
+            />
           </div>
-          <span className="flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300">{source.name}</span>
-        </button>
-        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/source:opacity-100 transition-opacity">
-          {source.audioUrl && (
+        ) : (
+          <>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                const a = document.createElement("a");
-                a.href = source.audioUrl as string;
-                a.download = "recording.wav";
-                a.click();
-              }}
-              className="p-1 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+              onClick={() => setEditOpen(true)}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
             >
-              <Download size={12} className="text-neutral-400" />
+              <div className="hidden @[10rem]/sources:flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
+                <Icon size={12} className="text-neutral-500" />
+              </div>
+              <span className="flex-1 truncate text-xs text-neutral-700 dark:text-neutral-300" title={source.path}>
+                {source.path}
+              </span>
             </button>
-          )}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            className="p-1 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-          >
-            <X size={12} className="text-neutral-400" />
-          </button>
-        </div>
+
+            <DropdownMenu
+              anchor="bottom end"
+              trigger={
+                <MenuButton
+                  title="Actions"
+                  onClick={(e) => e.stopPropagation()}
+                  className="shrink-0 p-1 rounded-md text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+                >
+                  <MoreVertical size={14} />
+                </MenuButton>
+              }
+            >
+              <DropdownMenuItem icon={<PencilLine size={13} />} onClick={() => startRename()}>
+                Rename
+              </DropdownMenuItem>
+              <DropdownMenuItem icon={<Download size={13} />} onClick={() => handleDownload()}>
+                Download
+              </DropdownMenuItem>
+              <DropdownMenuItem icon={<Trash2 size={13} />} destructive onClick={() => onDelete()}>
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenu>
+          </>
+        )}
       </div>
 
-      {expanded && (
-        <div className="ml-8.5 mr-2 mb-1 px-2.5 py-2 rounded-md bg-neutral-50 dark:bg-neutral-800/40 max-h-64 overflow-y-auto">
-          <p className="text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400 whitespace-pre-wrap">
-            {source.content.slice(0, 2000)}
-            {source.content.length > 2000 && "..."}
-          </p>
+      {editOpen && <SourceEditOverlay source={source} onSave={onUpdate} onClose={() => setEditOpen(false)} />}
+    </>
+  );
+}
+
+// ── Source Edit Overlay ─────────────────────────────────────────────────
+
+function SourceEditOverlay({
+  source,
+  onSave,
+  onClose,
+}: {
+  source: File;
+  onSave: (content: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [value, setValue] = useState(source.content);
+  const [saving, setSaving] = useState(false);
+
+  const binary = isBinarySource(source);
+  const isAudio = source.contentType?.startsWith("audio/") ?? false;
+  const isImage = source.contentType?.startsWith("image/") ?? false;
+
+  const dirty = !binary && value !== source.content;
+
+  const handleSave = async () => {
+    if (!dirty || saving) return;
+    setSaving(true);
+    try {
+      await onSave(value);
+      onClose();
+    } catch {
+      // parent surfaces the error; keep the dialog open for retry
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void handleSave();
+    }
+  };
+
+  return (
+    <Transition appear show as={Fragment}>
+      <Dialog as="div" className="relative z-80" onClose={onClose}>
+        <Transition.Child
+          as={Fragment}
+          enter="ease-out duration-300"
+          enterFrom="opacity-0"
+          enterTo="opacity-100"
+          leave="ease-in duration-200"
+          leaveFrom="opacity-100"
+          leaveTo="opacity-0"
+        >
+          <div className="fixed inset-0 bg-black/40 dark:bg-black/60" />
+        </Transition.Child>
+
+        <div className="fixed inset-0 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <Transition.Child
+              as={Fragment}
+              enter="ease-out duration-300"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-200"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <Dialog.Panel className="w-full max-w-2xl transform overflow-hidden rounded-xl bg-white/95 dark:bg-neutral-900/95 backdrop-blur-xl shadow-xl transition-all">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-neutral-200/60 dark:border-neutral-800/60">
+                  <Dialog.Title
+                    className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate"
+                    title={source.path}
+                  >
+                    {source.path}
+                  </Dialog.Title>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                <div className="px-5 py-3.5">
+                  {binary ? (
+                    <div className="flex items-center justify-center min-h-50 rounded-md bg-neutral-50 dark:bg-neutral-800/40 px-3 py-3">
+                      {isAudio ? (
+                        <audio controls className="w-full" src={source.content} />
+                      ) : isImage ? (
+                        <img
+                          src={source.content}
+                          alt={source.path}
+                          className="max-w-full max-h-96 rounded object-contain"
+                        />
+                      ) : (
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                          ({source.contentType ?? "binary"} content)
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      value={value}
+                      onChange={(e) => setValue(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      rows={16}
+                      autoFocus
+                      className="w-full px-3 py-2 text-sm font-mono rounded-md bg-white/50 dark:bg-neutral-800/50 border border-neutral-300/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 focus:border-transparent text-neutral-900 dark:text-neutral-100 resize-y min-h-50 backdrop-blur-sm transition-colors"
+                    />
+                  )}
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 px-5 py-3 border-t border-neutral-200/60 dark:border-neutral-800/60 bg-neutral-50/50 dark:bg-neutral-900/30">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3 py-1.5 text-xs font-medium rounded-md text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 transition-colors"
+                  >
+                    {binary ? "Close" : "Cancel"}
+                  </button>
+                  {!binary && (
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={!dirty || saving}
+                      className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 dark:bg-neutral-200 text-white dark:text-neutral-900 hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {saving ? "Saving..." : "Save"}
+                    </button>
+                  )}
+                </div>
+              </Dialog.Panel>
+            </Transition.Child>
+          </div>
         </div>
-      )}
-    </div>
+      </Dialog>
+    </Transition>
   );
 }

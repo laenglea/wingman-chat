@@ -2,12 +2,12 @@ import mime from "mime";
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod/v3";
-import instructionsRelatedPrompts from "@/features/chat/prompts/chat-suggestions.txt?raw";
-import instructionsSummarizeTitle from "@/features/chat/prompts/chat-title.txt?raw";
+import instructionsClassifyChat from "@/features/chat/prompts/chat-classify.txt?raw";
 import instructionsConvertCsv from "@/features/chat/prompts/convert-csv.txt?raw";
 import instructionsConvertMd from "@/features/chat/prompts/convert-md.txt?raw";
 import instructionsRewriteSelection from "@/features/chat/prompts/rewrite-selection.txt?raw";
 import instructionsRewriteText from "@/features/chat/prompts/rewrite-text.txt?raw";
+import instructionsSummarizeHistory from "@/features/chat/prompts/summarize-history.txt?raw";
 import type { SearchResult } from "@/features/research/types/search";
 import instructionsOptimizeSkill from "@/prompts/skill-optimizer.txt?raw";
 import type {
@@ -19,33 +19,112 @@ import type {
   ModelType,
   ReasoningContent,
   Tool,
+  ToolCallContent,
   ToolResultContent,
 } from "@/shared/types/chat";
 import { Role } from "@/shared/types/chat";
-import { isAbortError } from "./errors";
+import type { AgentContext } from "@/shared/types/telemetry";
+import { isAbortError, isRecoverableStreamError, waitBeforeStreamRetry } from "./errors";
 import { modelName, modelType } from "./models";
 import { traceGenAI } from "./otel";
+import { dropOrphanFunctionCalls } from "./recovery";
 import { serializeToolResultForApi, simplifyMarkdown } from "./utils";
+
+/**
+ * Extra application-level retries for stream failures the SDK's own maxRetries
+ * does not cover — a connection dropped mid-response after streaming started.
+ */
+const MAX_STREAM_RETRIES = 2;
 
 function expandToSentences(text: string, start: number, end: number): string {
   const sentenceBoundaries = /[.!?]+\s*|\n+/g;
   const boundaries: number[] = [0];
-  let match: RegExpExecArray | null = sentenceBoundaries.exec(text);
+  let match = sentenceBoundaries.exec(text);
   while (match !== null) {
     boundaries.push(match.index + match[0].length);
     match = sentenceBoundaries.exec(text);
   }
   boundaries.push(text.length);
 
-  let sentenceStart = 0;
-  let sentenceEnd = text.length;
+  let sentenceStart = -1;
+  let sentenceEnd = -1;
   for (let i = 0; i < boundaries.length - 1; i++) {
     if (boundaries[i] < end && boundaries[i + 1] > start) {
-      sentenceStart = Math.min(sentenceStart === 0 ? boundaries[i] : sentenceStart, boundaries[i]);
-      sentenceEnd = Math.max(sentenceEnd === text.length ? boundaries[i + 1] : sentenceEnd, boundaries[i + 1]);
+      sentenceStart = sentenceStart === -1 ? boundaries[i] : Math.min(sentenceStart, boundaries[i]);
+      sentenceEnd = sentenceEnd === -1 ? boundaries[i + 1] : Math.max(sentenceEnd, boundaries[i + 1]);
     }
   }
+  if (sentenceStart === -1) return text.substring(start, end).trim();
   return text.substring(sentenceStart, sentenceEnd).trim();
+}
+
+// mime.getExtension is lossy for audio containers — it maps audio/webm to
+// ".weba" and audio/ogg to ".oga", neither of which the transcription endpoint
+// accepts (it allows mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm, flac). Map the
+// types we send to an accepted extension before falling back to mime.
+const TRANSCRIBE_EXTENSIONS: Record<string, string> = {
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/opus": "ogg",
+  "audio/mp4": "m4a",
+  "audio/aac": "m4a",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/flac": "flac",
+};
+
+/**
+ * Optional geometry/quality knobs for image generation, forwarded to the
+ * backend's `/v1/render`. All are provider-neutral: the backend maps each to the
+ * target model's supported values (aspect ratios snap to the nearest available)
+ * and silently drops what a model can't honor, so the same options work across
+ * providers.
+ */
+export interface ImageRenderOptions {
+  /** Aspect ratio like "1:1" or "16:9"; snapped to the nearest the model supports. */
+  aspectRatio?: string;
+  /** Quality tier; higher is slower and may cost more. */
+  quality?: "low" | "medium" | "high";
+  /** Output resolution. */
+  resolution?: "512" | "1K" | "2K" | "4K";
+  /** Background handling (only honored by models that support it). */
+  background?: "transparent" | "opaque";
+  /** Desired output format; negotiated via the `Accept` header, not a form field. */
+  format?: "png" | "jpeg" | "webp";
+}
+
+export interface GuardResult {
+  flagged: boolean;
+  categories: Array<{ name: string; score: number }>;
+}
+
+/**
+ * Best-effort human-readable detail from a failed response body, so tool errors
+ * surface the backend's reason instead of a bare status code. Handles both
+ * plain-text errors (e.g. /api/v1/render) and `{ error: { message } }` /
+ * `{ error }` JSON envelopes, truncated so a stray HTML error page can't flood
+ * the message.
+ */
+async function readErrorBody(resp: Response): Promise<string> {
+  let text: string;
+  try {
+    text = (await resp.text()).trim();
+  } catch {
+    return "";
+  }
+  if (!text) return "";
+
+  if (text.startsWith("{") || text.startsWith("[")) {
+    try {
+      const body = JSON.parse(text);
+      const message = body?.error?.message ?? body?.error ?? body?.message;
+      if (typeof message === "string" && message.trim()) text = message.trim();
+    } catch {
+      // Not JSON after all — fall back to the raw text.
+    }
+  }
+
+  return text.length > 300 ? `${text.slice(0, 300)}…` : text;
 }
 
 export class Client {
@@ -83,6 +162,25 @@ export class Client {
     return mappedModels;
   }
 
+  // Lists the MCP servers the backend currently exposes (RBAC-filtered). The
+  // OpenAI SDK has no helper for this endpoint, so we hit `/v1/mcp` directly
+  // (same `{ object: "list", data: [...] }` shape as `/v1/models`).
+  async listMCPs(): Promise<string[]> {
+    const resp = await fetch(new URL("/api/v1/mcp", window.location.origin));
+
+    if (!resp.ok) {
+      throw new Error(`failed to list mcps: ${resp.status}`);
+    }
+
+    const body = await resp.json();
+
+    if (!Array.isArray(body?.data)) {
+      return [];
+    }
+
+    return body.data.map((mcp: { id: string }) => mcp.id);
+  }
+
   async complete(
     model: string,
     instructions: string,
@@ -90,19 +188,17 @@ export class Client {
     tools: Tool[],
     handler?: (content: Content[]) => void,
     options?: {
-      effort?: "none" | "minimal" | "low" | "medium" | "high";
+      effort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
       summary?: "auto" | "concise" | "detailed";
       verbosity?: "low" | "medium" | "high";
-      compactThreshold?: number;
       signal?: AbortSignal;
+      parentContext?: AgentContext;
     },
   ): Promise<Message> {
     return traceGenAI(
       "chat",
       model,
       async () => {
-        input = this.sanitizeMessages(input);
-
         const items: OpenAI.Responses.ResponseInputItem[] = [];
 
         for (const m of input) {
@@ -116,7 +212,8 @@ export class Client {
                   content.push({ type: "input_text", text: part.text });
                 } else if (part.type === "image") {
                   const imgPart = part as ImageContent;
-                  // data is already a full data URL
+                  // Skip attachments with unrecognized MIME (e.g. application/octet-stream)
+                  if (imgPart.data.startsWith("data:application/octet-stream")) continue;
                   content.push({
                     type: "input_image",
                     image_url: imgPart.data,
@@ -124,7 +221,7 @@ export class Client {
                   });
                 } else if (part.type === "file") {
                   const filePart = part as FileContent;
-                  // data is already a full data URL
+                  if (filePart.data.startsWith("data:application/octet-stream")) continue;
                   content.push({
                     type: "input_file",
                     file_data: filePart.data,
@@ -157,27 +254,9 @@ export class Client {
             }
 
             case Role.Assistant: {
-              // TODO: Re-enable reasoning items once encrypted_content verification is fixed server-side
-              // Temporarily skip sending reasoning items back to API to avoid invalid_encrypted_content errors
-              // const reasoningParts = m.content.filter((p): p is ReasoningContent => p.type === 'reasoning' && !!p.signature);
-              // for (const rp of reasoningParts) {
-              //   const reasoningItem: Record<string, unknown> = {
-              //     id: rp.id,
-              //     type: "reasoning",
-              //
-              //     encrypted_content: rp.signature,
-              //   };
-              //
-              //   if (rp.summary) {
-              //     reasoningItem.summary = [{ type: "summary_text", text: rp.summary }];
-              //   }
-              //
-              //   if (rp.text) {
-              //     reasoningItem.content = [{ type: "reasoning_text", text: rp.text }];
-              //   }
-              //
-              //   items.push(reasoningItem as unknown as OpenAI.Responses.ResponseInputItem);
-              // }
+              // Reasoning items are intentionally not replayed back to the API.
+              // encrypted_content is provider+key-specific and breaks on model
+              // swaps and across Azure deployments/subscriptions.
 
               let bufferedText = "";
 
@@ -211,13 +290,16 @@ export class Client {
                   });
                 }
 
-                if (part.type === "compaction") {
+                if (part.type === "summary") {
+                  // Replay client-side summary as assistant text. The wrapper
+                  // tells the model the prior context was condensed and to
+                  // continue naturally without referencing the summary itself.
                   flushAssistantText();
                   items.push({
-                    type: "compaction",
-                    id: part.id,
-                    encrypted_content: part.encrypted_content,
-                  } as unknown as OpenAI.Responses.ResponseInputItem);
+                    type: "message",
+                    role: "assistant",
+                    content: `[Earlier conversation condensed to save context. Continue naturally without referencing this summary.]\n\n${part.text}`,
+                  });
                 }
               }
 
@@ -228,194 +310,256 @@ export class Client {
           }
         }
 
-        // Track streaming content parts
         const contentParts: Content[] = [];
-        let currentType: "reasoning" | "text" | null = null;
 
-        // Helper to append text content
-        const appendText = (delta: string) => {
-          if (currentType === "text" && contentParts.length > 0) {
-            const lastPart = contentParts[contentParts.length - 1];
-            if (lastPart.type === "text") {
-              lastPart.text += delta;
-            }
-          } else {
-            contentParts.push({ type: "text", text: delta });
-            currentType = "text";
+        // Get-or-create the single reasoning part (always at index 0).
+        const ensureReasoning = (id: string): ReasoningContent => {
+          let part = contentParts.find((p): p is ReasoningContent => p.type === "reasoning");
+          if (!part) {
+            part = { type: "reasoning", id, text: "" };
+            contentParts.unshift(part);
           }
-          handler?.([...contentParts]);
+          return part;
         };
 
-        // Helper to append reasoning content (text or summary)
-        const appendReasoning = (id: string, delta: string, summary?: string) => {
-          let reasoningPart = contentParts.find((p): p is ReasoningContent => p.type === "reasoning");
-          if (!reasoningPart) {
-            reasoningPart = { type: "reasoning", id, text: "" };
-            contentParts.unshift(reasoningPart); // Reasoning goes first
-          }
-          if (summary) {
-            reasoningPart.summary = (reasoningPart.summary || "") + summary;
-          }
-          if (delta) {
-            reasoningPart.text += delta;
-          }
-          currentType = "reasoning";
-          handler?.([...contentParts]);
-        };
+        const emit = () => handler?.([...contentParts]);
 
-        const runner = this.oai.responses
-          .stream({
-            model: model,
-            store: false,
-            tools: this.toTools(tools),
-            input: items,
-            instructions: instructions,
-            ...(options?.effort
-              ? {
-                  include: ["reasoning.encrypted_content"],
-                  reasoning: {
-                    effort: options.effort,
-                    summary: options.summary ?? "auto",
-                  },
-                }
-              : {}),
-            ...(options?.verbosity
-              ? {
-                  text: { verbosity: options.verbosity },
-                }
-              : {}),
-            ...(options?.compactThreshold
-              ? {
-                  context_management: [{ type: "compaction" as const, compact_threshold: options.compactThreshold }],
-                }
-              : {}),
-          })
-          .on("response.reasoning_summary_text.delta", (event) => {
-            appendReasoning(event.item_id, "", event.delta);
-          })
-          .on("response.reasoning_text.delta", (event) => {
-            appendReasoning(event.item_id, event.delta);
-          })
-          .on("response.output_text.delta", (event) => {
-            appendText(event.delta);
-          })
-          .on("response.output_item.done", (event) => {
-            if (event.item.type === "function_call") {
-              contentParts.push({
-                type: "tool_call",
-                id: event.item.call_id,
-                name: event.item.name,
-                arguments: event.item.arguments,
-              });
-              currentType = null;
-              handler?.([...contentParts]);
-            } else if (event.item.type === "reasoning") {
-              // Capture encrypted_content signature for multi-turn conversations
-              const encryptedContent = (event.item as { encrypted_content?: string }).encrypted_content;
-              if (encryptedContent) {
-                // Find the reasoning part and add the signature
-                const reasoningPart = contentParts.find((p) => p.type === "reasoning");
-                if (reasoningPart && reasoningPart.type === "reasoning") {
-                  reasoningPart.signature = encryptedContent;
-                  handler?.([...contentParts]);
-                }
+        // Track in-flight tool calls by their output index so we can grow their
+        // arguments as deltas arrive. (output_index is present on every event;
+        // the item id is optional and the call id isn't on the delta events.)
+        const toolCallsByIndex = new Map<number, ToolCallContent>();
+
+        // Build and run one streaming attempt. Resets the accumulators so a
+        // retry re-streams from empty and the UI overwrites the partial render
+        // instead of duplicating deltas. Re-sending is replay-safe: the caller
+        // commits the assistant message (and runs its tools) only after this
+        // resolves, so a failed attempt left nothing committed.
+        const attemptStream = () => {
+          // Clearing only matters on a retry: drop the failed attempt's partial
+          // render so the UI overwrites it instead of appending duplicate deltas.
+          const hadPartial = contentParts.length > 0;
+          contentParts.length = 0;
+          toolCallsByIndex.clear();
+          if (hadPartial) emit();
+
+          const runner = this.oai.responses
+            .stream({
+              model: model,
+              store: false,
+              truncation: "auto",
+              tools: this.toTools(tools),
+              input: dropOrphanFunctionCalls(items),
+              instructions: instructions,
+              ...(options?.effort
+                ? {
+                    reasoning: {
+                      effort: options.effort,
+                      summary: options.summary ?? "auto",
+                    },
+                  }
+                : {}),
+              ...(options?.verbosity
+                ? {
+                    text: { verbosity: options.verbosity },
+                  }
+                : {}),
+            })
+            .on("response.reasoning_summary_text.delta", (event) => {
+              const r = ensureReasoning(event.item_id);
+              r.summary = (r.summary ?? "") + event.delta;
+              emit();
+            })
+            .on("response.reasoning_text.delta", (event) => {
+              ensureReasoning(event.item_id).text += event.delta;
+              emit();
+            })
+            .on("response.output_text.delta", (event) => {
+              const last = contentParts[contentParts.length - 1];
+              if (last?.type === "text") {
+                last.text += event.delta;
+              } else {
+                contentParts.push({ type: "text", text: event.delta });
               }
-            } else if (event.item.type === "compaction") {
-              const compactionItem = event.item as { id: string; encrypted_content: string };
-              console.log("[Compaction] Context compacted", {
-                id: compactionItem.id,
-                bytes: compactionItem.encrypted_content.length,
-              });
-              contentParts.push({
-                type: "compaction",
-                id: compactionItem.id,
-                encrypted_content: compactionItem.encrypted_content,
-              });
-              handler?.([...contentParts]);
+              emit();
+            })
+            // Materialize the tool-call part as soon as the call starts, so its
+            // spinner appears right after the intro instead of only once the model
+            // has finished writing all the arguments.
+            .on("response.output_item.added", (event) => {
+              if (event.item.type === "function_call") {
+                const part: ToolCallContent = {
+                  type: "tool_call",
+                  id: event.item.call_id,
+                  name: event.item.name,
+                  arguments: event.item.arguments ?? "",
+                };
+                toolCallsByIndex.set(event.output_index, part);
+                contentParts.push(part);
+                emit();
+              }
+            })
+            // Grow the arguments live as the model writes them (e.g. the Python script).
+            .on("response.function_call_arguments.delta", (event) => {
+              const part = toolCallsByIndex.get(event.output_index);
+              if (part) {
+                part.arguments += event.delta;
+                emit();
+              }
+            })
+            .on("response.output_item.done", (event) => {
+              if (event.item.type === "function_call") {
+                const existing = toolCallsByIndex.get(event.output_index);
+                if (existing) {
+                  existing.arguments = event.item.arguments; // authoritative final value
+                } else {
+                  contentParts.push({
+                    type: "tool_call",
+                    id: event.item.call_id,
+                    name: event.item.name,
+                    arguments: event.item.arguments,
+                  });
+                }
+                emit();
+              }
+            });
+
+          // Wire abort. Handle the already-aborted case explicitly —
+          // addEventListener on a signal that has already fired never invokes.
+          if (options?.signal) {
+            if (options.signal.aborted) {
+              runner.abort();
+            } else {
+              options.signal.addEventListener("abort", () => runner.abort(), { once: true });
             }
-          });
+          }
 
-        // If a signal was provided, wire it up to abort the runner
-        if (options?.signal) {
-          options.signal.addEventListener("abort", () => runner.abort(), { once: true });
-        }
+          // Attach an error listener so mid-stream errors don't surface as
+          // unhandled EventEmitter errors. The same error rejects
+          // `finalResponse()`, where we actually handle it.
+          runner.on("error", () => {});
 
-        // Attach an error listener so mid-stream errors don't surface as
-        // unhandled EventEmitter errors. The same error will also reject
-        // `finalResponse()` below, which is where we actually handle it.
-        runner.on("error", () => {
-          /* handled via finalResponse() rejection */
-        });
+          return runner.finalResponse();
+        };
 
-        try {
-          const finalResponse = await runner.finalResponse();
+        const assistant: Message = { role: Role.Assistant, content: contentParts };
 
-          return {
-            result: { role: Role.Assistant, content: contentParts } as Message,
-            response: {
-              id: finalResponse.id,
+        for (let attempt = 0; ; attempt++) {
+          try {
+            const finalResponse = await attemptStream();
+            assistant.usage = {
               model: finalResponse.model,
               inputTokens: finalResponse.usage?.input_tokens,
+              cachedInputTokens: finalResponse.usage?.input_tokens_details?.cached_tokens,
               outputTokens: finalResponse.usage?.output_tokens,
-            },
-          };
-        } catch (error) {
-          // On abort (either via our signal or runner.abort()), return the
-          // partial content accumulated so far as a successful result.
-          if (options?.signal?.aborted || isAbortError(error)) {
-            return {
-              result: { role: Role.Assistant, content: contentParts } as Message,
-              response: { id: "", model },
+              reasoningTokens: finalResponse.usage?.output_tokens_details?.reasoning_tokens,
             };
+            return {
+              result: assistant,
+              response: { id: finalResponse.id, ...assistant.usage },
+            };
+          } catch (error) {
+            // Abort (our signal or runner.abort()) is terminal: return whatever
+            // streamed so far as a successful, partial result.
+            if (options?.signal?.aborted || isAbortError(error)) {
+              return { result: assistant, response: { id: "", model } };
+            }
+            // A stream that dropped mid-response is retryable — the SDK's own
+            // maxRetries only covers pre-stream failures. Re-send from scratch.
+            if (attempt < MAX_STREAM_RETRIES && isRecoverableStreamError(error)) {
+              await waitBeforeStreamRetry(attempt, error, options?.signal);
+              if (options?.signal?.aborted) {
+                return { result: assistant, response: { id: "", model } };
+              }
+              continue;
+            }
+            throw error;
           }
-
-          throw error;
         }
       },
-      { effort: options?.effort, verbosity: options?.verbosity, toolCount: tools?.length },
+      options?.parentContext,
     ); // end traceGenAI
   }
 
-  async summarizeTitle(model: string, input: Message[]): Promise<string | null> {
+  async classifyChat(
+    model: string,
+    input: Message[],
+    categories: Array<{ id: string; description: string }> = [],
+    risks: Array<{ id: string; description: string }> = [],
+  ): Promise<{
+    title: string | null;
+    categories: Array<{ id: string; confidence: number }>;
+    risks: Array<{ id: string; confidence: number }>;
+  }> {
     const history = input.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+    const categoryIds = categories.map((c) => c.id);
+    const riskIds = risks.map((r) => r.id);
+
+    const categoryIdSchema = categoryIds.length > 0 ? z.enum(categoryIds as [string, ...string[]]) : z.string();
+    const riskIdSchema = riskIds.length > 0 ? z.enum(riskIds as [string, ...string[]]) : z.string();
+
+    const confidenceSchema = z
+      .number()
+      .describe(
+        "Model confidence that this category or risk applies to the latest user message. " +
+          "A value between 0 and 1, where higher values denote higher confidence. " +
+          "Omit matches with confidence below ~0.5.",
+      );
+
+    const schema = z
+      .object({
+        title: z.string().describe("Short, descriptive title for the conversation. Less than 10 words, no quotes."),
+        categories: z
+          .array(
+            z
+              .object({
+                id: categoryIdSchema.describe("Id of a category from the provided list."),
+                confidence: confidenceSchema,
+              })
+              .strict(),
+          )
+          .describe("Categories that clearly apply to the latest user message. May be empty."),
+        risks: z
+          .array(
+            z
+              .object({
+                id: riskIdSchema.describe("Id of a risk from the provided list."),
+                confidence: confidenceSchema,
+              })
+              .strict(),
+          )
+          .describe("Risks that the latest user message actually triggers (not merely mentions). May be empty."),
+      })
+      .strict();
+
     const result = await this.parse(
       model,
-      instructionsSummarizeTitle,
-      JSON.stringify(history),
-      z.object({ title: z.string() }).strict(),
-      "summarize_title",
+      instructionsClassifyChat,
+      JSON.stringify({ categories, risks, history }),
+      schema,
+      "classify_chat",
     );
-    return result?.title ?? null;
+    return {
+      title: result?.title ?? null,
+      categories: result?.categories ?? [],
+      risks: result?.risks ?? [],
+    };
   }
 
-  async relatedPrompts(model: string, prompt: string): Promise<string[]> {
+  /**
+   * Summarize a conversation history into a single dense text block.
+   * Used to condense older messages when the context window fills up.
+   * Returns plain text — caller wraps it into a SummaryContent part.
+   */
+  async summarizeHistory(model: string, input: Message[]): Promise<string> {
+    const history = input.map((m) => ({ role: m.role, content: m.content }));
     const result = await this.parse(
       model,
-      instructionsRelatedPrompts,
-      prompt || "No input",
-      z
-        .object({
-          prompts: z
-            .array(z.object({ prompt: z.string() }).strict())
-            .min(3)
-            .max(10),
-        })
-        .strict(),
-      "list_prompts",
+      instructionsSummarizeHistory,
+      JSON.stringify({ history }),
+      z.object({ summary: z.string() }).strict(),
+      "summarize_history",
     );
-    return result?.prompts.map((p) => p.prompt) ?? [];
-  }
-
-  async extractUrl(model: string, text: string): Promise<string | null> {
-    if (!text.trim()) return null;
-    const result = await this.parse(
-      model,
-      "Extract a valid URL from the given text. If the text contains a URL, extract it. If no valid URL is found, return null.",
-      text,
-      z.object({ url: z.string().nullable() }).strict(),
-      "extract_url",
-    );
-    return result?.url ?? null;
+    return result?.summary ?? "";
   }
 
   async convertCSV(model: string, text: string): Promise<string> {
@@ -488,8 +632,8 @@ export class Client {
     return (await this.post("/api/v1/extract", { ...(model && { model }), url, format: "text" })).text();
   }
 
-  async segmentText(blob: Blob): Promise<string[]> {
-    const result = await (await this.post("/api/v1/segment", { file: blob })).json();
+  async segmentText(text: string): Promise<string[]> {
+    const result = await (await this.post("/api/v1/segment", { text })).json();
     if (!Array.isArray(result)) return [];
     return result.map((item: { text?: string } | string) => (typeof item === "string" ? item : item.text || ""));
   }
@@ -505,15 +649,6 @@ export class Client {
   }
 
   async translate(lang: string, input: string | Blob): Promise<string | Blob> {
-    if (input instanceof Blob && input.size > 10 * 1024 * 1024) {
-      throw new Error(`File size ${(input.size / 1024 / 1024).toFixed(1)}MB exceeds the maximum limit of 10MB`);
-    }
-    if (typeof input === "string" && input.length > 50000) {
-      throw new Error(
-        `Text length ${input.length.toLocaleString()} characters exceeds the maximum limit of 50,000 characters`,
-      );
-    }
-
     const data = new FormData();
     data.append("lang", lang);
     const headers: Record<string, string> = {};
@@ -613,9 +748,9 @@ export class Client {
         resolve();
       };
 
-      audio.onerror = (error) => {
+      audio.onerror = () => {
         URL.revokeObjectURL(audioUrl);
-        reject(new Error(`Audio playback failed: ${error}`));
+        reject(new Error("Audio playback failed"));
       };
 
       audio.play().catch(reject);
@@ -623,7 +758,9 @@ export class Client {
   }
 
   async transcribe(model: string, blob: Blob): Promise<string> {
-    const extension = mime.getExtension(blob.type) || "audio";
+    // Strip any ";codecs=…" parameter (MediaRecorder emits "audio/webm;codecs=opus").
+    const baseType = blob.type.split(";")[0].trim();
+    const extension = TRANSCRIBE_EXTENSIONS[baseType] || mime.getExtension(baseType) || "audio";
     const file = new File([blob], `audio_recording.${extension}`, { type: blob.type });
     const result = await (await this.post("/api/v1/audio/transcriptions", { file, ...(model && { model }) })).json();
     return result.text || "";
@@ -634,14 +771,10 @@ export class Client {
     query: string,
     options?: { domains?: string[]; limit?: number },
   ): Promise<SearchResult[]> {
-    const fields: Record<string, string | Blob> = {
-      ...(model && { model }),
-      query,
-      limit: String(options?.limit ?? 10),
-    };
-
     const data = new FormData();
-    for (const [k, v] of Object.entries(fields)) data.append(k, v);
+    if (model) data.append("model", model);
+    data.append("query", query);
+    data.append("limit", String(options?.limit ?? 10));
     for (const domain of options?.domains ?? []) data.append("domain", domain);
 
     const resp = await this.postRaw("/api/v1/search", data);
@@ -655,19 +788,38 @@ export class Client {
     });
   }
 
+  async guard(model: string, text: string): Promise<GuardResult> {
+    const resp = await this.postRaw("/api/v1/guard", JSON.stringify({ ...(model && { model }), text }), {
+      "Content-Type": "application/json",
+    });
+    const result = await resp.json();
+    return {
+      flagged: result?.flagged === true,
+      categories: Array.isArray(result?.categories) ? result.categories : [],
+    };
+  }
+
   async research(model: string, instructions: string): Promise<string> {
     const result = await (await this.post("/api/v1/research", { ...(model && { model }), instructions })).json();
     return result.content || "";
   }
 
-  async generateImage(model: string, prompt: string, images?: Blob[]): Promise<Blob> {
+  async generateImage(model: string, prompt: string, images?: Blob[], options?: ImageRenderOptions): Promise<Blob> {
     const data = new FormData();
     data.append("input", prompt);
     if (model) data.append("model", model);
     images?.forEach((blob, i) => {
       data.append("file", blob, `image_${i}.${mime.getExtension(blob.type) || "image"}`);
     });
-    return (await this.postRaw("/api/v1/render", data)).blob();
+    if (options?.aspectRatio) data.append("aspect_ratio", options.aspectRatio);
+    if (options?.quality) data.append("quality", options.quality);
+    if (options?.resolution) data.append("resolution", options.resolution);
+    if (options?.background) data.append("background", options.background);
+    // Output format is negotiated via Accept, not a form field (see /v1/render).
+    const headers = options?.format ? { Accept: `image/${options.format}` } : undefined;
+    // Rendering — especially high quality or large sizes — can take minutes, so
+    // allow well beyond the default render/translate/search budget.
+    return (await this.postRaw("/api/v1/render", data, headers, 300_000)).blob();
   }
 
   private toTools(tools: Tool[]): OpenAI.Responses.Tool[] | undefined {
@@ -681,50 +833,9 @@ export class Client {
       name: tool.name,
       description: tool.description,
 
-      strict: false,
+      strict: tool.strict ?? false,
       parameters: tool.parameters,
     }));
-  }
-
-  private sanitizeMessages(messages: Message[]): Message[] {
-    // Extract tool result IDs from all messages
-    const toolResultIds = new Set(
-      messages.flatMap((m) =>
-        m.content.filter((p): p is ToolResultContent => p.type === "tool_result").map((p) => p.id),
-      ),
-    );
-
-    // Find tool calls that have matching results
-    const validToolCallIds = new Set(
-      messages.flatMap((m) =>
-        m.content
-          .filter(
-            (p): p is import("../types/chat").ToolCallContent => p.type === "tool_call" && toolResultIds.has(p.id),
-          )
-          .map((p) => p.id),
-      ),
-    );
-
-    return messages.filter((m) => {
-      const toolCalls = m.content.filter((p): p is import("../types/chat").ToolCallContent => p.type === "tool_call");
-      const toolResults = m.content.filter((p): p is ToolResultContent => p.type === "tool_result");
-
-      // If message has tool calls, all must have valid results
-      if (toolCalls.length > 0) {
-        return toolCalls.every((tc) => validToolCallIds.has(tc.id));
-      }
-
-      // If message has tool results, all must match valid tool calls
-      if (toolResults.length > 0) {
-        return toolResults.every((tr) => validToolCallIds.has(tr.id));
-      }
-
-      // Keep messages with meaningful content (text, images, files)
-      const hasContent = m.content.some(
-        (p) => (p.type === "text" && p.text.trim()) || p.type === "image" || p.type === "file",
-      );
-      return hasContent;
-    });
   }
 
   async optimizeSkill(
@@ -751,57 +862,76 @@ export class Client {
     };
   }
 
-  // biome-ignore lint: zod schema type is complex
-  private async parse<T extends z.ZodType<any>>(
+  async parse<T extends z.ZodType<any>>(
     model: string,
     instructions: string,
     input: string,
     schema: T,
     name: string,
+    parentContext?: AgentContext,
   ): Promise<z.infer<T> | null> {
-    return traceGenAI(name, model, async () => {
-      try {
-        const response = await this.oai.responses.parse({
-          model,
-          instructions,
-          input,
-          text: { format: zodTextFormat(schema, name) },
-        });
-        return { result: response.output_parsed ?? null };
-      } catch (error) {
-        // Propagate user-initiated cancellations; otherwise degrade gracefully.
-        // Transient errors (rate limits, 5xx, connection issues) have already
-        // been retried by the SDK (see `maxRetries` in the constructor), so
-        // re-throwing them here would not improve reliability — callers of
-        // these utility methods (titles, suggestions, conversions, rewrites)
-        // expect a best-effort result with a fallback.
-        if (isAbortError(error)) {
-          throw error;
+    return traceGenAI(
+      name,
+      model,
+      async () => {
+        try {
+          const response = await this.oai.responses.parse({
+            model,
+            instructions,
+            input,
+            truncation: "auto",
+            text: { format: zodTextFormat(schema, name) },
+          });
+          return { result: response.output_parsed ?? null };
+        } catch (error) {
+          if (isAbortError(error)) throw error;
+          console.error(`Error in ${name}:`, error);
+          return { result: null };
         }
-
-        console.error(`Error in ${name}:`, error);
-        return { result: null };
-      }
-    });
+      },
+      parentContext,
+    );
   }
 
   private async post(path: string, fields: Record<string, string | Blob>): Promise<Response> {
     const data = new FormData();
-    for (const [k, v] of Object.entries(fields)) {
-      if (v instanceof Blob) data.append(k, v);
-      else data.append(k, v);
-    }
+    for (const [k, v] of Object.entries(fields)) data.append(k, v);
     return this.postRaw(path, data);
   }
 
-  private async postRaw(path: string, data: FormData, headers?: HeadersInit): Promise<Response> {
-    const resp = await fetch(new URL(path, window.location.origin), {
-      method: "POST",
-      headers,
-      body: data,
-    });
+  private async postRaw(path: string, data: BodyInit, headers?: HeadersInit, timeoutMs = 90_000): Promise<Response> {
+    // Raw fetch has no built-in timeout; without this a stalled backend (render,
+    // translate, search) hangs forever — and when called from a Python bridge it
+    // wedges the single interpreter worker and every queued sandbox call. Image
+    // generation can legitimately run for minutes, so its caller passes a larger
+    // budget (see generateImage).
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    let resp: Response;
+    try {
+      resp = await fetch(new URL(path, window.location.origin), {
+        method: "POST",
+        headers,
+        body: data,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      // Surface a readable timeout instead of the runtime's opaque abort message
+      // (WebKit reports a timed-out fetch as the cryptic "Fetch is aborted").
+      if (timedOut) throw new Error(`${path} timed out after ${Math.round(timeoutMs / 1000)}s`);
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
 
-    if (!resp.ok) throw new Error(`${path} failed with status ${resp.status}`);
+    if (!resp.ok) {
+      const detail = await readErrorBody(resp);
+      throw new Error(`${path} failed with status ${resp.status}${detail ? `: ${detail}` : ""}`);
+    }
     return resp;
   }
 }

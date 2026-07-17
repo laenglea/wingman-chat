@@ -1,6 +1,9 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { ChevronRight, File, Folder, HardDrive, Loader2, RefreshCw, Trash2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
+import { cn } from "@/shared/lib/cn";
+import { confirm } from "@/shared/lib/confirm";
+import { notify } from "@/shared/lib/notify";
 import { deleteDirectory, deleteFile, getRoot } from "@/shared/lib/opfs";
 import { formatBytes } from "@/shared/lib/utils";
 
@@ -79,11 +82,11 @@ function TreeItem({ node, depth, onDelete }: { node: TreeNode; depth: number; on
         <button
           type="button"
           onClick={() => isDir && setExpanded(!expanded)}
-          className={`p-0.5 rounded transition-transform ${isDir ? "cursor-pointer" : "invisible"}`}
+          className={cn("p-0.5 rounded transition-transform", isDir ? "cursor-pointer" : "invisible")}
         >
           <ChevronRight
             size={14}
-            className={`text-neutral-400 transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
+            className={cn("text-neutral-400 transition-transform duration-150", expanded && "rotate-90")}
           />
         </button>
 
@@ -100,7 +103,7 @@ function TreeItem({ node, depth, onDelete }: { node: TreeNode; depth: number; on
         </span>
 
         {/* Meta */}
-        <span className="text-[11px] text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums mr-1">
+        <span className="text-xs text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums mr-1">
           {isDir
             ? `${stats?.files ?? 0} file${stats?.files === 1 ? "" : "s"} · ${formatBytes(stats?.size ?? 0)}`
             : formatBytes(node.size ?? 0)}
@@ -170,13 +173,20 @@ export function OpfsBrowser({ isOpen, onClose }: OpfsBrowserProps) {
   }, []);
 
   useEffect(() => {
-    if (isOpen) loadTree();
+    if (isOpen) void loadTree();
   }, [isOpen, loadTree]);
 
   const handleDelete = useCallback(
     async (node: TreeNode) => {
       const label = node.kind === "directory" ? "directory" : "file";
-      if (!window.confirm(`Delete ${label} "${node.path}"? This cannot be undone.`)) return;
+      if (
+        !(await confirm({
+          title: `Delete ${label}?`,
+          message: `"${node.path}" will be permanently removed and can't be recovered.`,
+          danger: true,
+        }))
+      )
+        return;
 
       try {
         if (node.kind === "directory") {
@@ -188,7 +198,7 @@ export function OpfsBrowser({ isOpen, onClose }: OpfsBrowserProps) {
         await loadTree();
       } catch (err) {
         console.error("Failed to delete:", err);
-        alert(`Failed to delete ${node.path}`);
+        notify.error("Couldn't delete", `"${node.path}" could not be removed.`);
       }
     },
     [loadTree],
@@ -237,7 +247,7 @@ export function OpfsBrowser({ isOpen, onClose }: OpfsBrowserProps) {
                       className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors disabled:opacity-50"
                       title="Refresh"
                     >
-                      <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                      <RefreshCw size={16} className={cn(loading && "animate-spin")} />
                     </button>
                     <button
                       type="button"

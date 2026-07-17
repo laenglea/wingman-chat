@@ -1,8 +1,8 @@
-import JSZip from "jszip";
-import type { File, FileEntry } from "@/features/artifacts/types/file";
-import { artifactContentToZipValue, normalizeArtifactPath } from "@/shared/lib/artifactFiles";
+import { contentToBlob, contentToZipValue } from "@/shared/lib/fileContent";
 import * as opfs from "@/shared/lib/opfs";
-import { downloadBlob } from "@/shared/lib/utils";
+import { normalizeArtifactPath } from "@/shared/lib/sandbox";
+import { downloadBlob, getFileName } from "@/shared/lib/utils";
+import type { File, FileEntry, FileSystem } from "@/shared/types/file";
 
 type FileEventType = "fileCreated" | "fileDeleted" | "fileRenamed" | "fileUpdated";
 
@@ -30,11 +30,21 @@ export interface OverlayCommitSummary {
   created: number;
   updated: number;
   deleted: number;
+  createdPaths: string[];
+  updatedPaths: string[];
+  deletedPaths: string[];
 }
 
 export interface OverlaySnapshotOptions {
   deleteMissing?: boolean;
   defaultContentType?: string;
+}
+
+/** A file cannot replace an existing file, contain one, or sit below one. */
+function hasFileTreeConflict(path: string, existingPaths: readonly string[]): boolean {
+  return existingPaths.some(
+    (existing) => existing === path || existing.startsWith(`${path}/`) || path.startsWith(`${existing}/`),
+  );
 }
 
 /**
@@ -43,31 +53,20 @@ export interface OverlaySnapshotOptions {
  * All operations go directly to OPFS. Events are emitted synchronously
  * after OPFS operations complete to notify UI of changes.
  */
-export class FileSystemManager {
+export class FileSystemManager implements FileSystem {
   private eventHandlers = new Map<FileEventType, Set<(...args: unknown[]) => void>>();
-  private _chatId: string | null = null;
+  readonly chatId: string;
 
-  constructor() {
+  constructor(chatId: string) {
+    if (!chatId) {
+      throw new Error("FileSystemManager requires a non-empty chatId");
+    }
+    this.chatId = chatId;
     // Initialize event handler sets
     this.eventHandlers.set("fileCreated", new Set());
     this.eventHandlers.set("fileDeleted", new Set());
     this.eventHandlers.set("fileRenamed", new Set());
     this.eventHandlers.set("fileUpdated", new Set());
-  }
-
-  // Get the current chat ID
-  get chatId(): string | null {
-    return this._chatId;
-  }
-
-  // Check if filesystem is ready (has a chat ID set)
-  get isReady(): boolean {
-    return this._chatId !== null;
-  }
-
-  // Set the current chat ID (called when switching chats)
-  setChatId(chatId: string | null): void {
-    this._chatId = chatId;
   }
 
   // Event subscription methods
@@ -115,22 +114,20 @@ export class FileSystemManager {
    * Writes directly to OPFS, then emits event.
    */
   async createFile(path: string, content: string, contentType?: string): Promise<void> {
-    if (!this._chatId) {
-      throw new Error("No chat ID set - cannot create file");
-    }
+    const normalized = this.normalizePath(path);
 
     // Check if file exists to determine event type
-    const existingFile = await opfs.readArtifact(this._chatId, path);
+    const existingFile = await opfs.readArtifact(this.chatId, normalized);
     const isUpdate = existingFile !== undefined;
 
     // Write to OPFS
-    await opfs.writeArtifact(this._chatId, path, content, contentType);
+    await opfs.writeArtifact(this.chatId, normalized, content, contentType);
 
     // Emit event synchronously after write completes
     if (isUpdate) {
-      this.emit("fileUpdated", path);
+      this.emit("fileUpdated", normalized);
     } else {
-      this.emit("fileCreated", path);
+      this.emit("fileCreated", normalized);
     }
   }
 
@@ -138,25 +135,23 @@ export class FileSystemManager {
    * Delete a file or folder. Returns true if something was deleted.
    */
   async deleteFile(path: string): Promise<boolean> {
-    if (!this._chatId) {
-      return false;
-    }
+    const normalized = this.normalizePath(path);
 
     // Check if this is a file
-    const file = await opfs.readArtifact(this._chatId, path);
+    const file = await opfs.readArtifact(this.chatId, normalized);
     if (file) {
-      await opfs.deleteArtifact(this._chatId, path);
-      this.emit("fileDeleted", path);
+      await opfs.deleteArtifact(this.chatId, normalized);
+      this.emit("fileDeleted", normalized);
       return true;
     }
 
     // Check if this is a folder (has files that start with path + '/')
-    const allFiles = await opfs.listArtifacts(this._chatId);
-    const affectedFiles = allFiles.filter((f) => f.startsWith(`${path}/`));
+    const allFiles = await opfs.listArtifacts(this.chatId);
+    const affectedFiles = allFiles.filter((f) => f.startsWith(`${normalized}/`));
 
     if (affectedFiles.length > 0) {
       // Delete the folder and all contents
-      await opfs.deleteArtifactFolder(this._chatId, path);
+      await opfs.deleteArtifactFolder(this.chatId, normalized);
 
       // Emit event for each deleted file
       for (const filePath of affectedFiles) {
@@ -172,43 +167,75 @@ export class FileSystemManager {
    * Rename/move a file or folder. Returns true on success.
    */
   async renameFile(oldPath: string, newPath: string): Promise<boolean> {
-    if (!this._chatId) {
+    const normalizedOld = this.normalizePath(oldPath);
+    const normalizedNew = this.normalizePath(newPath);
+
+    if (normalizedOld === normalizedNew || normalizedNew.startsWith(`${normalizedOld}/`)) {
       return false;
     }
 
+    const allFiles = await opfs.listArtifacts(this.chatId);
+
     // Check if source is a file
-    const file = await opfs.readArtifact(this._chatId, oldPath);
+    const file = await opfs.readArtifact(this.chatId, normalizedOld);
     if (file) {
-      // Check if destination already exists
-      const destFile = await opfs.readArtifact(this._chatId, newPath);
-      if (destFile) {
+      const unaffectedFiles = allFiles.filter((path) => path !== normalizedOld);
+      if (hasFileTreeConflict(normalizedNew, unaffectedFiles)) {
         return false;
       }
 
-      // Copy content to new location and delete old
-      await opfs.writeArtifact(this._chatId, newPath, file.content, file.contentType);
-      await opfs.deleteArtifact(this._chatId, oldPath);
-      this.emit("fileRenamed", oldPath, newPath);
+      // Copy first so the source remains intact on failure. The write itself
+      // can fail after creating a partial file, so every error removes it.
+      try {
+        await opfs.writeArtifact(this.chatId, normalizedNew, file.content, file.contentType);
+        await opfs.deleteArtifact(this.chatId, normalizedOld);
+      } catch (error) {
+        await opfs.deleteArtifact(this.chatId, normalizedNew).catch(() => undefined);
+        throw error;
+      }
+      this.emit("fileRenamed", normalizedOld, normalizedNew);
       return true;
     }
 
     // Check if source is a folder
-    const allFiles = await opfs.listArtifacts(this._chatId);
-    const affectedFiles = allFiles.filter((f) => f.startsWith(`${oldPath}/`));
+    const affectedFiles = allFiles.filter((f) => f.startsWith(`${normalizedOld}/`));
 
     if (affectedFiles.length > 0) {
-      // Rename all files in the folder
-      for (const filePath of affectedFiles) {
-        const relativePath = filePath.substring(oldPath.length);
-        const newFilePath = newPath + relativePath;
+      const affectedSet = new Set(affectedFiles);
+      const unaffectedFiles = allFiles.filter((path) => !affectedSet.has(path));
+      const moves = affectedFiles.map((from) => ({
+        from,
+        to: normalizedNew + from.substring(normalizedOld.length),
+      }));
 
-        const fileData = await opfs.readArtifact(this._chatId, filePath);
-        if (fileData) {
-          await opfs.writeArtifact(this._chatId, newFilePath, fileData.content, fileData.contentType);
-          await opfs.deleteArtifact(this._chatId, filePath);
-          this.emit("fileRenamed", filePath, newFilePath);
-        }
+      // Reject all collisions before changing anything.
+      if (moves.some(({ to }) => hasFileTreeConflict(to, unaffectedFiles))) {
+        return false;
       }
+
+      // This store is small, so stage the reads plainly before changing anything.
+      const staged: Array<{ from: string; to: string; file: { content: string; contentType?: string } }> = [];
+      for (const move of moves) {
+        const sourceFile = await opfs.readArtifact(this.chatId, move.from);
+        if (!sourceFile) return false;
+        staged.push({ ...move, file: sourceFile });
+      }
+
+      const written: string[] = [];
+      try {
+        for (const { to, file: sourceFile } of staged) {
+          // Track the attempt before writing: OPFS may create the file and then
+          // reject while writing or closing the stream.
+          written.push(to);
+          await opfs.writeArtifact(this.chatId, to, sourceFile.content, sourceFile.contentType);
+        }
+        await opfs.deleteArtifactFolder(this.chatId, normalizedOld);
+      } catch (error) {
+        await Promise.allSettled(written.map((path) => opfs.deleteArtifact(this.chatId, path)));
+        throw error;
+      }
+
+      for (const { from, to } of moves) this.emit("fileRenamed", from, to);
       return true;
     }
 
@@ -219,17 +246,14 @@ export class FileSystemManager {
    * Get a file by path. Returns undefined if not found.
    */
   async getFile(path: string): Promise<File | undefined> {
-    if (!this._chatId) {
-      return undefined;
-    }
-
-    const data = await opfs.readArtifact(this._chatId, path);
+    const normalized = this.normalizePath(path);
+    const data = await opfs.readArtifact(this.chatId, normalized);
     if (!data) {
       return undefined;
     }
 
     return {
-      path,
+      path: normalized,
       content: data.content,
       contentType: data.contentType,
     };
@@ -239,11 +263,7 @@ export class FileSystemManager {
    * List file entries without hydrating full content.
    */
   async listEntries(): Promise<FileEntry[]> {
-    if (!this._chatId) {
-      return [];
-    }
-
-    const entries = await opfs.listArtifactEntries(this._chatId);
+    const entries = await opfs.listArtifactEntries(this.chatId);
     return entries.sort((a, b) => a.path.localeCompare(b.path));
   }
 
@@ -251,15 +271,11 @@ export class FileSystemManager {
    * List all files in the filesystem.
    */
   async listFiles(): Promise<File[]> {
-    if (!this._chatId) {
-      return [];
-    }
-
     const entries = await this.listEntries();
     const files: File[] = [];
 
     for (const { path } of entries) {
-      const data = await opfs.readArtifact(this._chatId, path);
+      const data = await opfs.readArtifact(this.chatId, path);
       if (data) {
         files.push({
           path,
@@ -294,44 +310,41 @@ export class FileSystemManager {
    * Apply explicit overlay delta (upserts + deletes) to OPFS.
    */
   async applyOverlayDelta(delta: OverlayDelta): Promise<OverlayCommitSummary> {
-    if (!this._chatId) {
-      throw new Error("No chat ID set - cannot apply overlay delta");
-    }
-
-    const existingFiles = await this.listFiles();
-    const existingByPath = new Map(existingFiles.map((file) => [this.normalizePath(file.path), file]));
-
-    let created = 0;
-    let updated = 0;
-    let deleted = 0;
+    const createdPaths: string[] = [];
+    const updatedPaths: string[] = [];
+    const deletedPaths: string[] = [];
 
     for (const [rawPath, file] of Object.entries(delta.upserts)) {
       const path = this.normalizePath(rawPath);
-      const existing = existingByPath.get(path);
+      const existing = await opfs.readArtifact(this.chatId, path);
 
       if (!existing) {
-        await this.createFile(path, file.content, file.contentType);
-        created++;
+        await opfs.writeArtifact(this.chatId, path, file.content, file.contentType);
+        this.emit("fileCreated", path);
+        createdPaths.push(path);
       } else if (existing.content !== file.content || existing.contentType !== file.contentType) {
-        await this.createFile(path, file.content, file.contentType ?? existing.contentType);
-        updated++;
+        await opfs.writeArtifact(this.chatId, path, file.content, file.contentType ?? existing.contentType);
+        this.emit("fileUpdated", path);
+        updatedPaths.push(path);
       }
     }
 
     for (const rawPath of delta.deletes) {
-      const path = this.normalizePath(rawPath);
-
-      if (!existingByPath.has(path)) {
-        continue;
-      }
-
-      const didDelete = await this.deleteFile(path);
+      // deleteFile normalizes internally
+      const didDelete = await this.deleteFile(rawPath);
       if (didDelete) {
-        deleted++;
+        deletedPaths.push(this.normalizePath(rawPath));
       }
     }
 
-    return { created, updated, deleted };
+    return {
+      created: createdPaths.length,
+      updated: updatedPaths.length,
+      deleted: deletedPaths.length,
+      createdPaths,
+      updatedPaths,
+      deletedPaths,
+    };
   }
 
   /**
@@ -378,11 +391,7 @@ export class FileSystemManager {
    * Check if a file exists at the given path.
    */
   async fileExists(path: string): Promise<boolean> {
-    if (!this._chatId) {
-      return false;
-    }
-
-    const data = await opfs.readArtifact(this._chatId, path);
+    const data = await opfs.readArtifact(this.chatId, this.normalizePath(path));
     return data !== undefined;
   }
 
@@ -390,52 +399,44 @@ export class FileSystemManager {
    * Get the number of files in the filesystem.
    */
   async getFileCount(): Promise<number> {
-    if (!this._chatId) {
-      return 0;
-    }
-
     return (await this.listEntries()).length;
   }
 
   /**
    * Download all files as a zip archive.
    */
-  async downloadAsZip(filename?: string): Promise<void> {
+  async downloadAsZip(filename: string = "filesystem.zip"): Promise<void> {
     const files = await this.listFiles();
-    const filesystem: Record<string, File> = {};
-    for (const file of files) {
-      filesystem[file.path] = file;
+    if (files.length === 0) {
+      throw new Error("No files to download");
     }
-    return downloadFilesystemAsZip(filesystem, filename);
-  }
-}
 
-export async function downloadFilesystemAsZip(
-  filesystem: Record<string, File>,
-  filename: string = "filesystem.zip",
-): Promise<void> {
-  if (Object.keys(filesystem).length === 0) {
-    throw new Error("No files to download");
-  }
+    const JSZip = (await import("jszip")).default;
+    const zip = new JSZip();
+    for (const file of files) {
+      // Remove leading slash if present for cleaner zip structure
+      const cleanPath = file.path.startsWith("/") ? file.path.substring(1) : file.path;
+      zip.file(cleanPath, contentToZipValue(file));
+    }
 
-  const zip = new JSZip();
-
-  // Add each file to the zip
-  for (const [path, file] of Object.entries(filesystem)) {
-    // Remove leading slash if present for cleaner zip structure
-    const cleanPath = path.startsWith("/") ? path.substring(1) : path;
-
-    // Add file to zip with its content
-    zip.file(cleanPath, artifactContentToZipValue(file));
+    try {
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(zipBlob, filename);
+    } catch (error) {
+      throw new Error(`Failed to create zip file: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   }
 
-  try {
-    // Generate the zip file as a blob
-    const zipBlob = await zip.generateAsync({ type: "blob" });
+  /**
+   * Download a single file by path.
+   */
+  async downloadFile(path: string): Promise<void> {
+    const file = await this.getFile(path);
+    if (!file) {
+      throw new Error(`File not found: ${path}`);
+    }
 
-    // Download the zip file
-    downloadBlob(zipBlob, filename);
-  } catch (error) {
-    throw new Error(`Failed to create zip file: ${error instanceof Error ? error.message : "Unknown error"}`);
+    const blob = contentToBlob(file.content, file.contentType);
+    downloadBlob(blob, getFileName(file.path));
   }
 }

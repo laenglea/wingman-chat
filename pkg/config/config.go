@@ -16,8 +16,8 @@ func Load() *Config {
 		Disclaimer: os.Getenv("DISCLAIMER"),
 	}
 
-	if u, e := os.Getenv("SUPPORT_URL"), os.Getenv("SUPPORT_EMAIL"); u != "" || e != "" {
-		cfg.Support = &Support{URL: u, Email: e}
+	if u := os.Getenv("SUPPORT_URL"); u != "" {
+		cfg.Support = &Support{URL: u}
 	}
 
 	if bridgeURL := os.Getenv("BRIDGE_URL"); bridgeURL != "" {
@@ -35,8 +35,9 @@ func loadConfigFiles(cfg *Config) {
 	loadYAML("models.yaml", &cfg.Models)
 	loadYAML("drives.yaml", &cfg.Drives)
 	loadYAML("backgrounds.yaml", &cfg.Backgrounds)
-	loadYAMLPtr("canvas.yaml", &cfg.Canvas)
 
+	loadYAMLPtr("chat.yaml", &cfg.Chat)
+	loadYAMLPtr("notebook.yaml", &cfg.Notebook)
 	loadYAMLPtr("translator.yaml", &cfg.Translator)
 	loadYAMLPtr("vision.yaml", &cfg.Vision)
 	loadYAMLPtr("text.yaml", &cfg.Text)
@@ -90,15 +91,25 @@ func applyEnvOverrides(cfg *Config) {
 
 	withFeature("NOTEBOOK_ENABLED", &cfg.Notebook, func(n *Notebook) {
 		envOverride("NOTEBOOK_MODEL", &n.Model)
+		envOverride("NOTEBOOK_RENDERER", &n.Renderer)
 	})
 
 	withFeature("EXTRACTOR_ENABLED", &cfg.Extractor, func(e *Extractor) {
 		envOverride("EXTRACTOR_MODEL", &e.Model)
 	})
 
+	withFeature("TRANSLATOR_ENABLED", &cfg.Translator, func(t *Translator) {
+		envOverride("TRANSLATOR_MODEL", &t.Model)
+	})
+
 	if days := envPositiveInt("CHAT_RETENTION_DAYS", nil); days != nil {
 		cfg.Chat = ensurePtr(cfg.Chat)
 		cfg.Chat.RetentionDays = days
+	}
+
+	if v := os.Getenv("CHAT_INSTRUCTIONS"); v != "" {
+		cfg.Chat = ensurePtr(cfg.Chat)
+		cfg.Chat.Instructions = v
 	}
 
 	if v := os.Getenv("CHAT_SUMMARIZER"); v != "" {
@@ -109,6 +120,17 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("CHAT_OPTIMIZER"); v != "" {
 		cfg.Chat = ensurePtr(cfg.Chat)
 		cfg.Chat.Optimizer = v
+	}
+
+	if envBool("CHAT_COMPACTION_ENABLED") {
+		cfg.Chat = ensurePtr(cfg.Chat)
+		cfg.Chat.Compaction = ensurePtr(cfg.Chat.Compaction)
+	}
+
+	if v := envPositiveInt("CHAT_COMPACTION_THRESHOLD", nil); v != nil {
+		cfg.Chat = ensurePtr(cfg.Chat)
+		cfg.Chat.Compaction = ensurePtr(cfg.Chat.Compaction)
+		cfg.Chat.Compaction.Threshold = *v
 	}
 
 	withFeature("TELEMETRY_ENABLED", &cfg.Telemetry, nil)

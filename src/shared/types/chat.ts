@@ -1,8 +1,16 @@
 import type { Elicitation, ElicitationResult } from "./elicitation.ts";
+import type { AgentContext } from "./telemetry";
 
 export type ToolIcon = React.ComponentType<React.SVGProps<SVGSVGElement>> | string;
 
 export type ModelType = "completer" | "embedder" | "renderer" | "reranker" | "synthesizer" | "transcriber";
+
+/** Image-generation quality tier (renderer models). */
+export type ImageQuality = "low" | "medium" | "high";
+/** Image-generation output resolution (e.g. Gemini's 1K/2K/4K lever). */
+export type ImageResolution = "512" | "1K" | "2K" | "4K";
+/** Image-generation background mode beyond the default "auto" (which is omitted). */
+export type ImageBackground = "opaque" | "transparent";
 
 export type Model = {
   id: string;
@@ -11,17 +19,38 @@ export type Model = {
   type?: ModelType;
   description?: string;
 
-  effort?: "none" | "minimal" | "low" | "medium" | "high";
+  instructions?: string;
+
+  hidden?: boolean;
+
+  /**
+   * Reasoning effort. In config this is the model's default; on a chat's stored
+   * model it doubles as the per-chat override (the config default is recovered
+   * from the fresh model list by id). Unset means the backend/model default.
+   */
+  effort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  /** Reasoning-effort levels offered in the picker; empty/unset hides the effort selector. */
+  supportedEfforts?: ("none" | "minimal" | "low" | "medium" | "high" | "xhigh")[];
   summary?: "auto" | "concise" | "detailed";
   verbosity?: "low" | "medium" | "high";
   compactThreshold?: number;
+
+  /**
+   * Renderer (image) model capabilities, mirroring `supportedEfforts` for chat:
+   * config wins, else a per-family heuristic fills them in. Each drives the
+   * matching Canvas picker — an empty/unset list hides that control.
+   */
+  supportedQualities?: ImageQuality[];
+  supportedAspectRatios?: string[];
+  /** Output resolutions, for models whose size lever is resolution (e.g. Gemini) rather than a quality tier. */
+  supportedResolutions?: ImageResolution[];
+  /** Background modes beyond the always-available "auto" default (opaque/transparent). */
+  supportedBackgrounds?: ImageBackground[];
 
   tools?: {
     enabled: string[];
     disabled: string[];
   };
-
-  prompts?: string[];
 };
 
 export type MCP = {
@@ -59,15 +88,63 @@ export interface ToolProvider {
 
 export type Tool = {
   name: string;
-  description: string;
+  title?: string;
+  description?: string;
   icon?: string;
 
   parameters: Record<string, unknown>;
+
+  strict?: boolean;
 
   function: (
     args: Record<string, unknown>,
     context?: ToolContext,
   ) => Promise<(TextContent | ImageContent | AudioContent | FileContent)[]>;
+
+  /**
+   * Optional, tool-owned presentation for how a call renders in chat. Colocating
+   * it with the tool keeps the chat renderer generic; every hook is optional and
+   * falls back to a sensible default. See {@link ToolDisplay}.
+   */
+  display?: ToolDisplay;
+};
+
+/** A type icon for a tool's chat presentation (e.g. a lucide icon component). */
+export type ToolDisplayIcon = React.ComponentType<React.SVGProps<SVGSVGElement>>;
+
+export type ToolDisplayState = { running?: boolean; error?: boolean };
+
+/** A code/text block rendered in a tool call's expanded view. */
+export type ToolDisplayBlock = {
+  code: string;
+  language: string;
+  /** Optional caption for the block (e.g. "Arguments", "Result", "Instructions"). */
+  name?: string;
+};
+
+/**
+ * How a tool call renders in chat. Every hook is optional and falls back to the
+ * generic default (name-cased label, argument preview, JSON result), so a tool
+ * overrides only what it cares about.
+ */
+export type ToolDisplay = {
+  /** Collapsed/running header; return only the fields that differ from the defaults. */
+  header?: (
+    args: Record<string, unknown> | null,
+    state: ToolDisplayState,
+  ) => {
+    icon?: ToolDisplayIcon;
+    label?: string;
+    mono?: boolean;
+    /** Short text shown beside the label; overrides the generic argument preview. */
+    preview?: string;
+    /** Hide the preview entirely (the label already carries the detail). */
+    suppressPreview?: boolean;
+  };
+  /** Expanded input blocks; return `[]` to hide input, omit to fall back to generic arguments. */
+  input?: (args: Record<string, unknown> | null) => ToolDisplayBlock[];
+  /** Expanded success output; return `null` to fall back to generic result rendering. */
+  output?: (result: Content[]) => ToolDisplayBlock | null;
 };
 
 export interface RenderedAppHandle {
@@ -76,6 +153,8 @@ export interface RenderedAppHandle {
 }
 
 export interface ToolContext {
+  model?: string;
+  signal?: AbortSignal;
   content?(): Content[];
   elicit?(elicitation: Elicitation): Promise<ElicitationResult>;
   onElicitationComplete?(elicitationId: string): void;
@@ -83,7 +162,11 @@ export interface ToolContext {
   sendMessage?(message: Message): Promise<void>;
   setMeta?(meta: Record<string, unknown>): void;
   updateMeta?(meta: Record<string, unknown>): void;
+  setError?(error: MessageError): void;
+  setContent?(content: Record<string, unknown>): void;
   setContext?(text: string | null): Promise<void>;
+  /** Trace context for nested agents spawned from this tool. */
+  agentContext?: AgentContext;
 }
 
 // Content parts for messages - order matters
@@ -92,7 +175,6 @@ export type ReasoningContent = {
   id: string;
   text: string;
   summary?: string;
-  signature?: string; // Encrypted reasoning content for multi-turn conversations
 };
 
 export type ToolCallContent = {
@@ -109,12 +191,12 @@ export type ToolResultContent = {
   arguments: string;
   meta?: Record<string, unknown>;
   result: (TextContent | ImageContent | AudioContent | FileContent)[];
+  content?: Record<string, unknown>;
 };
 
-export type CompactionContent = {
-  type: "compaction";
-  id: string;
-  encrypted_content: string;
+export type SummaryContent = {
+  type: "summary";
+  text: string;
 };
 
 // Content is the union of all content types used in messages
@@ -126,7 +208,7 @@ export type Content =
   | ReasoningContent
   | ToolCallContent
   | ToolResultContent
-  | CompactionContent;
+  | SummaryContent;
 
 export type TextContent = {
   type: "text";
@@ -161,7 +243,17 @@ export type Message = {
   /** Ordered content parts (text, reasoning, tool_call, tool_result, images, files) */
   content: Content[];
 
+  usage?: MessageUsage;
+
   error?: MessageError | null;
+};
+
+export type MessageUsage = {
+  model?: string;
+  inputTokens?: number;
+  cachedInputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
 };
 
 export type MessageError = {

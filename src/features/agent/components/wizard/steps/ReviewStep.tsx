@@ -1,14 +1,16 @@
-import { ChevronDown, FileText, Server, ToggleLeft, ToggleRight, Wrench, Zap } from "lucide-react";
+import { ChevronDown, FileText, Mic, Server, ToggleLeft, ToggleRight, Wrench, Zap } from "lucide-react";
 import { type Dispatch, useId } from "react";
 import type { BridgeServer } from "@/features/agent/types/agent";
 import { useChat } from "@/features/chat/hooks/useChat";
+import { getSavedModelId } from "@/features/chat/hooks/useModels";
 import { getConfig } from "@/shared/config";
+import { defaultModelId } from "@/shared/lib/models";
+import { ModelDropdown } from "@/shared/ui/ModelDropdown";
 import type { WizardAction } from "../AgentWizard";
 import { StepHeader } from "../StepHeader";
 
 interface ReviewStepProps {
   name: string;
-  description: string;
   instructions: string;
   selectedSkills: string[];
   selectedTools: string[];
@@ -21,7 +23,6 @@ interface ReviewStepProps {
 
 export function ReviewStep({
   name,
-  description,
   instructions,
   selectedSkills,
   selectedTools,
@@ -35,6 +36,8 @@ export function ReviewStep({
   const { models } = useChat();
   const config = getConfig();
 
+  const effectiveModel = model || defaultModelId(models, getSavedModelId());
+
   return (
     <div className="space-y-4">
       <StepHeader
@@ -43,55 +46,67 @@ export function ReviewStep({
       />
 
       {/* Model */}
-      <div>
-        <label
-          htmlFor={modelSelectId}
-          className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5"
-        >
-          Model
-        </label>
-        <div className="relative">
-          <select
-            id={modelSelectId}
-            value={model || models[0]?.id || ""}
-            onChange={(e) => dispatch({ type: "SET_MODEL", id: e.target.value })}
-            className="w-full appearance-none rounded-lg bg-white/40 dark:bg-neutral-900/60 py-2 pl-3 pr-8 text-sm text-neutral-900 dark:text-neutral-100 border border-neutral-200/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 hover:border-neutral-300/80 dark:hover:border-neutral-600/80 transition-colors backdrop-blur-lg cursor-pointer"
+      {model === "realtime" ? (
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-neutral-200/60 dark:border-neutral-700/60 bg-white/30 dark:bg-neutral-900/20">
+          <Mic size={14} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
+          <div>
+            <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Real-time Voice Mode</div>
+            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              This agent uses low-latency real-time voice conversation.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          <label
+            htmlFor={modelSelectId}
+            className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5"
           >
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name ?? m.id}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            size={14}
-            className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400"
+            Model
+          </label>
+          <ModelDropdown
+            models={models}
+            value={effectiveModel}
+            onChange={(modelId) => dispatch({ type: "SET_MODEL", id: modelId })}
+            trigger={({ getProps }) => (
+              <button
+                id={modelSelectId}
+                type="button"
+                {...getProps()}
+                className="w-full flex items-center justify-between rounded-lg bg-white/40 dark:bg-neutral-900/60 py-2 pl-3 pr-8 text-sm text-neutral-900 dark:text-neutral-100 border border-neutral-200/60 dark:border-neutral-700/60 focus:ring-2 focus:ring-neutral-500/60 hover:border-neutral-300/80 dark:hover:border-neutral-600/80 transition-colors backdrop-blur-lg cursor-pointer text-left"
+              >
+                <span className="truncate">{models.find((m) => m.id === effectiveModel)?.name ?? effectiveModel}</span>
+                <ChevronDown
+                  size={14}
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 transition-transform"
+                />
+              </button>
+            )}
           />
         </div>
-      </div>
+      )}
 
       {/* Summary */}
       <div className="rounded-lg border border-neutral-200/60 dark:border-neutral-700/60 bg-white/30 dark:bg-neutral-900/20 divide-y divide-neutral-200/40 dark:divide-neutral-700/40">
         {/* Identity */}
         <div className="px-3 py-2.5">
           <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{name}</div>
-          {description && <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{description}</div>}
           {instructions && (
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-1 line-clamp-2">{instructions}</div>
+            <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-1 line-clamp-2">{instructions}</div>
           )}
         </div>
 
         {/* Skills */}
         {selectedSkills.length > 0 && (
           <div className="px-3 py-2.5">
-            <div className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
+            <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
               Skills
             </div>
             <div className="flex flex-wrap gap-1">
               {selectedSkills.map((s) => (
                 <span
                   key={s}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-neutral-100 dark:bg-neutral-800/40 text-neutral-700 dark:text-neutral-300"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-neutral-100 dark:bg-neutral-800/40 text-neutral-700 dark:text-neutral-300"
                 >
                   <Zap size={8} /> {s}
                 </span>
@@ -103,14 +118,14 @@ export function ReviewStep({
         {/* Tools */}
         {(selectedTools.length > 0 || servers.length > 0) && (
           <div className="px-3 py-2.5">
-            <div className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
+            <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
               Tools
             </div>
             <div className="flex flex-wrap gap-1">
               {selectedTools.map((t) => (
                 <span
                   key={t}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
                 >
                   <Wrench size={8} /> {t}
                 </span>
@@ -118,7 +133,7 @@ export function ReviewStep({
               {servers.map((s) => (
                 <span
                   key={s.url}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
                 >
                   <Server size={8} /> {s.name}
                 </span>
@@ -130,14 +145,14 @@ export function ReviewStep({
         {/* Files */}
         {pendingFiles.length > 0 && (
           <div className="px-3 py-2.5">
-            <div className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
+            <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wide mb-1">
               Files
             </div>
             <div className="flex flex-wrap gap-1">
               {pendingFiles.map((f) => (
                 <span
                   key={`${f.name}-${f.size}-${f.lastModified}`}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
                 >
                   <FileText size={8} /> {f.name}
                 </span>
@@ -152,9 +167,7 @@ export function ReviewStep({
         <div className="flex items-center justify-between py-1">
           <div>
             <div className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Memory</div>
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500">
-              Remember context across conversations
-            </div>
+            <div className="text-xs text-neutral-400 dark:text-neutral-500">Remember context across conversations</div>
           </div>
           <button
             type="button"

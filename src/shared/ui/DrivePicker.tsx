@@ -1,6 +1,7 @@
 import { Dialog, Transition } from "@headlessui/react";
 import { ChevronRight, File, Folder, FolderOpen, Loader2, Square, SquareCheckBig, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { cn } from "@/shared/lib/cn";
 import { type DriveEntry, listDriveEntries } from "@/shared/lib/drives";
 import { formatBytes, lookupContentType } from "@/shared/lib/utils";
 
@@ -117,9 +118,9 @@ function TreeItem({ entry, depth, driveId, selected, onToggleSelect, acceptFilte
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            if (isDir) handleExpand();
+            if (isDir) void handleExpand();
           }}
-          className={`p-0.5 rounded transition-transform ${isDir ? "cursor-pointer" : "invisible"}`}
+          className={cn("p-0.5 rounded transition-transform", isDir ? "cursor-pointer" : "invisible")}
           aria-label={expanded ? `Collapse ${entry.name}` : `Expand ${entry.name}`}
         >
           {loading ? (
@@ -127,22 +128,24 @@ function TreeItem({ entry, depth, driveId, selected, onToggleSelect, acceptFilte
           ) : (
             <ChevronRight
               size={14}
-              className={`text-neutral-400 transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
+              className={cn("text-neutral-400 transition-transform duration-150", expanded && "rotate-90")}
             />
           )}
         </button>
 
         <button
           type="button"
-          className={`group flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pr-2 rounded-md text-left transition-colors ${
+          className={cn(
+            "group flex min-w-0 flex-1 items-center gap-1.5 py-1.5 pr-2 rounded-md text-left transition-colors",
             isDisabled
               ? "opacity-40 cursor-default"
-              : "hover:bg-neutral-100/60 dark:hover:bg-neutral-800/40 cursor-pointer"
-          }`}
+              : "hover:bg-neutral-100/60 dark:hover:bg-neutral-800/40 cursor-pointer",
+          )}
           disabled={isDisabled}
           onClick={() => {
             if (isDisabled) return;
-            isDir ? handleExpand() : onToggleSelect(entry);
+            if (isDir) void handleExpand();
+            else onToggleSelect(entry);
           }}
         >
           {isDir ? (
@@ -165,7 +168,7 @@ function TreeItem({ entry, depth, driveId, selected, onToggleSelect, acceptFilte
           <span className="ml-0.5 flex-1 truncate text-sm text-neutral-800 dark:text-neutral-200">{entry.name}</span>
 
           {!isDir && entry.size != null && entry.size > 0 && (
-            <span className="mr-1 whitespace-nowrap text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500">
+            <span className="mr-1 whitespace-nowrap text-xs tabular-nums text-neutral-400 dark:text-neutral-500">
               {formatBytes(entry.size)}
             </span>
           )}
@@ -342,7 +345,7 @@ export function DrivePicker({ isOpen, onClose, drive, onFilesSelected, accept, m
 
                 {/* Footer */}
                 <div className="flex items-center justify-between px-5 py-3 border-t border-neutral-200/60 dark:border-neutral-800/60 bg-neutral-50/50 dark:bg-neutral-900/30 rounded-b-xl shrink-0">
-                  <span className="text-[11px] text-neutral-500">
+                  <span className="text-xs text-neutral-500">
                     {selected.size > 0 ? `${selected.size} file${selected.size === 1 ? "" : "s"} selected` : ""}
                   </span>
                   <div className="flex items-center gap-2.5">

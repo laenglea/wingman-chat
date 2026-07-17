@@ -1,19 +1,14 @@
 import { Loader2, Mic, Square, X } from "lucide-react";
 import { useState } from "react";
-import { type FieldRecorderResult, useFieldRecorder } from "../hooks/useFieldRecorder";
+import { useFieldRecorder } from "../hooks/useFieldRecorder";
+import { formatTimestamp } from "../lib/format";
 
 interface FieldRecorderOverlayProps {
-  onComplete: (result: FieldRecorderResult) => void;
+  onSave: (transcript: string, audioUrl: string) => Promise<void>;
   onClose: () => void;
 }
 
-function formatElapsed(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-}
-
-export function FieldRecorderOverlay({ onComplete, onClose }: FieldRecorderOverlayProps) {
+export function FieldRecorderOverlay({ onSave, onClose }: FieldRecorderOverlayProps) {
   const { isRecording, elapsedSec, error, start, stop } = useFieldRecorder({ chunkDurationSec: 120 });
   const [isStopping, setIsStopping] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
@@ -30,10 +25,11 @@ export function FieldRecorderOverlay({ onComplete, onClose }: FieldRecorderOverl
   const handleStop = async () => {
     setIsStopping(true);
     try {
-      const result = await stop();
-      onComplete(result);
+      const { transcript, audioUrl } = await stop();
+      await onSave(transcript, audioUrl);
+      onClose();
     } catch (err) {
-      setStartError(err instanceof Error ? err.message : "Failed to stop recording");
+      setStartError(err instanceof Error ? err.message : "Failed to save recording");
       setIsStopping(false);
     }
   };
@@ -88,7 +84,7 @@ export function FieldRecorderOverlay({ onComplete, onClose }: FieldRecorderOverl
                   </span>
                 )}
                 <span className="text-3xl font-mono font-medium text-neutral-800 dark:text-neutral-100 tabular-nums">
-                  {formatElapsed(elapsedSec)}
+                  {formatTimestamp(elapsedSec)}
                 </span>
               </div>
 

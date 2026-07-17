@@ -2,6 +2,8 @@ import { X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useArtifacts } from "@/features/artifacts/hooks/useArtifacts";
 import { executeCode } from "@/features/tools/lib/interpreter";
+import { withSandboxLock } from "@/features/tools/lib/sandboxLock";
+import { ResizablePanel, ResizablePanelGroup } from "@/shared/ui/Resizable";
 import { CodeEditor } from "./CodeEditor";
 
 interface PythonEditorProps {
@@ -27,14 +29,15 @@ export function PythonEditor({ content, onRunReady, onRunningChange }: PythonEdi
     setError(null);
 
     try {
-      // Read files fresh from filesystem at execution time
-      const files: Record<string, { content: string; contentType?: string }> = {};
-      const fileList = await fs.listFiles();
-      for (const file of fileList) {
-        files[file.path] = { content: file.content, contentType: file.contentType };
-      }
-
-      const result = await executeCode({ code: content, files });
+      const result = await withSandboxLock(async () => {
+        // Read files fresh from filesystem at execution time
+        const files: Record<string, { content: string; contentType?: string }> = {};
+        const fileList = (await fs?.listFiles()) ?? [];
+        for (const file of fileList) {
+          files[file.path] = { content: file.content, contentType: file.contentType };
+        }
+        return executeCode({ code: content, files });
+      });
 
       if (result.success) {
         setOutput(result.output);
@@ -63,33 +66,43 @@ export function PythonEditor({ content, onRunReady, onRunningChange }: PythonEdi
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* Code Editor */}
-      <div className={hasOutput ? "h-1/2 overflow-hidden" : "flex-1 overflow-hidden"}>
-        <CodeEditor content={content} language="python" />
-      </div>
-
-      {/* Output Panel */}
-      {hasOutput && (
-        <div className="h-1/2 flex flex-col border-t border-black/5 dark:border-white/5">
-          <div className="flex items-center justify-between px-3 py-1">
-            <span className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Output</span>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-neutral-400 dark:text-neutral-500"
-              title="Clear output"
-            >
-              <X size={12} />
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400">
-            {error ? (
-              <pre className="text-red-500/80 dark:text-red-400/70 whitespace-pre-wrap">{error}</pre>
-            ) : (
-              <pre className="whitespace-pre-wrap">{output}</pre>
-            )}
-          </div>
+      {!hasOutput ? (
+        <div className="flex-1 overflow-hidden">
+          <CodeEditor content={content} language="python" />
         </div>
+      ) : (
+        <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0">
+          {/* Code Editor */}
+          <ResizablePanel defaultSize={75} minSize={20} className="overflow-hidden">
+            <CodeEditor content={content} language="python" />
+          </ResizablePanel>
+
+          {/* Output Panel */}
+          <ResizablePanel
+            defaultSize={25}
+            minSize={10}
+            className="flex flex-col border-t border-black/5 dark:border-white/5"
+          >
+            <div className="flex items-center justify-between px-3 py-1 shrink-0">
+              <span className="text-xs uppercase tracking-wider text-neutral-400 dark:text-neutral-500">Output</span>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 text-neutral-400 dark:text-neutral-500"
+                title="Clear output"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto px-3 py-2 font-mono text-xs text-neutral-600 dark:text-neutral-400">
+              {error ? (
+                <pre className="text-red-500/80 dark:text-red-400/70 whitespace-pre-wrap">{error}</pre>
+              ) : (
+                <pre className="whitespace-pre-wrap">{output}</pre>
+              )}
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       )}
     </div>
   );

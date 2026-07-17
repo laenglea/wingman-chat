@@ -1,233 +1,110 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod/v3";
 import { getConfig } from "@/shared/config";
+import { run } from "@/shared/lib/agent";
 import { convertFileToText } from "@/shared/lib/convert";
 import { blobToDataUrl } from "@/shared/lib/opfs-core";
 import type { Content } from "@/shared/types/chat";
-import { getTextFromContent } from "@/shared/types/chat";
+import type { File } from "@/shared/types/file";
+import { compactAgentMessage } from "../lib/chat-history";
 import * as store from "../lib/opfs-notebook";
+import {
+  type GenerateContext,
+  generateHtmlSlides,
+  generateImageSlides,
+  generateInfographic,
+  generateMindMap,
+  generatePodcast,
+  generateQuiz,
+  generateText,
+} from "../lib/output-generators";
+import { createSourceExecTools } from "../lib/source-exec-tools";
 import { createSourceTools } from "../lib/source-tools";
-import { runWithTools } from "../lib/tool-loop";
-import chatInstructions from "../prompts/chat.txt?raw";
-import podcastStyleBriefing from "../prompts/podcast-style-briefing.txt?raw";
-import podcastStyleDebate from "../prompts/podcast-style-debate.txt?raw";
-import podcastStyleDeepDive from "../prompts/podcast-style-deep-dive.txt?raw";
-import podcastStyleOverview from "../prompts/podcast-style-overview.txt?raw";
-import podcastStyleStory from "../prompts/podcast-style-story.txt?raw";
-import slideCommonRules from "../prompts/slide-style-common.txt?raw";
-import slideStyleConsulting from "../prompts/slide-style-consulting.txt?raw";
-import slideStyleDark from "../prompts/slide-style-dark.txt?raw";
-import slideStyleNature from "../prompts/slide-style-nature.txt?raw";
-import slideStyleSwiss from "../prompts/slide-style-swiss.txt?raw";
-import slideStyleWhiteboard from "../prompts/slide-style-whiteboard.txt?raw";
-import reportStyleDashboard from "../prompts/report-style-dashboard.txt?raw";
-import reportStyleExecutive from "../prompts/report-style-executive.txt?raw";
-import reportStyleMagazine from "../prompts/report-style-magazine.txt?raw";
-import reportStyleResearch from "../prompts/report-style-research.txt?raw";
-import studioAudioInstructions from "../prompts/studio-audio-overview.txt?raw";
-import studioInfographicInstructions from "../prompts/studio-infographic.txt?raw";
-import studioMindMapInstructions from "../prompts/studio-mind-map.txt?raw";
-import studioQuizInstructions from "../prompts/studio-quiz.txt?raw";
-import studioReportInstructions from "../prompts/studio-report.txt?raw";
-import studioSlideInstructions from "../prompts/studio-slide-deck.txt?raw";
-import type {
-  MindMapNode,
-  Notebook,
-  NotebookMessage,
-  NotebookOutput,
-  NotebookSource,
-  OutputType,
-  QuizQuestion,
-} from "../types/notebook";
+import { type BuildInstructionsOptions, buildInstructions, chatInstructions, OUTPUT_META } from "../lib/styles";
+import type { Notebook, NotebookMessage, NotebookOutput, OutputType } from "../types/notebook";
+import { useNotebookSkills } from "./useNotebookSkills";
 
 function generateId(): string {
   return crypto.randomUUID();
 }
 
 /**
- * Merge multiple WAV blobs into a single WAV blob.
- * Assumes all blobs are PCM WAV with the same sample rate and format.
+ * Hold a screen wake lock for the duration of a long-running task so the
+ * device doesn't sleep / dim mid-generation (a deck or podcast can run for
+ * minutes with the user idle). Wake-lock acquisition is best-effort: if the
+ * API is unavailable, denied, or auto-released on visibility change, the
+ * promise still runs to completion. Mirrors the pattern in
+ * `useFieldRecorder.ts` so behaviour stays consistent across the notebook.
  */
-async function mergeWavBlobs(blobs: Blob[]): Promise<Blob> {
-  if (blobs.length === 1) return blobs[0];
-
-  const buffers = await Promise.all(blobs.map((b) => b.arrayBuffer()));
-
-  // Read header from first WAV to get format info
-  const firstView = new DataView(buffers[0]);
-  const numChannels = firstView.getUint16(22, true);
-  const sampleRate = firstView.getUint32(24, true);
-  const bitsPerSample = firstView.getUint16(34, true);
-
-  // Extract raw PCM data from each WAV (skip 44-byte header)
-  const pcmChunks: ArrayBuffer[] = [];
-  let totalDataSize = 0;
-  for (const buf of buffers) {
-    const dataStart = 44;
-    const chunk = buf.slice(dataStart);
-    pcmChunks.push(chunk);
-    totalDataSize += chunk.byteLength;
+async function withScreenWakeLock<T>(task: Promise<T>): Promise<T> {
+  let lock: WakeLockSentinel | null = null;
+  if (typeof navigator !== "undefined" && navigator.wakeLock) {
+    lock = await navigator.wakeLock.request("screen").catch(() => null);
   }
-
-  // Build new WAV
-  const headerSize = 44;
-  const result = new ArrayBuffer(headerSize + totalDataSize);
-  const view = new DataView(result);
-  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-  const blockAlign = numChannels * (bitsPerSample / 8);
-
-  // RIFF header
-  writeString(view, 0, "RIFF");
-  view.setUint32(4, 36 + totalDataSize, true);
-  writeString(view, 8, "WAVE");
-
-  // fmt chunk
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true); // chunk size
-  view.setUint16(20, 1, true); // PCM
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-
-  // data chunk
-  writeString(view, 36, "data");
-  view.setUint32(40, totalDataSize, true);
-
-  // Copy PCM data
-  const output = new Uint8Array(result);
-  let offset = headerSize;
-  for (const chunk of pcmChunks) {
-    output.set(new Uint8Array(chunk), offset);
-    offset += chunk.byteLength;
-  }
-
-  return new Blob([result], { type: "audio/wav" });
-}
-
-function writeString(view: DataView, offset: number, str: string) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
+  try {
+    return await task;
+  } finally {
+    if (lock) await lock.release().catch(() => {});
   }
 }
 
-const STUDIO_PROMPTS: Record<OutputType, string> = {
-  podcast: studioAudioInstructions,
-  slides: studioSlideInstructions,
-  infographic: studioInfographicInstructions,
-  report: studioReportInstructions,
-  quiz: studioQuizInstructions,
-  mindmap: studioMindMapInstructions,
-};
+const filenameSchema = z.object({ filename: z.string() }).strict();
 
-type SlideStyle = { id: string; label: string; prompt: string };
-type PodcastStyle = { id: string; label: string; prompt: string; voices: string[] };
-type ReportStyle = { id: string; label: string; prompt: string };
+/**
+ * Conventional source the chat maintains to capture task-shaping decisions
+ * (audience, scope, tone, focus). Its content is appended as user
+ * instructions to every output generation.
+ */
+export const BRIEF_SOURCE_PATH = "brief.md";
 
-const DEFAULT_SLIDE_STYLES: SlideStyle[] = [
-  { id: "whiteboard", label: "Whiteboard", prompt: slideStyleWhiteboard },
-  { id: "consulting", label: "Consulting", prompt: slideStyleConsulting },
-  { id: "dark", label: "Dark", prompt: slideStyleDark },
-  { id: "swiss", label: "Swiss", prompt: slideStyleSwiss },
-  { id: "nature", label: "Nature", prompt: slideStyleNature },
-];
+/** Placeholders the UI passes when the user didn't provide a real name. */
+export const PLACEHOLDER_SOURCE_NAMES = {
+  pastedText: "Pasted text",
+  fieldRecording: "Field Recording",
+} as const;
 
-export function getSlideStyles(): SlideStyle[] {
-  const config = getConfig();
-  const slides = config.canvas?.slides;
-
-  if (slides && slides.length > 0) {
-    return slides.map((s) => ({
-      id: s.name.toLowerCase().replace(/\s+/g, "-"),
-      label: s.name,
-      prompt: s.prompt,
-    }));
-  }
-
-  return DEFAULT_SLIDE_STYLES;
+function isPlaceholderName(name: string): boolean {
+  const trimmed = name.trim().toLowerCase();
+  if (!trimmed) return true;
+  return Object.values(PLACEHOLDER_SOURCE_NAMES).some((p) => p.toLowerCase() === trimmed);
 }
 
-const DEFAULT_PODCAST_STYLES: PodcastStyle[] = [
-  { id: "overview", label: "Overview", prompt: podcastStyleOverview, voices: ["host"] },
-  { id: "deep-dive", label: "Deep Dive", prompt: podcastStyleDeepDive, voices: ["analyst"] },
-  { id: "briefing", label: "Briefing", prompt: podcastStyleBriefing, voices: ["narrator"] },
-  { id: "story", label: "Story", prompt: podcastStyleStory, voices: ["storyteller"] },
-  { id: "debate", label: "Debate", prompt: podcastStyleDebate, voices: ["host", "skeptic"] },
-];
-
-export function getPodcastStyles(): PodcastStyle[] {
-  const config = getConfig();
-  const podcasts = config.canvas?.podcasts;
-
-  if (podcasts && podcasts.length > 0) {
-    return podcasts.map((p) => ({
-      id: p.name.toLowerCase().replace(/\s+/g, "-"),
-      label: p.name,
-      prompt: p.prompt,
-      voices: p.voices ?? ["host"],
-    }));
-  }
-
-  return DEFAULT_PODCAST_STYLES;
+function fallbackNameFromText(text: string): string {
+  return text.trim().replace(/\s+/g, " ").split(" ").slice(0, 6).join(" ").slice(0, 50);
 }
 
-function buildSlideInstructions(styleId: string): string {
-  const slideStyles = getSlideStyles();
-  const style = slideStyles.find((s) => s.id === styleId) ?? slideStyles[0] ?? DEFAULT_SLIDE_STYLES[0];
-  return studioSlideInstructions
-    .replace("{{COMMON_RULES}}", slideCommonRules)
-    .replace("{{STYLE_SECTION}}", style.prompt);
+const EXT_RE = /^[a-z0-9]{1,5}$/i;
+
+/** Split a path into `{prefix, stem, ext}` using the same extension rule as `withDefaultExtension`. */
+function splitPath(path: string): { prefix: string; stem: string; ext: string } {
+  const slash = path.lastIndexOf("/");
+  const prefix = slash >= 0 ? path.slice(0, slash + 1) : "";
+  const last = slash >= 0 ? path.slice(slash + 1) : path;
+  const dot = last.lastIndexOf(".");
+  const hasExt = dot > 0 && EXT_RE.test(last.slice(dot + 1));
+  return hasExt ? { prefix, stem: last.slice(0, dot), ext: last.slice(dot) } : { prefix, stem: last, ext: "" };
 }
 
-const DEFAULT_REPORT_STYLES: ReportStyle[] = [
-  { id: "executive", label: "Executive", prompt: reportStyleExecutive },
-  { id: "dashboard", label: "Dashboard", prompt: reportStyleDashboard },
-  { id: "research", label: "Research", prompt: reportStyleResearch },
-  { id: "magazine", label: "Magazine", prompt: reportStyleMagazine },
-];
-
-export function getReportStyles(): ReportStyle[] {
-  const config = getConfig();
-  const reports = config.canvas?.reports;
-
-  if (reports && reports.length > 0) {
-    return reports.map((r) => ({
-      id: r.name.toLowerCase().replace(/\s+/g, "-"),
-      label: r.name,
-      prompt: r.prompt,
-    }));
-  }
-
-  return DEFAULT_REPORT_STYLES;
+/** Append " (n)" before the extension until the path is unique among `existing`. */
+function uniquePath(path: string, existing: Set<string>): string {
+  if (!existing.has(path)) return path;
+  const { prefix, stem, ext } = splitPath(path);
+  let i = 2;
+  while (existing.has(`${prefix}${stem} (${i})${ext}`)) i++;
+  return `${prefix}${stem} (${i})${ext}`;
 }
-
-function buildAudioInstructions(styleId: string): string {
-  const podcastStyles = getPodcastStyles();
-  const style = podcastStyles.find((s) => s.id === styleId) ?? podcastStyles[0] ?? DEFAULT_PODCAST_STYLES[0];
-  return studioAudioInstructions.replace("{{STYLE_SECTION}}", style.prompt);
-}
-
-function buildReportInstructions(styleId: string): string {
-  const reportStyles = getReportStyles();
-  const style = reportStyles.find((s) => s.id === styleId) ?? reportStyles[0] ?? DEFAULT_REPORT_STYLES[0];
-  return studioReportInstructions.replace("{{STYLE_SECTION}}", style.prompt);
-}
-
-const OUTPUT_TITLES: Record<OutputType, string> = {
-  podcast: "Podcast",
-  slides: "Slides",
-  infographic: "Infographic",
-  report: "Report",
-  quiz: "Quiz",
-  mindmap: "Mind Map",
-};
 
 export function useNotebook(notebookId?: string) {
   const config = getConfig();
   const client = config.client;
 
+  // Domain-capability skills the source-chat can `read_skill` while analyzing
+  // sources (null when no skill library is served). Folded into the chat run
+  // below — the Studio generators don't use it.
+  const skills = useNotebookSkills();
+
   const [notebook, setNotebook] = useState<Notebook | null>(null);
-  const [sources, setSources] = useState<NotebookSource[]>([]);
+  const [sources, setSources] = useState<File[]>([]);
   const [outputs, setOutputs] = useState<NotebookOutput[]>([]);
   const [messages, setMessages] = useState<NotebookMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -290,12 +167,58 @@ export function useNotebook(notebookId?: string) {
     return rid;
   }, []);
 
+  // Keep a ref to current notebook so async flows can read the latest id
+  const notebookRef = useRef<Notebook | null>(notebook);
+  notebookRef.current = notebook;
+
+  // Lazily create a notebook on first write if none exists yet
+  const ensureNotebook = useCallback(async (): Promise<Notebook> => {
+    if (notebookRef.current) return notebookRef.current;
+    const now = new Date().toISOString();
+    const r: Notebook = {
+      id: generateId(),
+      title: "Untitled notebook",
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.saveNotebook(r);
+    notebookRef.current = r;
+    setNotebook(r);
+    setSources([]);
+    setOutputs([]);
+    setMessages([]);
+    return r;
+  }, []);
+
+  // Reset to the empty state (no active notebook)
+  const resetNotebook = useCallback(() => {
+    loadIdRef.current++;
+    notebookRef.current = null;
+    setNotebook(null);
+    setSources([]);
+    setOutputs([]);
+    setMessages([]);
+    setStreamingContent(null);
+  }, []);
+
   useEffect(() => {
-    if (notebookId) {
-      // Clear stale data immediately to avoid showing old notebook content
+    if (!notebookId) {
+      // No id (new/empty state) — reset to blank slate
+      loadIdRef.current++;
+      notebookRef.current = null;
       setNotebook(null);
-      initNotebook(notebookId);
+      setSources([]);
+      setOutputs([]);
+      setMessages([]);
+      setStreamingContent(null);
+      setLoading(false);
+      return;
     }
+    // Skip reload if we already hold this notebook (e.g. just created via ensureNotebook)
+    if (notebookRef.current?.id === notebookId) return;
+    // Clear stale data immediately to avoid showing old notebook content
+    setNotebook(null);
+    void initNotebook(notebookId);
   }, [notebookId, initNotebook]);
 
   // ── Title ──────────────────────────────────────────────────────────
@@ -334,70 +257,138 @@ export function useNotebook(notebookId?: string) {
     [client, config],
   );
 
+  const reservePath = useCallback(
+    (path: string, extra?: Iterable<string>): string =>
+      uniquePath(path, new Set([...sourcesRef.current.map((s) => s.path), ...(extra ?? [])])),
+    [],
+  );
+
   const addSearchResult = useCallback(
-    async (query: string, mode: "web" | "research", content: string) => {
-      if (!notebook) return;
+    async (query: string, _mode: "web" | "research", content: string) => {
+      const nb = await ensureNotebook();
 
-      const source: NotebookSource = {
-        id: generateId(),
-        type: "web",
-        name: query.slice(0, 60),
-        content,
-        metadata: { query, url: mode },
-        addedAt: new Date().toISOString(),
-      };
+      let path: string;
+      try {
+        path = store.normalizeSourcePath(query.slice(0, 60)) || generateId();
+      } catch {
+        path = generateId();
+      }
+      path = reservePath(store.withDefaultExtension(path, "md"));
 
-      await store.addSource(notebook.id, source);
-      setSources((prev) => [...prev, source]);
+      const source: File = { path, content };
+      await store.addSource(nb.id, source);
+      void store.touchNotebook(nb.id);
+      setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
-    [notebook],
+    [ensureNotebook, reservePath],
   );
 
   const addFileSource = useCallback(
-    async (file: File) => {
-      if (!notebook) return;
+    async (file: globalThis.File) => {
+      const nb = await ensureNotebook();
 
-      const content = await convertFileToText(file, (f) => client.extractText(f));
+      let path: string;
+      try {
+        path = store.normalizeSourcePath(file.name) || generateId();
+      } catch {
+        path = generateId();
+      }
+      path = reservePath(path);
+
+      // Images are stored verbatim as binary sources (data URLs) — we don't
+      // try to extract text from them. Models with vision can read the content
+      // directly, and python tools can open them from the sandbox.
+      if (file.type.startsWith("image/")) {
+        const dataUrl = await blobToDataUrl(file);
+        const source: File = {
+          path,
+          content: dataUrl,
+          contentType: file.type,
+        };
+        await store.addSource(nb.id, source);
+        setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
+        return;
+      }
+
+      const content = await convertFileToText(file);
 
       if (!content?.trim()) {
         throw new Error(`Could not extract text from ${file.name}`);
       }
 
-      const source: NotebookSource = {
-        id: generateId(),
-        type: "file",
-        name: file.name,
-        content,
-        metadata: {
-          fileType: file.type,
-          fileSize: file.size,
-        },
-        addedAt: new Date().toISOString(),
-      };
-
-      await store.addSource(notebook.id, source);
-      setSources((prev) => [...prev, source]);
+      const source: File = { path, content };
+      await store.addSource(nb.id, source);
+      void store.touchNotebook(nb.id);
+      setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
-    [notebook, client],
+    [ensureNotebook, reservePath],
+  );
+
+  const suggestSourceFilename = useCallback(
+    async (name: string, text: string): Promise<string> => {
+      if (!isPlaceholderName(name)) return name;
+
+      const fallback = fallbackNameFromText(text);
+      if (!text.trim()) return fallback || name;
+
+      try {
+        const result = await client.parse(
+          getModel(),
+          "You are naming a text snippet that will be saved as a file in a research notebook. " +
+            "Produce a short, descriptive title (3-7 words) that captures the topic. " +
+            "Use plain Title Case with spaces — no extension, no quotes, no path separators.",
+          text.slice(0, 1500),
+          filenameSchema,
+          "source_filename",
+        );
+        const suggested = result?.filename?.trim().replace(/[\\/]/g, " ").slice(0, 80) ?? "";
+        return suggested || fallback || name;
+      } catch {
+        return fallback || name;
+      }
+    },
+    [client, getModel],
   );
 
   const addTextSource = useCallback(
-    async (name: string, text: string, audioUrl?: string) => {
-      if (!notebook) return;
+    async (name: string, text: string, audioUrl?: string): Promise<string> => {
+      const nb = await ensureNotebook();
 
-      const source: NotebookSource = {
-        id: generateId(),
-        type: "text",
-        name: name || "Pasted text",
-        content: text,
-        ...(audioUrl && { audioUrl }),
-        addedAt: new Date().toISOString(),
-      };
+      const displayName = (await suggestSourceFilename(name, text)) || name || PLACEHOLDER_SOURCE_NAMES.pastedText;
+      let basePath: string;
+      try {
+        basePath = store.normalizeSourcePath(displayName) || generateId();
+      } catch {
+        basePath = generateId();
+      }
+      const textPath = reservePath(store.withDefaultExtension(basePath, "md"));
 
-      await store.addSource(notebook.id, source);
-      setSources((prev) => [...prev, source]);
+      const textSource: File = { path: textPath, content: text };
+      await store.addSource(nb.id, textSource);
+      const added: File[] = [textSource];
+
+      // Audio companion becomes its own `.wav` source so it lives on the
+      // filesystem like any other binary artifact.
+      if (audioUrl) {
+        const stem = textPath.replace(/\.[a-z0-9]{1,5}$/i, "");
+        const audioPath = reservePath(store.withDefaultExtension(stem, "wav"), [textPath]);
+        const audioSource: File = {
+          path: audioPath,
+          content: audioUrl,
+          contentType: "audio/wav",
+        };
+        await store.addSource(nb.id, audioSource);
+        added.push(audioSource);
+      }
+
+      void store.touchNotebook(nb.id);
+      setSources((prev) => {
+        const paths = new Set(added.map((s) => s.path));
+        return [...prev.filter((s) => !paths.has(s.path)), ...added];
+      });
+      return textSource.path;
     },
-    [notebook],
+    [ensureNotebook, reservePath, suggestSourceFilename],
   );
 
   const scrapeWeb = useCallback(
@@ -417,39 +408,98 @@ export function useNotebook(notebookId?: string) {
 
   const addScrapeResult = useCallback(
     async (url: string, content: string) => {
-      if (!notebook) return;
+      const nb = await ensureNotebook();
 
-      const source: NotebookSource = {
-        id: generateId(),
-        type: "web",
-        name: url,
-        content,
-        metadata: { url },
-        addedAt: new Date().toISOString(),
-      };
+      let path: string;
+      try {
+        path = store.normalizeSourcePath(url) || generateId();
+      } catch {
+        path = generateId();
+      }
+      path = reservePath(store.withDefaultExtension(path, "md"));
 
-      await store.addSource(notebook.id, source);
-      setSources((prev) => [...prev, source]);
+      const source: File = { path, content };
+      await store.addSource(nb.id, source);
+      void store.touchNotebook(nb.id);
+      setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
     },
-    [notebook],
+    [ensureNotebook, reservePath],
   );
 
-  const deleteSource = useCallback(
-    async (sourceId: string) => {
-      if (!notebook) return;
-      await store.removeSource(notebook.id, sourceId);
-      setSources((prev) => prev.filter((s) => s.id !== sourceId));
-    },
-    [notebook],
-  );
+  const deleteSource = useCallback(async (path: string) => {
+    // Read the live ref, not the `notebook` state — the notebook may have been
+    // lazily created this turn (chat from an empty notebook), so the closed-over
+    // state is still null while the ref is already set.
+    const nb = notebookRef.current;
+    if (!nb) return;
+    await store.removeSource(nb.id, path);
+    void store.touchNotebook(nb.id);
+    setSources((prev) => prev.filter((s) => s.path !== path));
+  }, []);
+
+  const renameSource = useCallback(async (oldPath: string, rawNewPath: string) => {
+    const nb = notebookRef.current;
+    if (!nb) return;
+    const trimmed = rawNewPath.trim();
+    if (!trimmed) throw new Error("Name cannot be empty");
+
+    let newPath: string;
+    try {
+      newPath = store.normalizeSourcePath(trimmed);
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : "Invalid name");
+    }
+    if (!newPath) throw new Error("Name cannot be empty");
+
+    // Preserve the original extension if the user didn't supply one.
+    const oldExt = splitPath(oldPath).ext;
+    if (oldExt) newPath = store.withDefaultExtension(newPath, oldExt.slice(1));
+    if (newPath === oldPath) return;
+
+    const current = sourcesRef.current.find((s) => s.path === oldPath);
+    if (!current) throw new Error("Source not found");
+
+    if (sourcesRef.current.some((s) => s.path === newPath)) {
+      throw new Error(`A source named "${newPath}" already exists`);
+    }
+
+    const renamed: File = current.contentType
+      ? { path: newPath, content: current.content, contentType: current.contentType }
+      : { path: newPath, content: current.content };
+
+    await store.addSource(nb.id, renamed);
+    await store.removeSource(nb.id, oldPath);
+    void store.touchNotebook(nb.id);
+    setSources((prev) => prev.map((s) => (s.path === oldPath ? renamed : s)));
+  }, []);
+
+  /**
+   * Write (or overwrite) a source at the given path. Used by the python/javascript
+   * execution tools to persist files the sandbox produced back into the
+   * notebook. Paths are taken verbatim; content may be utf-8 text or a
+   * `data:` URL for binary payloads.
+   */
+  const writeSource = useCallback(async (path: string, content: string, contentType?: string) => {
+    const nb = notebookRef.current;
+    if (!nb) return;
+    const source: File = contentType ? { path, content, contentType } : { path, content };
+    await store.addSource(nb.id, source);
+    void store.touchNotebook(nb.id);
+    setSources((prev) => [...prev.filter((s) => s.path !== path), source]);
+  }, []);
 
   // ── Chat ───────────────────────────────────────────────────────────
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!notebook || isChatting) return;
+      if (isChatting) return;
       setIsChatting(true);
       setStreamingContent(null);
+
+      // Lazily create the notebook on the first message, so the chat works from
+      // an empty state — the assistant can draft notes and create sources from
+      // scratch, not only analyze existing ones.
+      const nb = notebook ?? (await ensureNotebook());
 
       const userMsg: NotebookMessage = {
         role: "user",
@@ -461,25 +511,45 @@ export function useNotebook(notebookId?: string) {
       setMessages(newMessages);
 
       try {
-        const tools = createSourceTools(sourcesRef.current);
+        const tools = [
+          ...createSourceTools(() => sourcesRef.current, {
+            onWrite: writeSource,
+            onRename: renameSource,
+            onDelete: deleteSource,
+          }),
+          ...createSourceExecTools(() => sourcesRef.current, {
+            onWrite: writeSource,
+          }),
+          ...(skills?.tools ?? []),
+        ];
+
+        // Fold the skills provider's guidance into the system prompt the same
+        // way the main chat composes tool-provider instructions.
+        const instructions = [chatInstructions, skills?.instructions].filter(Boolean).join("\n\n");
 
         // Build Message[] for the LLM (strip timestamps)
-        const conversation = newMessages.map(({ timestamp, ...msg }) => msg);
+        const conversation = newMessages.map(({ timestamp: _timestamp, ...msg }) => msg);
 
-        const response = await runWithTools(client, getModel(), chatInstructions, conversation, tools, (content) =>
-          setStreamingContent(content),
-        );
+        const result = await run(client, getModel(), instructions, conversation, tools, {
+          agentName: "notebook",
+          onStream: (content) => setStreamingContent(content),
+        });
 
         setStreamingContent(null);
 
-        const assistantMsg: NotebookMessage = {
-          ...response,
-          timestamp: new Date().toISOString(),
-        };
+        // Keep the whole agent run (tool calls + results, compacted) so the
+        // next turn remembers what was read and edited — without this the
+        // model re-surveys the sources on every message and multi-turn
+        // refinement loses the prior edits from context.
+        const stamp = new Date().toISOString();
+        const agentMessages: NotebookMessage[] = result
+          .slice(conversation.length)
+          .map((m) => ({ ...compactAgentMessage(m), timestamp: stamp }));
 
-        const finalMessages = [...newMessages, assistantMsg];
+        const finalMessages = [...newMessages, ...agentMessages];
         setMessages(finalMessages);
-        await store.saveMessages(notebook.id, finalMessages);
+        await store.saveMessages(nb.id, finalMessages);
+        void store.touchNotebook(nb.id);
       } catch (err) {
         setStreamingContent(null);
 
@@ -495,297 +565,111 @@ export function useNotebook(notebookId?: string) {
         };
         const finalMessages = [...newMessages, errorMsg];
         setMessages(finalMessages);
+        // Persist the failed turn too — otherwise the user's question and the
+        // error reply silently vanish on reload.
+        await store.saveMessages(nb.id, finalMessages).catch((saveErr) => {
+          console.error("Failed to persist messages after chat error:", saveErr);
+        });
+        void store.touchNotebook(nb.id);
       } finally {
         setIsChatting(false);
       }
     },
-    [notebook, messages, client, getModel, isChatting],
+    [notebook, ensureNotebook, messages, client, getModel, isChatting, skills, writeSource, renameSource, deleteSource],
   );
 
   // ── Outputs ────────────────────────────────────────────────────────
 
   const generateOutput = useCallback(
-    (type: OutputType, styleId?: string) => {
+    (type: OutputType, styleId?: string, options?: BuildInstructionsOptions) => {
       if (!notebook || sources.length === 0) return;
 
       const output: NotebookOutput = {
         id: generateId(),
         type,
-        title: OUTPUT_TITLES[type],
+        title: OUTPUT_META[type].title,
         content: "",
         status: "generating",
         createdAt: new Date().toISOString(),
       };
 
-      // Add immediately as generating
       setOutputs((prev) => [output, ...prev]);
 
-      const completeOutput = async (completed: NotebookOutput) => {
-        setOutputs((prev) => prev.map((o) => (o.id === output.id ? completed : o)));
-        await store.addOutput(notebook.id, completed);
-      };
+      const notebookId = notebook.id;
 
-      const failOutput = (err: unknown) => {
-        setOutputs((prev) =>
-          prev.map((o) =>
-            o.id === output.id
-              ? {
-                  ...o,
-                  status: "error" as const,
-                  error: err instanceof Error ? err.message : "Generation failed",
-                }
-              : o,
-          ),
-        );
-      };
+      // The notebook brief (maintained via chat) feeds every generation as
+      // user instructions, ahead of any one-shot instructions from the dialog.
+      const brief = sourcesRef.current
+        .find((s) => s.path === BRIEF_SOURCE_PATH && !s.content.startsWith("data:"))
+        ?.content.trim();
+      const effectiveOptions: BuildInstructionsOptions | undefined = brief
+        ? { ...options, instructions: [brief, options?.instructions].filter(Boolean).join("\n\n") }
+        : options;
 
-      // Fire and forget
-      const tools = createSourceTools(sourcesRef.current);
-      const instructions =
-        type === "slides"
-          ? buildSlideInstructions(styleId ?? "whiteboard")
-          : type === "podcast"
-            ? buildAudioInstructions(styleId ?? "overview")
-            : type === "report"
-              ? buildReportInstructions(styleId ?? "executive")
-              : STUDIO_PROMPTS[type];
-      const userMessage = {
-        role: "user" as const,
-        content: [
-          {
-            type: "text" as const,
-            text: `Generate a ${OUTPUT_TITLES[type].toLowerCase()} from the available sources.`,
-          },
-        ],
-      };
+      // Mirror of the in-flight output including everything the generator
+      // reported via onProgress — the catch below persists it so a failure
+      // keeps expensive partial work (e.g. a podcast script).
+      let latest: NotebookOutput = output;
 
-      if (type === "podcast") {
-        // Audio overview: LLM generates script → TTS generates audio per paragraph → merge
-        runWithTools(client, getModel(), instructions, [userMessage], tools)
-          .then(async (response) => {
-            const script = getTextFromContent(response.content);
-            if (!script?.trim()) {
-              throw new Error("Could not generate audio script");
-            }
+      const task: Promise<Partial<NotebookOutput>> = withScreenWakeLock(
+        (async () => {
+          const instructions = await buildInstructions(type, styleId, effectiveOptions);
+          const ctx: GenerateContext = {
+            client,
+            model: getModel(),
+            instructions,
+            sourceTools: createSourceTools(() => sourcesRef.current),
+            getSources: () => sourcesRef.current,
+            onProgress: (partial) => {
+              latest = { ...latest, ...partial };
+              setOutputs((prev) => prev.map((o) => (o.id === output.id ? { ...o, ...partial } : o)));
+            },
+          };
 
-            const ttsModel = config.tts?.model || "";
-            const voiceMap = config.tts?.voices ?? {};
-            const resolveVoice = (role: string) => voiceMap[role] || role;
-            const podcastStyles = getPodcastStyles();
-            const podcastStyle =
-              podcastStyles.find((s) => s.id === styleId) ?? podcastStyles[0] ?? DEFAULT_PODCAST_STYLES[0];
-            const voices = podcastStyle.voices;
+          switch (type) {
+            case "podcast":
+              return generatePodcast(ctx, styleId);
+            case "infographic":
+              return generateInfographic(ctx);
+            case "slides":
+              return options?.slideMode === "images"
+                ? generateImageSlides(ctx)
+                : generateHtmlSlides(ctx, styleId, effectiveOptions);
+            case "quiz":
+              return generateQuiz(ctx);
+            case "mindmap":
+              return generateMindMap(ctx);
+            default:
+              return generateText(ctx, OUTPUT_META[type].title);
+          }
+        })(),
+      );
 
-            // Parse segments: for multi-voice styles, extract [1]/[2] speaker tags
-            // For single-voice styles, just split by paragraphs
-            const segments: { text: string; voice: string }[] = [];
-            if (voices.length > 1) {
-              // Split by speaker tags: [1] or [2]
-              const tagPattern = /^\[(\d+)\]\s*/;
-              for (const para of script
-                .split(/\n\n+/)
-                .map((p) => p.trim())
-                .filter(Boolean)) {
-                const match = para.match(tagPattern);
-                if (match) {
-                  const idx = Math.min(parseInt(match[1], 10) - 1, voices.length - 1);
-                  segments.push({ text: para.replace(tagPattern, ""), voice: voices[Math.max(0, idx)] });
-                } else {
-                  segments.push({ text: para, voice: voices[0] });
-                }
-              }
-            } else {
-              for (const para of script
-                .split(/\n\n+/)
-                .map((p) => p.trim())
-                .filter(Boolean)) {
-                segments.push({ text: para, voice: voices[0] });
-              }
-            }
-
-            // Generate audio for each segment with its assigned voice
-            const audioBlobs = await Promise.all(
-              segments.map(async ({ text, voice }) => {
-                try {
-                  return await client.generateAudio(ttsModel, text, resolveVoice(voice));
-                } catch {
-                  return null;
-                }
-              }),
-            );
-
-            // Merge WAV blobs into a single audio blob
-            const validBlobs = audioBlobs.filter((b): b is Blob => b !== null);
-            if (validBlobs.length === 0) {
-              throw new Error("Failed to generate audio");
-            }
-
-            const mergedBlob = await mergeWavBlobs(validBlobs);
-            const audioUrl = await blobToDataUrl(mergedBlob);
-
-            await completeOutput({
-              ...output,
-              content: script,
-              audioUrl,
-              status: "completed",
-            });
-          })
-          .catch(failOutput);
-      } else if (type === "infographic") {
-        // Infographic: LLM generates image prompt → renderer creates image
-        runWithTools(client, getModel(), instructions, [userMessage], tools)
-          .then(async (response) => {
-            const imagePrompt = getTextFromContent(response.content);
-            if (!imagePrompt?.trim()) {
-              throw new Error("Could not generate image prompt");
-            }
-
-            const rendererModel = config.renderer?.model || "";
-            const imageBlob = await client.generateImage(rendererModel, imagePrompt);
-            const imageUrl = await blobToDataUrl(imageBlob);
-
-            await completeOutput({
-              ...output,
-              content: imagePrompt,
-              imageUrl,
-              status: "completed",
-            });
-          })
-          .catch(failOutput);
-      } else if (type === "slides") {
-        // Slide deck: LLM generates slide text + image prompts → render each slide sequentially
-        // so each slide can use the previous one as a style reference
-        runWithTools(client, getModel(), instructions, [userMessage], tools)
-          .then(async (response) => {
-            const fullContent = getTextFromContent(response.content);
-            if (!fullContent?.trim()) {
-              throw new Error("Could not generate slide deck");
-            }
-
-            // Parse slides: split by ---SLIDE--- separator
-            const slideBlocks = fullContent
-              .split(/---SLIDE---/i)
-              .map((s) => s.trim())
-              .filter(Boolean);
-
-            // Extract text content and image prompts per slide
-            const slideTexts: string[] = [];
-            const imagePrompts: string[] = [];
-
-            for (const block of slideBlocks) {
-              const parts = block.split(/---PROMPT---/i);
-              slideTexts.push((parts[0] || "").trim());
-              if (parts[1]) {
-                imagePrompts.push(parts[1].trim());
-              }
-            }
-
-            const textContent = slideTexts.join("\n\n---\n\n");
-
-            // Generate first slide alone to establish style, then remaining in parallel batches of 4
-            const rendererModel = config.renderer?.model || "";
-            const slideImages: string[] = new Array(imagePrompts.length).fill("");
-
-            if (imagePrompts.length > 0) {
-              try {
-                const firstBlob = await client.generateImage(rendererModel, imagePrompts[0]);
-                slideImages[0] = await blobToDataUrl(firstBlob);
-
-                const remaining = imagePrompts.slice(1);
-                for (let i = 0; i < remaining.length; i += 4) {
-                  const batch = remaining.slice(i, i + 4);
-                  const results = await Promise.allSettled(
-                    batch.map((prompt) =>
-                      client.generateImage(rendererModel, prompt, [firstBlob]).then((blob) => blobToDataUrl(blob)),
-                    ),
-                  );
-                  for (let j = 0; j < results.length; j++) {
-                    const result = results[j];
-                    slideImages[1 + i + j] = result.status === "fulfilled" ? result.value : "";
-                  }
-                }
-              } catch {
-                // first slide failed — skip all image generation
-              }
-            }
-
-            await completeOutput({
-              ...output,
-              content: textContent,
-              slides: slideImages.filter(Boolean),
-              status: "completed",
-            });
-          })
-          .catch(failOutput);
-      } else if (type === "quiz") {
-        // Quiz: LLM reads sources → produces structured JSON
-        runWithTools(client, getModel(), instructions, [userMessage], tools)
-          .then(async (response) => {
-            const raw = getTextFromContent(response.content);
-            if (!raw?.trim()) throw new Error("Could not generate quiz");
-
-            const jsonStr = raw
-              .replace(/^```json?\s*/i, "")
-              .replace(/```\s*$/i, "")
-              .trim();
-            const parsed = JSON.parse(jsonStr) as { questions: QuizQuestion[] };
-
-            if (!parsed.questions?.length) {
-              throw new Error("No questions generated");
-            }
-
-            await completeOutput({
-              ...output,
-              content: raw,
-              quiz: parsed.questions,
-              status: "completed",
-            });
-          })
-          .catch(failOutput);
-      } else if (type === "mindmap") {
-        // Mind map: LLM reads sources → produces structured JSON tree
-        runWithTools(client, getModel(), instructions, [userMessage], tools)
-          .then(async (response) => {
-            const raw = getTextFromContent(response.content);
-            if (!raw?.trim()) throw new Error("Could not generate mind map");
-
-            const jsonStr = raw
-              .replace(/^```json?\s*/i, "")
-              .replace(/```\s*$/i, "")
-              .trim();
-            const parsed = JSON.parse(jsonStr) as MindMapNode;
-
-            if (!parsed.label) {
-              throw new Error("Invalid mind map structure");
-            }
-
-            await completeOutput({
-              ...output,
-              content: raw,
-              mindMap: parsed,
-              status: "completed",
-            });
-          })
-          .catch(failOutput);
-      } else {
-        // Other types: LLM generates text content
-        runWithTools(client, getModel(), instructions, [userMessage], tools)
-          .then(async (response) => {
-            const content = getTextFromContent(response.content);
-            if (!content?.trim()) {
-              throw new Error("Could not generate output");
-            }
-
-            await completeOutput({
-              ...output,
-              content,
-              status: "completed",
-            });
-          })
-          .catch(failOutput);
-      }
+      task
+        .then(async (partial) => {
+          const completed: NotebookOutput = { ...latest, ...partial, status: "completed" };
+          setOutputs((prev) => prev.map((o) => (o.id === output.id ? completed : o)));
+          await store.addOutput(notebookId, completed);
+          void store.touchNotebook(notebookId);
+        })
+        .catch(async (err) => {
+          const errored: NotebookOutput = {
+            ...latest,
+            status: "error",
+            error: err instanceof Error ? err.message : "Generation failed",
+          };
+          setOutputs((prev) => prev.map((o) => (o.id === output.id ? errored : o)));
+          // Persist the failure so it is still visible (and deletable) after a
+          // reload instead of silently disappearing.
+          try {
+            await store.addOutput(notebookId, errored);
+            void store.touchNotebook(notebookId);
+          } catch (persistErr) {
+            console.error("Failed to persist errored output:", persistErr);
+          }
+        });
     },
-    [notebook, sources, client, config, getModel],
+    [notebook, sources, client, getModel],
   );
 
   const deleteOutput = useCallback(
@@ -793,6 +677,16 @@ export function useNotebook(notebookId?: string) {
       if (!notebook) return;
       await store.removeOutput(notebook.id, outputId);
       setOutputs((prev) => prev.filter((o) => o.id !== outputId));
+    },
+    [notebook],
+  );
+
+  const updateOutput = useCallback(
+    async (output: NotebookOutput) => {
+      if (!notebook) return;
+      setOutputs((prev) => prev.map((o) => (o.id === output.id ? output : o)));
+      await store.updateOutput(notebook.id, output);
+      void store.touchNotebook(notebook.id);
     },
     [notebook],
   );
@@ -809,6 +703,7 @@ export function useNotebook(notebookId?: string) {
     isChatting,
 
     initNotebook,
+    resetNotebook,
     updateTitle,
 
     searchWeb,
@@ -818,10 +713,13 @@ export function useNotebook(notebookId?: string) {
     addFileSource,
     addTextSource,
     deleteSource,
+    renameSource,
+    writeSource,
 
     sendMessage,
 
     generateOutput,
+    updateOutput,
     deleteOutput,
   };
 }

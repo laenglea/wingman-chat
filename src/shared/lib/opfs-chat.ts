@@ -22,6 +22,7 @@ import {
   readBlob,
   writeBlob,
 } from "./opfs-core";
+import { lookupContentType } from "./utils";
 
 // ============================================================================
 // Co-located Blob Storage (blobs stored within their parent entity folder)
@@ -77,6 +78,7 @@ export type StoredContent =
 export interface StoredMessage {
   role: "user" | "assistant";
   content: StoredContent[];
+  usage?: Message["usage"];
   error?: { code: string; message: string } | null;
 }
 
@@ -126,7 +128,14 @@ async function rehydrateContentBlobForChat(chatId: string, content: StoredConten
       const blob = await getChatBlob(chatId, blobId);
 
       if (blob) {
-        const dataUrl = await blobToDataUrl(blob);
+        // OPFS never persists the blob's MIME, so re-infer it from the content
+        // name (or a per-type default) and let blobToDataUrl stamp it — never
+        // trust the `.bin` read-back type (see blobToDataUrl).
+        const ext = (content as { name?: string }).name?.split(".").pop() ?? "";
+        const contentType =
+          lookupContentType(ext) ??
+          (content.type === "image" ? "image/png" : content.type === "audio" ? "audio/wav" : undefined);
+        const dataUrl = await blobToDataUrl(blob, contentType);
         return { ...content, data: dataUrl };
       }
       // Blob not found, return with empty data or placeholder
@@ -156,6 +165,7 @@ export async function extractMessageBlobsForChat(chatId: string, message: Messag
   return {
     role: message.role,
     content: extractedContent,
+    usage: message.usage,
     error: message.error,
   };
 }
@@ -169,6 +179,7 @@ export async function rehydrateMessageBlobsForChat(chatId: string, message: Stor
   return {
     role: message.role,
     content: rehydratedContent,
+    usage: message.usage,
     error: message.error,
   };
 }

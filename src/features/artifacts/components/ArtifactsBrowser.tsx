@@ -1,8 +1,12 @@
-import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
-import { ChevronDown, ChevronRight, Edit2, Folder, FolderOpen, MoreVertical, Trash } from "lucide-react";
+import { Download, Edit2, Folder, FolderOpen, MoreVertical, PanelRightClose, Trash, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { FileSystemManager } from "@/features/artifacts/lib/fs";
-import type { FileEntry } from "@/features/artifacts/types/file";
+import type { DriveConfig } from "@/shared/config";
+import { cn } from "@/shared/lib/cn";
+import { notify } from "@/shared/lib/notify";
+import type { FileEntry } from "@/shared/types/file";
+import { DriveIcon } from "@/shared/ui/DriveIcon";
+import { DropdownMenu, DropdownMenuItem, MenuButton } from "@/shared/ui/DropdownMenu";
 import { FileIcon } from "@/shared/ui/FileIcon";
 
 // Helper function to build folder tree structure
@@ -14,64 +18,45 @@ interface FileNode {
   file?: FileEntry;
 }
 
+// Folders before files, then alphabetical by name.
+function compareNodes(a: FileNode, b: FileNode): number {
+  if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+  return a.name.localeCompare(b.name);
+}
+
+function sortTree(nodes: FileNode[]): void {
+  nodes.sort(compareNodes);
+  for (const node of nodes) {
+    if (node.children) sortTree(node.children);
+  }
+}
+
 function buildFileTree(files: FileEntry[]): FileNode[] {
   const tree: FileNode[] = [];
   const folderMap = new Map<string, FileNode>();
 
-  // Sort files by path to ensure consistent ordering
-  const sortedFiles = [...files].sort((a, b) => a.path.localeCompare(b.path));
-
-  for (const file of sortedFiles) {
-    const pathParts = file.path.split("/").filter((part: string) => part.length > 0);
+  for (const file of files) {
+    const pathParts = file.path.split("/").filter((part) => part.length > 0);
     let currentPath = "";
     let currentLevel = tree;
 
-    // Create folder structure
+    // Build the folder chain leading to the file, reusing folders already created.
     for (let i = 0; i < pathParts.length - 1; i++) {
-      const folderName = pathParts[i];
-      currentPath += `/${folderName}`;
-
+      currentPath += `/${pathParts[i]}`;
       let folderNode = folderMap.get(currentPath);
       if (!folderNode) {
-        folderNode = {
-          name: folderName,
-          path: currentPath,
-          type: "folder",
-          children: [],
-        };
+        folderNode = { name: pathParts[i], path: currentPath, type: "folder", children: [] };
         folderMap.set(currentPath, folderNode);
         currentLevel.push(folderNode);
-
-        // Sort folders before files
-        currentLevel.sort((a, b) => {
-          if (a.type === "folder" && b.type === "file") return -1;
-          if (a.type === "file" && b.type === "folder") return 1;
-          return a.name.localeCompare(b.name);
-        });
       }
-
-      const folderChildren = folderNode.children ?? [];
-      folderNode.children = folderChildren;
-      currentLevel = folderChildren;
+      currentLevel = folderNode.children ??= [];
     }
 
-    // Add the file
-    const fileName = pathParts[pathParts.length - 1];
-    currentLevel.push({
-      name: fileName,
-      path: file.path,
-      type: "file",
-      file: file,
-    });
-
-    // Sort the current level again
-    currentLevel.sort((a, b) => {
-      if (a.type === "folder" && b.type === "file") return -1;
-      if (a.type === "file" && b.type === "folder") return 1;
-      return a.name.localeCompare(b.name);
-    });
+    currentLevel.push({ name: pathParts[pathParts.length - 1], path: file.path, type: "file", file });
   }
 
+  // Sort once at the end rather than on every insert.
+  sortTree(tree);
   return tree;
 }
 
@@ -85,6 +70,7 @@ interface FileTreeNodeProps {
   onToggleFolder: (path: string) => void;
   onDeleteFile: (path: string) => void;
   onRenameFile: (path: string) => void;
+  onDownloadFile: (path: string) => void;
 }
 
 function FileTreeNode({
@@ -96,6 +82,7 @@ function FileTreeNode({
   onToggleFolder,
   onDeleteFile,
   onRenameFile,
+  onDownloadFile,
 }: FileTreeNodeProps) {
   const isExpanded = expandedFolders.has(node.path);
 
@@ -104,38 +91,35 @@ function FileTreeNode({
       <>
         <button
           type="button"
-          className="flex w-full items-center gap-2 p-1 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer min-w-0"
-          style={{ marginLeft: `${level * 10}px` }}
+          className="flex w-full items-center gap-1.5 h-7 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer min-w-0"
+          style={{ paddingLeft: `${level * 12 + 12}px` }}
           onClick={() => onToggleFolder(node.path)}
         >
-          <div className="flex items-center gap-1 min-w-0">
-            {isExpanded ? (
-              <ChevronDown size={14} className="text-neutral-500 shrink-0" />
-            ) : (
-              <ChevronRight size={14} className="text-neutral-500 shrink-0" />
-            )}
-            {isExpanded ? (
-              <FolderOpen size={16} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
-            ) : (
-              <Folder size={16} className="text-neutral-500 dark:text-neutral-400 shrink-0" />
-            )}
-            <span className="text-sm text-neutral-700 dark:text-neutral-300 truncate">{node.name}</span>
-          </div>
+          {isExpanded ? (
+            <FolderOpen size={13} className="text-neutral-400 dark:text-neutral-500 shrink-0" />
+          ) : (
+            <Folder size={13} className="text-neutral-400 dark:text-neutral-500 shrink-0" />
+          )}
+          <span className="text-xs text-neutral-600 dark:text-neutral-400 truncate">{node.name}</span>
         </button>
-        {isExpanded &&
-          node.children?.map((child) => (
-            <FileTreeNode
-              key={child.path}
-              node={child}
-              level={level + 1}
-              openTabs={openTabs}
-              onFileClick={onFileClick}
-              expandedFolders={expandedFolders}
-              onToggleFolder={onToggleFolder}
-              onDeleteFile={onDeleteFile}
-              onRenameFile={onRenameFile}
-            />
-          ))}
+        {isExpanded && node.children && node.children.length > 0 && (
+          <div>
+            {node.children.map((child) => (
+              <FileTreeNode
+                key={child.path}
+                node={child}
+                level={level + 1}
+                openTabs={openTabs}
+                onFileClick={onFileClick}
+                expandedFolders={expandedFolders}
+                onToggleFolder={onToggleFolder}
+                onDeleteFile={onDeleteFile}
+                onRenameFile={onRenameFile}
+                onDownloadFile={onDownloadFile}
+              />
+            ))}
+          </div>
+        )}
       </>
     );
   }
@@ -145,57 +129,48 @@ function FileTreeNode({
 
   return (
     <div
-      className="flex items-center gap-1 p-1 hover:bg-black/5 dark:hover:bg-white/5 transition-colors min-w-0 group relative"
-      style={{ marginLeft: `${level * 10 + 14}px` }}
+      className="flex items-center gap-1 h-7 pr-2 hover:bg-black/5 dark:hover:bg-white/5 transition-colors min-w-0 group relative"
+      style={{ paddingLeft: `${level * 12 + 12}px` }}
     >
       <button
         type="button"
         onClick={() => onFileClick(node.path)}
-        className="flex items-center gap-1 flex-1 min-w-0 text-left"
+        className="flex items-center gap-1 flex-1 min-w-0 text-left overflow-hidden"
       >
-        <FileIcon name={node.path} contentType={node.file?.contentType} />
+        <span className="shrink-0">
+          <FileIcon name={node.path} contentType={node.file?.contentType} size={14} />
+        </span>
         <span
-          className={`text-sm truncate ${isTabOpen ? "font-medium text-neutral-900 dark:text-neutral-100" : "text-neutral-700 dark:text-neutral-300"}`}
+          className={cn(
+            "text-xs truncate",
+            isTabOpen ? "font-medium text-neutral-900 dark:text-neutral-100" : "text-neutral-700 dark:text-neutral-300",
+          )}
           title={node.name}
         >
           {node.name}
         </span>
       </button>
-      <Menu>
-        <MenuButton
-          className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 rounded hover:bg-white/30 dark:hover:bg-black/20"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MoreVertical size={14} />
-        </MenuButton>
-        <MenuItems
-          modal={false}
-          transition
-          anchor="bottom end"
-          className="w-32 origin-top-right rounded-md border border-white/20 dark:border-white/15 bg-white/90 dark:bg-black/90 backdrop-blur-lg shadow-lg transition duration-100 ease-out [--anchor-gap:var(--spacing-1)] data-closed:scale-95 data-closed:opacity-0 z-50"
-        >
-          <MenuItem>
-            <button
-              type="button"
-              onClick={() => onRenameFile(node.path)}
-              className="group flex w-full items-center gap-2 rounded-md py-2 px-3 data-focus:bg-neutral-500/10 dark:data-focus:bg-neutral-500/20 text-neutral-600 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
-            >
-              <Edit2 size={14} />
-              Rename
-            </button>
-          </MenuItem>
-          <MenuItem>
-            <button
-              type="button"
-              onClick={() => onDeleteFile(node.path)}
-              className="group flex w-full items-center gap-2 rounded-md py-2 px-3 data-focus:bg-red-500/10 dark:data-focus:bg-red-500/20 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-            >
-              <Trash size={14} />
-              Delete
-            </button>
-          </MenuItem>
-        </MenuItems>
-      </Menu>
+      <DropdownMenu
+        anchor="bottom end"
+        trigger={
+          <MenuButton
+            className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1.5 rounded hover:bg-white/30 dark:hover:bg-black/20"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreVertical size={14} />
+          </MenuButton>
+        }
+      >
+        <DropdownMenuItem icon={<Download size={12} />} onClick={() => onDownloadFile(node.path)}>
+          Download
+        </DropdownMenuItem>
+        <DropdownMenuItem icon={<Edit2 size={12} />} onClick={() => onRenameFile(node.path)}>
+          Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem icon={<Trash size={12} />} destructive onClick={() => onDeleteFile(node.path)}>
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenu>
     </div>
   );
 }
@@ -205,9 +180,29 @@ interface ArtifactsBrowserProps {
   files: FileEntry[];
   openTabs: string[];
   onFileClick: (path: string) => void;
+  drives?: DriveConfig[];
+  isProcessing?: boolean;
+  onUploadLocal?: () => void;
+  onUploadDrive?: (drive: DriveConfig) => void;
+  onDownloadAll?: () => void;
+  onDownloadFile?: (path: string) => void;
+  onClose?: () => void;
 }
 
-export function ArtifactsBrowser({ fs, files, openTabs, onFileClick }: ArtifactsBrowserProps) {
+export function ArtifactsBrowser({
+  fs,
+  files,
+  openTabs,
+  onFileClick,
+  drives = [],
+  isProcessing = false,
+  onUploadLocal,
+  onUploadDrive,
+  onDownloadAll,
+  onDownloadFile,
+  onClose,
+}: ArtifactsBrowserProps) {
+  const hasDrives = drives.length > 0 && !!onUploadDrive;
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -298,7 +293,7 @@ export function ArtifactsBrowser({ fs, files, openTabs, onFileClick }: Artifacts
     if (newPath !== renamingPath) {
       const success = await fs.renameFile(renamingPath, newPath);
       if (!success) {
-        alert("Failed to rename file. A file with that name may already exist.");
+        notify.error("Couldn't rename file", "A file with that name may already exist.");
       }
     }
 
@@ -311,29 +306,119 @@ export function ArtifactsBrowser({ fs, files, openTabs, onFileClick }: Artifacts
     setRenameValue("");
   };
 
+  // Upload + drive entries, shared by the header overflow menu and the bottom button.
+  const uploadMenuItems = (disabled: boolean) => (
+    <>
+      {onUploadLocal && (
+        <DropdownMenuItem icon={<Upload size={16} />} onClick={onUploadLocal} disabled={disabled}>
+          Upload
+        </DropdownMenuItem>
+      )}
+      {hasDrives &&
+        drives.map((drive) => (
+          <DropdownMenuItem
+            key={drive.id}
+            disabled={disabled}
+            icon={<DriveIcon drive={drive} />}
+            onClick={() => onUploadDrive?.(drive)}
+          >
+            {drive.name}
+          </DropdownMenuItem>
+        ))}
+    </>
+  );
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* File list - grows to fill space */}
       <div className="flex-1 overflow-auto min-h-0">
-        {files.length > 0 && (
-          <div className="p-2 min-w-full">
-            {/* Render file tree with folders */}
-            {fileTree.map((node) => (
-              <FileTreeNode
-                key={node.path}
-                node={node}
-                level={0}
-                openTabs={openTabs}
-                onFileClick={onFileClick}
-                expandedFolders={expandedFolders}
-                onToggleFolder={handleToggleFolder}
-                onDeleteFile={handleDeleteFile}
-                onRenameFile={handleRenameFile}
-              />
-            ))}
+        <div className="min-w-full">
+          {/* Root folder row — height matches the editor top bar so the close
+              button lines up with the open button it replaces. */}
+          <div className="flex items-center gap-1 pl-1.5 pr-2 h-12 md:h-10 min-w-0 group">
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                title="Hide files"
+                className="shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                <PanelRightClose size={14} />
+              </button>
+            )}
+            <div className="flex-1" />
+            {(onUploadLocal || hasDrives || onDownloadAll) && (
+              <DropdownMenu
+                anchor="bottom start"
+                trigger={
+                  <MenuButton className="shrink-0 text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 p-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5">
+                    <MoreVertical size={14} />
+                  </MenuButton>
+                }
+              >
+                {uploadMenuItems(isProcessing)}
+                {onDownloadAll && files.length > 0 && (
+                  <DropdownMenuItem icon={<Download size={16} />} onClick={onDownloadAll}>
+                    Download all
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenu>
+            )}
           </div>
-        )}
+
+          {/* Render file tree indented under root */}
+          {fileTree.length > 0 && (
+            <div className="py-1">
+              {fileTree.map((node) => (
+                <FileTreeNode
+                  key={node.path}
+                  node={node}
+                  level={0}
+                  openTabs={openTabs}
+                  onFileClick={onFileClick}
+                  expandedFolders={expandedFolders}
+                  onToggleFolder={handleToggleFolder}
+                  onDeleteFile={handleDeleteFile}
+                  onRenameFile={handleRenameFile}
+                  onDownloadFile={onDownloadFile ?? (() => {})}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Bottom: Upload + Download all */}
+      {(onUploadLocal || hasDrives) && (
+        <div className="@container shrink-0 px-3 py-2">
+          {hasDrives ? (
+            <DropdownMenu
+              anchor="top start"
+              trigger={
+                <MenuButton
+                  disabled={isProcessing}
+                  className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-neutral-600 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors disabled:opacity-50"
+                >
+                  <Upload size={12} className="shrink-0" />
+                  <span className="@max-[160px]:hidden">Upload files</span>
+                </MenuButton>
+              }
+            >
+              {uploadMenuItems(false)}
+            </DropdownMenu>
+          ) : (
+            <button
+              type="button"
+              disabled={isProcessing}
+              onClick={onUploadLocal}
+              className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-neutral-600 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors disabled:opacity-50"
+            >
+              <Upload size={12} className="shrink-0" />
+              <span className="@max-[160px]:hidden">Upload files</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Rename Dialog */}
       {renamingPath && (
@@ -353,7 +438,7 @@ export function ArtifactsBrowser({ fs, files, openTabs, onFileClick }: Artifacts
               onChange={(e) => setRenameValue(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  handleRenameSubmit();
+                  void handleRenameSubmit();
                 } else if (e.key === "Escape") {
                   handleRenameCancel();
                 }

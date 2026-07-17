@@ -1,11 +1,25 @@
-import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  lazyRouteComponent,
+  Outlet,
+  redirect,
+} from "@tanstack/react-router";
 import { ChatPage } from "./features/chat/pages/ChatPage";
-import { NotebookPage } from "./features/notebook/pages/NotebookPage";
-import { CanvasPage } from "./features/canvas/pages/CanvasPage";
-import { OAuthCallbackPage } from "./features/settings/pages/OAuthCallbackPage";
-import { TranslatePage } from "./features/translate/pages/TranslatePage";
 import { getConfig } from "./shared/config";
 import { AppLayout } from "./shell/AppLayout";
+
+// ChatPage is the default landing route, so it stays in the initial bundle.
+// The other pages are loaded on demand — this keeps notebook code, ReactFlow
+// (@xyflow), and translate/canvas out of the initial download.
+const CanvasPage = lazyRouteComponent(() => import("./features/canvas/pages/CanvasPage"), "CanvasPage");
+const NotebookPage = lazyRouteComponent(() => import("./features/notebook/pages/NotebookPage"), "NotebookPage");
+const TranslatePage = lazyRouteComponent(() => import("./features/translate/pages/TranslatePage"), "TranslatePage");
+const OAuthCallbackPage = lazyRouteComponent(
+  () => import("./features/settings/pages/OAuthCallbackPage"),
+  "OAuthCallbackPage",
+);
 
 const hashToRoute: Record<string, string> = {
   chat: "/chat",
@@ -90,13 +104,11 @@ const notebookRoute = createRoute({
   component: NotebookPage,
 });
 
+// Child route — provides the :notebookId param without remounting the parent.
 const notebookIdRoute = createRoute({
-  getParentRoute: () => appLayoutRoute,
-  path: "/notebook/$notebookId",
-  beforeLoad: () => {
-    if (!getConfig().notebook) throw redirect({ to: "/chat" });
-  },
-  component: NotebookPage,
+  getParentRoute: () => notebookRoute,
+  path: "$notebookId",
+  component: () => null,
 });
 
 // OAuth callback route — rendered under bare layout (no app shell)
@@ -114,8 +126,7 @@ const routeTree = rootRoute.addChildren([
     chatIdRoute,
     translateRoute,
     canvasRoute,
-    notebookRoute,
-    notebookIdRoute,
+    notebookRoute.addChildren([notebookIdRoute]),
   ]),
   oauthLayoutRoute.addChildren([oauthCallbackRoute]),
 ]);
