@@ -229,12 +229,10 @@ function createReadTool(source: ReadableFileSource, opts: Required<FileToolsOpti
         },
         startLine: {
           type: ["integer", "null"],
-          minimum: 1,
           description: "Start line number (1-indexed), or null for 1.",
         },
         endLine: {
           type: ["integer", "null"],
-          minimum: 1,
           description: "End line number (1-indexed, inclusive), or null for the default page size.",
         },
       },
@@ -802,8 +800,7 @@ function createGrepTool(source: ReadableFileSource, opts: Required<FileToolsOpti
         },
         contextLines: {
           type: ["integer", "null"],
-          minimum: 0,
-          description: `Context lines before/after match, or null for ${opts.defaultContextLines}.`,
+          description: `Context lines (0 or more) before/after match, or null for ${opts.defaultContextLines}.`,
         },
       },
       required: ["pattern", "filePattern", "ignoreCase", "contextLines"],
